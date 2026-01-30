@@ -5,11 +5,12 @@
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
+    "app": "pnpm --filter sidecar dev & pnpm --filter desktop tauri dev",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "desktop": "pnpm --filter desktop dev",
+    "desktop": "pnpm --filter desktop tauri dev",
     "sidecar": "pnpm --filter sidecar dev"
   },
   "devDependencies": {
