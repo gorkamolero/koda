@@ -1,0 +1,812 @@
+# Koda Build Program
+# OpenProse orchestration for building the review-first agent IDE
+
+# ============================================================================
+# AGENTS
+# ============================================================================
+
+agent captain:
+  model: opus
+  persist: true
+  prompt: """
+    You are the build captain for Koda - the review-first agent IDE.
+    You coordinate phases, verify quality, and make architectural decisions.
+    NEVER implement code directly - delegate to specialists.
+
+    Working directory: /Users/gorkolas/Projects/agent-orchestrator
+    Spec file: ./SPEC.md
+
+    Key insights from research:
+    - Study Superset: Multi-process arch, tRPC over IPC, git worktrees
+    - Study Zed patterns: Rope data structures, background threading, batched IPC
+    - Target 60fps in Tauri (can't match Zed's GPU rendering but can feel snappy)
+
+    Quality standards:
+    - Zero warnings policy (TypeScript, ESLint, Rust clippy)
+    - TDD: Write E2E tests with Playwright FIRST
+    - Use pnpm (not npm/yarn)
+    - Every feature must feel instant
+  """
+
+agent rust_builder:
+  model: sonnet
+  prompt: """
+    You are a Tauri/Rust specialist building the native shell.
+    Working directory: /Users/gorkolas/Projects/agent-orchestrator
+
+    Key patterns from Zed research:
+    - Use `ropey` crate for text handling
+    - Use `notify` crate for file watching with debounced batching
+    - Spawn blocking work with `tokio::task::spawn_blocking`
+    - Keep authoritative state in Rust, send diffs to frontend
+    - Batch related IPC calls
+
+    Standards:
+    - Tauri 2.x with required plugins
+    - Proper error handling with thiserror
+    - Tests with cargo test
+  """
+
+agent react_builder:
+  model: sonnet
+  prompt: """
+    You are a React/TypeScript specialist building the frontend.
+    Working directory: /Users/gorkolas/Projects/agent-orchestrator
+
+    Key patterns from research:
+    - Use @tanstack/react-virtual for virtual lists (file trees, message lists)
+    - Use Jotai or Zustand for atomic state updates
+    - CSS transforms for GPU-accelerated animations
+    - Target 60fps - avoid layout thrashing
+    - Monaco editor for code/diff viewing
+
+    Standards:
+    - React 18+ with hooks
+    - TailwindCSS for styling
+    - Playwright for E2E tests
+    - Zero TypeScript/ESLint warnings
+  """
+
+agent node_builder:
+  model: sonnet
+  prompt: """
+    You are a Node.js specialist building the orchestration sidecar.
+    Working directory: /Users/gorkolas/Projects/agent-orchestrator
+
+    Key patterns from Superset:
+    - Consider tRPC for type-safe IPC (like Superset uses trpc-electron)
+    - Multi-process architecture: sidecar + terminal daemon + PTY subprocesses
+    - Terminal sessions that survive app restarts (daemon mode)
+    - Claude/Codex/Kimi as first-class agents with native UI integration
+
+    Standards:
+    - TypeScript with strict mode
+    - JSON-RPC 2.0 (or tRPC) over Unix sockets
+    - Vitest for testing
+  """
+
+agent db_builder:
+  model: sonnet
+  prompt: """
+    You are a database specialist handling SQLite schema.
+    Working directory: /Users/gorkolas/Projects/agent-orchestrator
+
+    Schema must support:
+    - Multi-git identity (multiple GitHub accounts)
+    - Workspace sharing (collaboration-ready from day 1)
+    - Conversation forking
+    - Visual snapshots (before/after UI)
+    - Git checkpoints per turn
+    - Spec-based workspaces (interview mode → spec)
+
+    Standards:
+    - SQLite via Drizzle ORM (like Superset)
+    - Proper migrations
+    - Foreign key constraints
+    - Indexes for common queries
+  """
+
+# ============================================================================
+# PHASE 1: Core Infrastructure (Tauri + React + Sidecar)
+# ============================================================================
+
+session: captain
+  prompt: """
+    Read ./SPEC.md to understand the full Koda architecture.
+
+    Phase 1 creates the foundation:
+    1. Tauri 2.x app with plugins (fs, shell, sql, http, notification, etc.)
+    2. React frontend with TailwindCSS and router
+    3. Node.js sidecar with Unix socket server
+    4. SQLite database with Drizzle ORM
+    5. Basic IPC tunnel (JSON-RPC or tRPC)
+
+    Key insight: Follow Superset's multi-process pattern - sidecar manages
+    agent processes, frontend just renders.
+
+    List the exact files to create and what can be built in parallel.
+  """
+
+let phase1_plan = resume: captain
+  prompt: "Confirm Phase 1 plan. What's the file structure?"
+
+# Parallel: Tauri + React + Node sidecar scaffolds
+parallel:
+  tauri_scaffold = session: rust_builder
+    prompt: """
+      Initialize Tauri 2.x project:
+
+      1. Create project structure:
+         pnpm create tauri-app@latest . --template react-ts --manager pnpm
+
+      2. Add Tauri plugins to src-tauri/Cargo.toml:
+         - tauri-plugin-fs, tauri-plugin-shell, tauri-plugin-sql
+         - tauri-plugin-http, tauri-plugin-notification
+         - tauri-plugin-window-state, tauri-plugin-dialog, tauri-plugin-opener
+
+      3. Add performance crates:
+         - ropey (text handling)
+         - notify (file watching)
+         - tokio (async runtime)
+
+      4. Configure src-tauri/tauri.conf.json:
+         - App identifier: com.koda.app
+         - Window: 1400x900 default, resizable
+         - Security: Allow localhost:* for dev server
+
+      5. Write basic src-tauri/src/lib.rs with:
+         - Sidecar spawning function
+         - Unix socket connection
+         - Tauri command stubs
+
+      Write tests for Tauri commands before implementing.
+    """
+    context: phase1_plan
+
+  react_scaffold = session: react_builder
+    prompt: """
+      Set up React frontend (in src/ directory created by Tauri):
+
+      1. Configure build tools:
+         - TailwindCSS with proper config
+         - Path aliases (@/ for src/)
+
+      2. Install dependencies:
+         pnpm add @tanstack/react-router @tanstack/react-query
+         pnpm add @tanstack/react-virtual jotai
+         pnpm add @monaco-editor/react xterm xterm-addon-fit
+         pnpm add -D @playwright/test
+
+      3. Create router structure:
+         - / → WorkspaceList
+         - /workspace/:id → WorkspaceView
+         - /settings → Settings
+
+      4. Create base components:
+         - Layout with sidebar
+         - WorkspaceList (empty state)
+         - WorkspaceView (tabs: terminal, diff, chat)
+
+      5. Set up Playwright:
+         - playwright.config.ts
+         - Basic smoke test that app loads
+
+      Run the E2E test to verify setup works.
+    """
+    context: phase1_plan
+
+  sidecar_scaffold = session: node_builder
+    prompt: """
+      Create Node.js sidecar in src-sidecar/ directory:
+
+      1. Initialize:
+         mkdir src-sidecar && cd src-sidecar
+         pnpm init
+         pnpm add typescript tsx @types/node
+         pnpm add zod superjson  # For type-safe RPC
+
+      2. Configure tsconfig.json:
+         - strict mode
+         - ES2022 target
+         - Node16 module resolution
+
+      3. Create src-sidecar/src/index.ts:
+         - Unix socket server on KODA_SOCKET env var
+         - JSON-RPC 2.0 message handling
+         - Basic method stubs: ping, getStatus
+
+      4. Create src-sidecar/src/rpc/router.ts:
+         - Type-safe router pattern
+         - Zod validation for inputs
+
+      5. Write tests:
+         pnpm add -D vitest
+         - Test socket connection
+         - Test RPC message parsing
+    """
+    context: phase1_plan
+
+# Database schema (can run parallel with scaffolds)
+let db_schema = session: db_builder
+  prompt: """
+    Create SQLite schema with Drizzle ORM:
+
+    1. Add Drizzle to sidecar:
+       cd src-sidecar
+       pnpm add drizzle-orm better-sqlite3
+       pnpm add -D drizzle-kit @types/better-sqlite3
+
+    2. Create src-sidecar/src/db/schema.ts with tables from SPEC.md:
+       - users, git_identities
+       - repos, worktrees, workspaces, workspace_shares
+       - sessions, session_messages
+       - diff_comments, visual_snapshots
+       - git_checkpoints, settings
+
+    3. Create drizzle.config.ts
+
+    4. Generate initial migration:
+       pnpm drizzle-kit generate:sqlite
+
+    5. Write test that runs migrations and verifies schema.
+
+    Schema must be collaboration-ready from day 1!
+  """
+  context: phase1_plan
+
+# Sequential: Connect everything
+let ipc_tunnel = session: node_builder
+  prompt: """
+    Connect Tauri ↔ Sidecar via IPC:
+
+    1. In Tauri (src-tauri/src/):
+       - spawn_sidecar() function using Command::new()
+       - connect_to_sidecar() via UnixStream
+       - Tauri commands that forward to sidecar
+
+    2. In sidecar:
+       - Accept connection from Tauri
+       - Handle bidirectional messages
+       - Emit events back to frontend
+
+    3. In React:
+       - Create src/lib/rpc.ts client
+       - Type-safe method calls
+       - Subscribe to sidecar events
+
+    Write integration test that sends message through full pipeline.
+  """
+  context: [tauri_scaffold, react_scaffold, sidecar_scaffold, db_schema]
+
+let phase1_verify = resume: captain
+  prompt: """
+    Verify Phase 1 completion:
+
+    1. pnpm install (all deps installed)
+    2. cargo build (Tauri compiles)
+    3. pnpm build (React builds)
+    4. pnpm test (Playwright E2E passes)
+    5. cargo test (Rust tests pass)
+    6. cd src-sidecar && pnpm test (sidecar tests pass)
+    7. pnpm tauri dev (app launches, connects to sidecar)
+
+    Report any issues. If all passes, summarize Phase 1 deliverables.
+  """
+  context: [tauri_scaffold, react_scaffold, sidecar_scaffold, db_schema, ipc_tunnel]
+
+# ============================================================================
+# PHASE 2: Agent Integration (Claude, Codex, Kimi)
+# ============================================================================
+
+resume: captain
+  prompt: "Begin Phase 2: Agent Integration. Review SPEC.md for handler requirements."
+  context: phase1_verify
+
+parallel:
+  claude_handler = session: node_builder
+    prompt: """
+      Implement Claude handler in src-sidecar/src/agents/claude.ts:
+
+      1. Claude SDK integration:
+         pnpm add @anthropic-ai/claude-agent-sdk
+
+      2. Session management:
+         - start(workspaceId, prompt, options)
+         - resume(sessionId)
+         - cancel(sessionId)
+
+      3. Message streaming:
+         - Parse stream-json output
+         - Forward to frontend via events
+
+      4. Full access to user's Claude setup:
+         - Read ~/.claude/settings.json
+         - Pass skills, hooks, MCP servers
+
+      5. Context tracking:
+         - Track token usage
+         - Emit context_used events
+
+      Write tests for each method.
+    """
+    context: phase1_verify
+
+  codex_handler = session: node_builder
+    prompt: """
+      Implement Codex handler in src-sidecar/src/agents/codex.ts:
+
+      1. OpenAI SDK:
+         pnpm add @openai/codex  # or whatever the CLI package is
+
+      2. Session management (similar to Claude):
+         - start, resume, cancel
+
+      3. Message streaming
+
+      4. Thread management (Codex uses threads)
+
+      Write tests.
+    """
+    context: phase1_verify
+
+  kimi_handler = session: node_builder
+    prompt: """
+      Implement Kimi handler in src-sidecar/src/agents/kimi.ts:
+
+      1. Research Kimi Code CLI installation
+
+      2. Session management (same interface as Claude/Codex)
+
+      3. Message streaming
+
+      Write tests.
+    """
+    context: phase1_verify
+
+# Agent UI integration
+let agent_ui = session: react_builder
+  prompt: """
+    Create agent UI components:
+
+    1. src/components/AgentChat/
+       - MessageList (virtualized with @tanstack/react-virtual)
+       - MessageItem (render streaming text)
+       - InputArea (prompt input, attachments)
+       - ModelSelector (Claude/Codex/Kimi dropdown)
+
+    2. src/components/ContextMeter/
+       - Visual context usage bar
+       - Token count display
+
+    3. Hook up to sidecar events:
+       - Subscribe to 'message' events
+       - Update Jotai atoms
+       - Optimistic UI updates
+
+    Write E2E test that:
+    - Opens workspace
+    - Sends a message (mock agent response)
+    - Verifies message appears
+  """
+  context: [claude_handler, codex_handler, kimi_handler]
+
+let session_persistence = session: db_builder
+  prompt: """
+    Implement session persistence:
+
+    1. CRUD operations in src-sidecar/src/db/sessions.ts:
+       - createSession, getSession, updateSession
+       - addMessage, getMessages
+
+    2. Save full message JSON for replay
+
+    3. Query optimizations:
+       - Index on workspace_id
+       - Pagination for messages
+
+    Write tests.
+  """
+  context: agent_ui
+
+let phase2_verify = resume: captain
+  prompt: """
+    Verify Phase 2:
+
+    1. Can we start a Claude session? (mock if no API key)
+    2. Do messages stream to UI in real-time?
+    3. Are sessions persisted to SQLite?
+    4. Can we switch between Claude/Codex/Kimi?
+
+    Run all tests and report status.
+  """
+  context: [claude_handler, codex_handler, kimi_handler, agent_ui, session_persistence]
+
+# ============================================================================
+# PHASE 3: Review-First Features (Visual Diffs, Monaco, Comments)
+# ============================================================================
+
+resume: captain
+  prompt: """
+    Begin Phase 3: Review-First Features.
+
+    This is the killer differentiator. Focus on:
+    1. Visual diffs (before/after UI screenshots)
+    2. Monaco diff view with inline comments
+    3. File browser (Zed-like snappy)
+  """
+  context: phase2_verify
+
+parallel:
+  visual_diff = session: node_builder
+    prompt: """
+      Implement visual diff engine in src-sidecar/src/visual/:
+
+      1. Add Playwright:
+         pnpm add playwright
+
+      2. Create screenshot capture:
+         - captureScreenshot(url, selector?)
+         - Store in visual_snapshots table
+
+      3. Integration with agent turns:
+         - Before turn: capture "before" state
+         - After turn: capture "after" state
+         - Store both with turn_id
+
+      4. Diff comparison:
+         - Generate pixel diff between before/after
+         - Highlight changed regions
+
+      Write tests.
+    """
+    context: phase2_verify
+
+  monaco_diff = session: react_builder
+    prompt: """
+      Create Monaco diff viewer in src/components/DiffView/:
+
+      1. DiffView component:
+         - Split/unified mode toggle
+         - File tree navigation (left sidebar)
+         - Monaco editor for selected file
+
+      2. Inline comments:
+         - Click line number to add comment
+         - Comment stored in diff_comments table
+         - Comments become agent review items
+
+      3. Visual comparison tab:
+         - Display before/after screenshots
+         - Pixel diff overlay option
+
+      4. Performance:
+         - Virtual list for file tree
+         - Lazy load file contents
+
+      Write E2E tests for diff interactions.
+    """
+    context: phase2_verify
+
+  file_browser = session: react_builder
+    prompt: """
+      Create snappy file browser in src/components/FileExplorer/:
+
+      Key patterns from Zed research:
+      - Virtual list for 60fps scrolling
+      - Lazy load directory contents
+      - Cache file metadata in Rust backend
+
+      1. FileExplorer component:
+         - Tree view with expand/collapse
+         - File icons by extension
+         - Quick open (Cmd+P fuzzy search)
+
+      2. Rust backend support:
+         - readDirectory command (cached)
+         - watchDirectory (notify crate, batched events)
+
+      3. Monaco integration:
+         - Click file → opens in Monaco
+         - Edit → save via Tauri fs
+
+      Write E2E test for file navigation.
+    """
+    context: phase2_verify
+
+let phase3_verify = resume: captain
+  prompt: """
+    Verify Phase 3:
+
+    1. Visual diff captures before/after screenshots
+    2. Monaco diff view shows code changes
+    3. Can add inline comments
+    4. File browser feels instant (60fps)
+
+    Run all tests.
+  """
+  context: [visual_diff, monaco_diff, file_browser]
+
+# ============================================================================
+# PHASE 4: Spec-Based Programming (Interview Mode, Ralph Loop)
+# ============================================================================
+
+resume: captain
+  prompt: """
+    Begin Phase 4: Spec-Based Programming.
+
+    This is the Ralph Wiggum integration:
+    1. Interview mode → spec generation
+    2. Ralph loop orchestration (fresh agents per task)
+    3. OpenProse VM integration
+  """
+  context: phase3_verify
+
+let interview_mode = session: react_builder
+  prompt: """
+    Create interview mode UI in src/components/Interview/:
+
+    1. InterviewMode component:
+       - Series of questions from agent
+       - User answers (text, multiple choice)
+       - Progress indicator
+
+    2. SpecBuilder:
+       - Compile answers into feature spec
+       - Save to workspace.spec_content
+       - Generate fix_plan.md from spec
+
+    3. Workspace type switching:
+       - Toggle workspace_type: standard → spec-driven → ralph
+
+    Write E2E test for interview flow.
+  """
+  context: phase3_verify
+
+let ralph_loop = session: node_builder
+  prompt: """
+    Implement Ralph loop in src-sidecar/src/ralph/:
+
+    The Core Pattern (Fresh Agents):
+    1. Fresh agent sees fix_plan.md
+    2. Agent picks most important task
+    3. Agent completes ONE task
+    4. Handoff to fresh agent with remaining tasks
+    5. Repeat until done
+
+    Implementation:
+    1. parseFixPlan(content) → Task[]
+    2. selectNextTask(tasks) → Task (most important)
+    3. spawnFreshAgent(task, context)
+    4. onComplete(result) → update fix_plan, loop
+
+    Handoff data (what carries over):
+    - Git state (commit hash)
+    - Updated fix_plan.md
+    - Test results
+    - NOT conversation history
+
+    Write tests for loop orchestration.
+  """
+  context: interview_mode
+
+let openprose_vm = session: node_builder
+  prompt: """
+    Integrate OpenProse VM in src-sidecar/src/openprose/:
+
+    1. .prose file parser (basic)
+
+    2. VM executor:
+       - Read .prose file
+       - Execute session statements via agent handlers
+       - Track state in workspace
+
+    3. UI integration:
+       - Show execution flow
+       - Resume from checkpoint
+
+    This is experimental - basic integration is fine.
+
+    Write basic test.
+  """
+  context: ralph_loop
+
+let phase4_verify = resume: captain
+  prompt: """
+    Verify Phase 4:
+
+    1. Interview mode generates spec
+    2. Ralph loop runs with fresh agents
+    3. Tasks get completed and checked off
+    4. OpenProse can run basic .prose files
+
+    Run all tests.
+  """
+  context: [interview_mode, ralph_loop, openprose_vm]
+
+# ============================================================================
+# PHASE 5: Git & Workspace Management
+# ============================================================================
+
+resume: captain
+  prompt: "Begin Phase 5: Git & Workspace Management."
+  context: phase4_verify
+
+parallel:
+  git_identity = session: node_builder
+    prompt: """
+      Implement multi-git identity in src-sidecar/src/git/:
+
+      1. Identity CRUD:
+         - addIdentity(provider, username, token)
+         - listIdentities()
+         - setDefaultIdentity(id)
+
+      2. Per-workspace config:
+         - Configure git user.name/email per worktree
+         - Use correct token for operations
+
+      3. Secure token storage:
+         - Encrypt tokens in SQLite
+         - Use system keychain if available
+
+      Write tests.
+    """
+    context: phase4_verify
+
+  worktree_manager = session: node_builder
+    prompt: """
+      Implement git worktree management (like Superset):
+
+      1. createWorktree(repoId, branch):
+         - git worktree add .worktrees/{branch}
+         - Create workspace record
+
+      2. deleteWorktree(workspaceId):
+         - git worktree remove
+         - Soft delete workspace
+
+      3. Setup/teardown scripts:
+         - Read .koda/config.json
+         - Run setup commands on create
+         - Run teardown on delete
+
+      Write tests.
+    """
+    context: phase4_verify
+
+  checkpoint_system = session: node_builder
+    prompt: """
+      Implement git checkpoint system from SPEC:
+
+      1. saveCheckpoint(workspaceId, turnId):
+         - git write-tree
+         - Store HEAD, index, worktree state
+         - Save to git_checkpoints table
+
+      2. restoreCheckpoint(checkpointId):
+         - git reset --hard
+         - Restore worktree
+         - Restore index
+
+      3. diffCheckpoints(id1, id2):
+         - Show what changed between checkpoints
+
+      This enables undo for agent changes.
+
+      Write tests.
+    """
+    context: phase4_verify
+
+let phase5_verify = resume: captain
+  prompt: """
+    Verify Phase 5:
+
+    1. Can switch git identities per workspace
+    2. Worktrees created/deleted correctly
+    3. Checkpoints save/restore state
+
+    Run all tests.
+  """
+  context: [git_identity, worktree_manager, checkpoint_system]
+
+# ============================================================================
+# PHASE 6: Polish & Production
+# ============================================================================
+
+resume: captain
+  prompt: "Begin Phase 6: Polish & Production."
+  context: phase5_verify
+
+parallel:
+  notifications = session: react_builder
+    prompt: """
+      Implement notifications:
+
+      1. System notifications via tauri-plugin-notification:
+         - Agent finished
+         - Agent needs approval
+         - Error occurred
+
+      2. In-app toast notifications
+
+      3. Sounds (optional, add later)
+
+      Write test.
+    """
+    context: phase5_verify
+
+  session_recording = session: node_builder
+    prompt: """
+      Implement session recording:
+
+      1. Record all agent interactions
+      2. Playback UI (like a video)
+      3. Store recordings efficiently
+
+      Basic implementation is fine - this is P2.
+    """
+    context: phase5_verify
+
+  keyboard_shortcuts = session: react_builder
+    prompt: """
+      Add keyboard shortcuts:
+
+      1. Cmd+Enter - send message
+      2. Cmd+K - command palette
+      3. Cmd+P - quick open file
+      4. Cmd+B - toggle sidebar
+      5. Cmd+1/2/3 - switch tabs
+
+      Write tests.
+    """
+    context: phase5_verify
+
+let final_integration = session: react_builder
+  prompt: """
+    Full integration testing:
+
+    E2E flow:
+    1. Add repository
+    2. Create workspace (worktree)
+    3. Enter interview mode → generate spec
+    4. Start Ralph loop
+    5. Review diffs as agent works
+    6. Add comment on diff
+    7. Agent addresses comment
+    8. Create checkpoint
+    9. View before/after UI diff
+    10. Complete spec
+
+    Fix any issues found.
+  """
+  context: { notifications, session_recording, keyboard_shortcuts }
+
+# ============================================================================
+# FINAL VERIFICATION
+# ============================================================================
+
+output build_result = resume: captain
+  prompt: """
+    FINAL BUILD VERIFICATION
+
+    Run comprehensive checks:
+    1. pnpm install (clean install)
+    2. cargo build --release
+    3. pnpm build
+    4. pnpm test (all Playwright E2E tests)
+    5. cargo test (all Rust tests)
+    6. cd src-sidecar && pnpm test
+    7. pnpm lint (zero warnings)
+    8. cargo clippy (zero warnings)
+    9. pnpm tauri build (create release binary)
+
+    Produce final report:
+    - Lines of code by language
+    - Test count and coverage
+    - Bundle size
+    - Known issues (if any)
+    - What's ready for MVP vs Phase 2
+
+    If all checks pass, Koda MVP is COMPLETE.
+  """
+  context: [phase1_verify, phase2_verify, phase3_verify, phase4_verify, phase5_verify, final_integration]

@@ -1,0 +1,36 @@
+{
+  "name": "@koda/sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js orchestration sidecar for Koda",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc && cp -r src/db/migrations dist/db/",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "^0.92.0",
+    "better-sqlite3": "^9.2.2",
+    "drizzle-orm": "^0.45.1",
+    "playwright": "^1.58.1",
+    "superjson": "^2.2.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.11.5",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+}
