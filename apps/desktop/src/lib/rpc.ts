@@ -40,16 +40,32 @@ export const RPC_METHODS = {
   // Health
   PING: 'ping',
   GET_STATUS: 'getStatus',
+  // Repos
+  REPO_CREATE: 'repo.create',
+  REPO_GET: 'repo.get',
+  REPO_LIST: 'repo.list',
+  REPO_DELETE: 'repo.delete',
   // Workspaces
   WORKSPACE_LIST: 'workspace.list',
   WORKSPACE_CREATE: 'workspace.create',
   WORKSPACE_GET: 'workspace.get',
+  // Worktrees
+  WORKTREE_CREATE: 'worktree.create',
+  WORKTREE_DELETE: 'worktree.delete',
+  WORKTREE_GET: 'worktree.get',
+  WORKTREE_LIST: 'worktree.list',
   // Claude agent
   CLAUDE_START: 'claude.start',
   CLAUDE_RESUME: 'claude.resume',
   CLAUDE_CANCEL: 'claude.cancel',
   CLAUDE_GET_SESSION: 'claude.getSession',
   CLAUDE_GET_MESSAGES: 'claude.getMessages',
+  // Checkpoints
+  CHECKPOINT_SAVE: 'checkpoint.save',
+  CHECKPOINT_RESTORE: 'checkpoint.restore',
+  CHECKPOINT_DIFF: 'checkpoint.diff',
+  CHECKPOINT_GET: 'checkpoint.get',
+  CHECKPOINT_LIST: 'checkpoint.list',
 } as const
 
 /**
@@ -68,6 +84,64 @@ export interface HealthResponse {
   status: 'ok'
   timestamp: number
   version: string
+}
+
+/**
+ * Repo types - aligned with sidecar schema
+ */
+export interface Repo {
+  id: string
+  rootPath: string
+  name?: string
+  remoteUrl?: string
+  defaultBranch?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateRepoParams {
+  rootPath: string
+  name?: string
+  remoteUrl?: string
+  defaultBranch?: string
+}
+
+export interface CreateWorktreeParams {
+  repoId: string
+  branch: string
+  fromBranch?: string
+}
+
+export interface WorktreeResult {
+  id: string
+  repositoryId?: string
+  directoryName: string
+  branch?: string
+  workspaceType?: string
+  worktreePath?: string
+  setupError?: string
+}
+
+/**
+ * Checkpoint types
+ */
+export interface CheckpointDiff {
+  files: FileDiff[]
+  summary: DiffSummary
+}
+
+export interface FileDiff {
+  path: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+  diff?: string
+  additions?: number
+  deletions?: number
+}
+
+export interface DiffSummary {
+  filesChanged: number
+  additions: number
+  deletions: number
 }
 
 /**

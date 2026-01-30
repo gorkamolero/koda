@@ -24,7 +24,6 @@ import {
   deleteRepo,
   CreateRepoSchema,
   GetRepoSchema,
-  ListReposSchema,
   DeleteRepoSchema,
 } from './handlers/repo.js';
 
@@ -134,6 +133,12 @@ function registerMethods() {
   // Health checks
   router.register('ping', ping);
   router.register('getStatus', getStatus);
+
+  // Repos
+  router.register('repo.create', createRepo, CreateRepoSchema);
+  router.register('repo.get', getRepo, GetRepoSchema);
+  router.register('repo.list', listRepos);
+  router.register('repo.delete', deleteRepo, DeleteRepoSchema);
 
   // Workspaces
   router.register('workspace.create', createWorkspace, CreateWorkspaceSchema);
