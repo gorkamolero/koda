@@ -15,6 +15,11 @@ import {
   type ListWorkspacesParams,
   type SidecarStatus,
   type HealthResponse,
+  type Repo,
+  type CreateRepoParams,
+  type CreateWorktreeParams,
+  type WorktreeResult,
+  type CheckpointDiff,
 } from '@/lib/rpc'
 
 /**
@@ -160,5 +165,146 @@ export function useCreateWorkspace() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
     },
+  })
+}
+
+// ============================================================================
+// Repo Hooks
+// ============================================================================
+
+/**
+ * List all registered repos
+ */
+export function useRepos() {
+  return useQuery({
+    queryKey: ['repos'],
+    queryFn: () => rpcRequest<Repo[]>(RPC_METHODS.REPO_LIST),
+    retry: false,
+  })
+}
+
+/**
+ * Get a single repo
+ */
+export function useRepo(id: string) {
+  return useQuery({
+    queryKey: ['repo', id],
+    queryFn: () => rpcRequest<Repo>(RPC_METHODS.REPO_GET, { id }),
+    enabled: !!id,
+    retry: false,
+  })
+}
+
+/**
+ * Register a new repo
+ */
+export function useCreateRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: CreateRepoParams) =>
+      rpcRequest<Repo>(RPC_METHODS.REPO_CREATE, params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['repos'] })
+    },
+  })
+}
+
+/**
+ * Delete a repo
+ */
+export function useDeleteRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      rpcRequest<{ success: boolean }>(RPC_METHODS.REPO_DELETE, { id }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['repos'] })
+    },
+  })
+}
+
+// ============================================================================
+// Worktree Hooks
+// ============================================================================
+
+/**
+ * Create a worktree (creates workspace + git worktree)
+ */
+export function useCreateWorktree() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: CreateWorktreeParams) =>
+      rpcRequest<WorktreeResult>(RPC_METHODS.WORKTREE_CREATE, params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+    },
+  })
+}
+
+/**
+ * List worktrees for a repo
+ */
+export function useWorktrees(repoId: string) {
+  return useQuery({
+    queryKey: ['worktrees', repoId],
+    queryFn: () => rpcRequest<Workspace[]>(RPC_METHODS.WORKTREE_LIST, { repoId }),
+    enabled: !!repoId,
+    retry: false,
+  })
+}
+
+/**
+ * Delete a worktree
+ */
+export function useDeleteWorktree() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { workspaceId: string; deleteBranch?: boolean }) =>
+      rpcRequest<Workspace>(RPC_METHODS.WORKTREE_DELETE, params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+    },
+  })
+}
+
+// ============================================================================
+// Checkpoint Hooks
+// ============================================================================
+
+/**
+ * Get diff between two checkpoints
+ */
+export function useCheckpointDiff(checkpointId1: string, checkpointId2: string, repoPath: string) {
+  return useQuery({
+    queryKey: ['checkpoint-diff', checkpointId1, checkpointId2],
+    queryFn: () =>
+      rpcRequest<CheckpointDiff>(RPC_METHODS.CHECKPOINT_DIFF, {
+        checkpointId1,
+        checkpointId2,
+        repoPath,
+      }),
+    enabled: !!checkpointId1 && !!checkpointId2 && !!repoPath,
+    retry: false,
+  })
+}
+
+/**
+ * List checkpoints for a workspace
+ */
+export function useCheckpoints(workspaceId: string) {
+  return useQuery({
+    queryKey: ['checkpoints', workspaceId],
+    queryFn: () =>
+      rpcRequest<{ id: string; turnId: string; createdAt: string }[]>(
+        RPC_METHODS.CHECKPOINT_LIST,
+        { workspaceId }
+      ),
+    enabled: !!workspaceId,
+    retry: false,
   })
 }
