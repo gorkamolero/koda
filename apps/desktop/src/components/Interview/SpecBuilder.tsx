@@ -7,7 +7,6 @@ interface SpecBuilderProps {
   workspaceId: string
   initialSpec: string
   initialFixPlan: string
-  mockMode?: boolean
   onBack: () => void
   onDone: () => void
 }
@@ -19,7 +18,6 @@ export function SpecBuilder({
   workspaceId,
   initialSpec,
   initialFixPlan,
-  mockMode = false,
   onBack,
   onDone,
 }: SpecBuilderProps) {
@@ -56,18 +54,13 @@ export function SpecBuilder({
     setError(null)
 
     try {
-      if (mockMode) {
-        // Mock mode for E2E tests
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      } else {
-        // Save spec and fix plan to workspace via RPC
-        await rpcRequest('workspace.update', {
-          id: workspaceId,
-          specContent: spec,
-          fixPlanContent: fixPlan,
-          workspaceType: 'spec-driven',
-        })
-      }
+      // Save spec and fix plan to workspace via RPC
+      await rpcRequest('workspace.update', {
+        id: workspaceId,
+        specContent: spec,
+        fixPlanContent: fixPlan,
+        workspaceType: 'spec-driven',
+      })
 
       setIsSaved(true)
     } catch (err) {
@@ -77,7 +70,7 @@ export function SpecBuilder({
     } finally {
       setIsSaving(false)
     }
-  }, [workspaceId, spec, fixPlan, mockMode])
+  }, [workspaceId, spec, fixPlan])
 
   if (isSaved) {
     return (

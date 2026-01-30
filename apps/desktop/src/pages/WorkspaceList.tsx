@@ -108,7 +108,7 @@ export function WorkspaceList() {
           </p>
         </div>
         <button
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => { setIsCreateOpen(true); }}
           className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors"
         >
           New Workspace
@@ -137,7 +137,7 @@ export function WorkspaceList() {
                       {repos.map((repo) => (
                         <button
                           key={repo.id}
-                          onClick={() => handleRepoSelect(repo.id)}
+                          onClick={() => { handleRepoSelect(repo.id); }}
                           className="w-full text-left p-3 border border-border rounded-md hover:border-primary hover:bg-accent/50 transition-colors"
                         >
                           <div className="font-medium">{repo.name}</div>
@@ -190,7 +190,7 @@ export function WorkspaceList() {
                     <input
                       type="text"
                       value={branchName}
-                      onChange={(e) => setBranchName(e.target.value)}
+                      onChange={(e) => { setBranchName(e.target.value); }}
                       placeholder="feature/my-feature"
                       className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       autoFocus
@@ -207,7 +207,7 @@ export function WorkspaceList() {
                 
                 <div className="flex justify-between mt-6">
                   <button
-                    onClick={() => setCreateMode('repo')}
+                    onClick={() => { setCreateMode('repo'); }}
                     className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Back
@@ -240,7 +240,7 @@ export function WorkspaceList() {
           {workspaces.map((workspace) => (
             <button
               key={workspace.id}
-              onClick={() => handleWorkspaceClick(workspace)}
+              onClick={() => { handleWorkspaceClick(workspace); }}
               className="text-left p-4 border border-border rounded-lg hover:border-primary hover:bg-accent/50 transition-colors"
             >
               <h3 className="font-medium text-primary">{workspace.directoryName}</h3>
@@ -280,7 +280,7 @@ export function WorkspaceList() {
               Select a git repository and create a branch to start working with agents.
             </p>
             <button
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => { setIsCreateOpen(true); }}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors"
             >
               New Workspace

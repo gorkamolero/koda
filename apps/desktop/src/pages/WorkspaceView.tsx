@@ -15,6 +15,7 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useWorkspace } from '@/hooks/useRpc'
 
 type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec'
 
@@ -24,8 +25,8 @@ export function WorkspaceView() {
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const sidebarVisible = useAtomValue(sidebarVisibleAtom)
 
-  // Check if we're in mock mode for E2E tests
-  const mockMode = (search as { mock?: boolean }).mock === true
+  // Fetch workspace data to get the real path
+  const { data: workspace } = useWorkspace(id)
 
   // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
@@ -45,8 +46,10 @@ export function WorkspaceView() {
     }
   }, [startMode])
 
-  // Workspace root path (mock or real)
-  const rootPath = mockMode ? '/workspace' : `/Users/workspace-${id}`
+  // Get real workspace path from worktree
+  const rootPath = workspace?.directoryName
+    ? `/Users/gorkolas/.koda/worktrees/${workspace.directoryName}`
+    : ''
 
   // Build tabs based on workspace type
   const getTabs = (): { id: Tab; label: string }[] => {
@@ -84,14 +87,6 @@ export function WorkspaceView() {
     tabCount: tabs.length,
   })
 
-  // Mock workspace data for E2E tests
-  const mockSpecContent = mockMode
-    ? '# Feature Specification\n\nMock spec content for testing.'
-    : null
-  const mockFixPlanContent = mockMode
-    ? '# Fix Plan\n\n[ ] Task 1\n[ ] Task 2'
-    : null
-
   return (
     <div className="h-full flex flex-col">
       {/* Command Palette (global) */}
@@ -108,7 +103,6 @@ export function WorkspaceView() {
           <div className="flex items-center gap-2">
             <WorkspaceTypeSelector
               workspaceId={id}
-              mockMode={mockMode}
             />
             <button className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 transition-colors">
               Open in VS Code
@@ -145,34 +139,25 @@ export function WorkspaceView() {
 
       <div className="flex-1 overflow-hidden bg-secondary/10">
         {activeTab === 'chat' && (
-          <AgentChat workspaceId={id} mockMode={mockMode} />
+          <AgentChat workspaceId={id} />
         )}
 
         {activeTab === 'spec' && workspaceType === 'spec-driven' && (
-          <SpecDrivenView
-            workspaceId={id}
-            mockMode={mockMode}
-            specContent={mockSpecContent}
-          />
+          <SpecDrivenView workspaceId={id} />
         )}
 
         {activeTab === 'spec' && workspaceType === 'ralph' && (
-          <RalphView
-            workspaceId={id}
-            mockMode={mockMode}
-            specContent={mockSpecContent}
-            fixPlanContent={mockFixPlanContent}
-          />
+          <RalphView workspaceId={id} />
         )}
 
         {/* Show interview mode directly when in interview mode param */}
         {activeTab === 'spec' &&
           startMode === 'interview' &&
           workspaceType === 'standard' && (
-            <InterviewMode workspaceId={id} mockMode={mockMode} />
+            <InterviewMode workspaceId={id} />
           )}
 
-        {activeTab === 'files' && (
+        {activeTab === 'files' && rootPath && (
           <div className="h-full flex">
             {/* File explorer sidebar */}
             {sidebarVisible && (
@@ -180,19 +165,19 @@ export function WorkspaceView() {
                 data-testid="file-explorer-sidebar"
                 className="w-64 border-r border-border h-full overflow-hidden"
               >
-                <FileExplorer rootPath={rootPath} mockMode={mockMode} />
+                <FileExplorer rootPath={rootPath} />
               </div>
             )}
 
             {/* Editor area */}
             <div className="flex-1 h-full overflow-hidden">
-              <Editor mockMode={mockMode} />
+              <Editor />
             </div>
           </div>
         )}
 
         {activeTab === 'diff' && (
-          <DiffView workspaceId={id} mockMode={mockMode} />
+          <DiffView workspaceId={id} />
         )}
 
         {activeTab === 'terminal' && (

@@ -9,7 +9,6 @@ import { rpcRequest } from '@/lib/tauri'
 
 interface WorkspaceTypeSelectorProps {
   workspaceId: string
-  mockMode?: boolean
   onTypeChange?: (type: WorkspaceType) => void
 }
 
@@ -18,7 +17,6 @@ interface WorkspaceTypeSelectorProps {
  */
 export function WorkspaceTypeSelector({
   workspaceId,
-  mockMode = false,
   onTypeChange,
 }: WorkspaceTypeSelectorProps) {
   const [workspaceType, setWorkspaceType] = useAtom(workspaceTypeAtom)
@@ -53,20 +51,14 @@ export function WorkspaceTypeSelector({
       setIsUpdating(true)
 
       try {
-        // In mock mode, skip RPC and just update local state
-        if (mockMode) {
-          setWorkspaceType(type)
-          onTypeChange?.(type)
-        } else {
-          // Update workspace type via RPC
-          await rpcRequest('workspace.update', {
-            id: workspaceId,
-            workspaceType: type,
-          })
-          // Only update local state after successful RPC
-          setWorkspaceType(type)
-          onTypeChange?.(type)
-        }
+        // Update workspace type via RPC
+        await rpcRequest('workspace.update', {
+          id: workspaceId,
+          workspaceType: type,
+        })
+        // Only update local state after successful RPC
+        setWorkspaceType(type)
+        onTypeChange?.(type)
       } catch (error) {
         console.error('Failed to update workspace type:', error)
         // In case of RPC error, don't update local state
@@ -75,7 +67,7 @@ export function WorkspaceTypeSelector({
         setIsOpen(false)
       }
     },
-    [workspaceId, workspaceType, mockMode, setWorkspaceType, onTypeChange]
+    [workspaceId, workspaceType, setWorkspaceType, onTypeChange]
   )
 
   const currentType = WORKSPACE_TYPES.find((t) => t.id === workspaceType)

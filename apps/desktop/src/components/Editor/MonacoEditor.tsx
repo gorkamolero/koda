@@ -10,19 +10,15 @@ import {
 import { useFileSystem } from '@/hooks/useFileSystem'
 import type { editor } from 'monaco-editor'
 
-interface MonacoEditorProps {
-  mockMode?: boolean
-}
-
 /**
  * Monaco editor component for file editing
  */
-export function MonacoEditor({ mockMode = false }: MonacoEditorProps) {
+export function MonacoEditor() {
   const openFiles = useAtomValue(openFilesAtom)
   const activeFilePath = useAtomValue(activeFilePathAtom)
   const updateFileContent = useSetAtom(updateFileContentAtom)
   const markFileDirty = useSetAtom(markFileDirtyAtom)
-  const { writeFile } = useFileSystem({ mockMode })
+  const { writeFile } = useFileSystem()
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const activeFilePathRef = useRef(activeFilePath)
