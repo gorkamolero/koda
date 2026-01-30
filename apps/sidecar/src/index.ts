@@ -16,6 +16,18 @@ import {
   GetWorkspaceSchema,
 } from './handlers/workspace.js';
 
+// Import repo handlers
+import {
+  createRepo,
+  getRepo,
+  listRepos,
+  deleteRepo,
+  CreateRepoSchema,
+  GetRepoSchema,
+  ListReposSchema,
+  DeleteRepoSchema,
+} from './handlers/repo.js';
+
 // Import Codex agent handlers
 import {
   startCodexSession,
