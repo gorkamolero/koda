@@ -1,10 +1,9 @@
 import { useState } from 'react'
+import { useWorkspace } from '@/hooks/useRpc'
 import { InterviewMode } from './InterviewMode'
 
 interface SpecDrivenViewProps {
   workspaceId: string
-  mockMode?: boolean
-  specContent?: string | null
   onStartInterview?: () => void
 }
 
@@ -12,18 +11,17 @@ interface SpecDrivenViewProps {
  * View for spec-driven workspace mode
  * Shows interview button or current spec content
  */
-export function SpecDrivenView({
-  workspaceId,
-  mockMode = false,
-  specContent,
-}: SpecDrivenViewProps) {
+export function SpecDrivenView({ workspaceId }: SpecDrivenViewProps) {
   const [isInterviewing, setIsInterviewing] = useState(false)
+  const { data: workspace } = useWorkspace(workspaceId)
+
+  // Get spec content from workspace if available
+  const specContent = (workspace as { specContent?: string })?.specContent
 
   if (isInterviewing) {
     return (
       <InterviewMode
         workspaceId={workspaceId}
-        mockMode={mockMode}
         onComplete={() => { setIsInterviewing(false) }}
       />
     )

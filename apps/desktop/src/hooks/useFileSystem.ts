@@ -2,10 +2,6 @@ import { useState, useCallback, useRef } from 'react'
 import { readDir, readTextFile, writeTextFile, type DirEntry } from '@tauri-apps/plugin-fs'
 import type { FileEntry } from '@/store/fileExplorer'
 
-interface UseFileSystemOptions {
-  mockMode?: boolean
-}
-
 interface UseFileSystemReturn {
   readDirectory: (path: string) => Promise<FileEntry[]>
   readFile: (path: string) => Promise<string>
@@ -15,90 +11,9 @@ interface UseFileSystemReturn {
 }
 
 /**
- * Mock file tree for E2E tests
- */
-const MOCK_FILE_TREE: FileEntry[] = [
-  {
-    name: 'src',
-    path: '/workspace/src',
-    type: 'directory',
-    children: [
-      {
-        name: 'index.ts',
-        path: '/workspace/src/index.ts',
-        type: 'file',
-      },
-      {
-        name: 'styles.css',
-        path: '/workspace/src/styles.css',
-        type: 'file',
-      },
-      {
-        name: 'components',
-        path: '/workspace/src/components',
-        type: 'directory',
-        children: [
-          {
-            name: 'App.tsx',
-            path: '/workspace/src/components/App.tsx',
-            type: 'file',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: 'package.json',
-    path: '/workspace/package.json',
-    type: 'file',
-  },
-  {
-    name: 'README.md',
-    path: '/workspace/README.md',
-    type: 'file',
-  },
-]
-
-/**
- * Mock file contents for E2E tests
- */
-const MOCK_FILE_CONTENTS: Record<string, string> = {
-  '/workspace/src/index.ts': `import { App } from './components/App'
-
-export function main() {
-  console.log('Hello, world!')
-}
-`,
-  '/workspace/src/styles.css': `body {
-  margin: 0;
-  padding: 0;
-  font-family: sans-serif;
-}
-`,
-  '/workspace/src/components/App.tsx': `import React from 'react'
-
-export function App() {
-  return <div>Hello, App!</div>
-}
-`,
-  '/workspace/package.json': `{
-  "name": "test-workspace",
-  "version": "1.0.0"
-}
-`,
-  '/workspace/README.md': `# Test Workspace
-
-This is a test workspace.
-`,
-}
-
-/**
  * Hook for file system operations with Tauri fs plugin
- * Supports mock mode for E2E tests
  */
-export function useFileSystem({
-  mockMode = false,
-}: UseFileSystemOptions = {}): UseFileSystemReturn {
+export function useFileSystem(): UseFileSystemReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -122,14 +37,6 @@ export function useFileSystem({
    */
   const readDirectory = useCallback(
     async (path: string): Promise<FileEntry[]> => {
-      // Mock mode for E2E tests
-      if (mockMode) {
-        setIsLoading(true)
-        await new Promise((resolve) => setTimeout(resolve, 100)) // Simulate latency
-        setIsLoading(false)
-        return MOCK_FILE_TREE
-      }
-
       // Check cache
       const cached = cache.current.get(path)
       if (cached) {
@@ -163,56 +70,39 @@ export function useFileSystem({
         setIsLoading(false)
       }
     },
-    [mockMode, convertDirEntry]
+    [convertDirEntry]
   )
 
   /**
    * Read file contents
    */
-  const readFile = useCallback(
-    async (path: string): Promise<string> => {
-      // Mock mode
-      if (mockMode) {
-        return MOCK_FILE_CONTENTS[path] ?? '// File not found'
-      }
+  const readFile = useCallback(async (path: string): Promise<string> => {
+    setError(null)
 
-      setError(null)
-
-      try {
-        const content = await readTextFile(path)
-        return content
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        setError(`Failed to read file: ${message}`)
-        return ''
-      }
-    },
-    [mockMode]
-  )
+    try {
+      const content = await readTextFile(path)
+      return content
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError(`Failed to read file: ${message}`)
+      return ''
+    }
+  }, [])
 
   /**
    * Write file contents
    */
-  const writeFile = useCallback(
-    async (path: string, content: string): Promise<void> => {
-      // Mock mode
-      if (mockMode) {
-        MOCK_FILE_CONTENTS[path] = content
-        return
-      }
+  const writeFile = useCallback(async (path: string, content: string): Promise<void> => {
+    setError(null)
 
-      setError(null)
-
-      try {
-        await writeTextFile(path, content)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        setError(`Failed to write file: ${message}`)
-        throw err
-      }
-    },
-    [mockMode]
-  )
+    try {
+      await writeTextFile(path, content)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError(`Failed to write file: ${message}`)
+      throw err
+    }
+  }, [])
 
   return {
     readDirectory,

@@ -13,18 +13,17 @@ import { useFileSystem } from '@/hooks/useFileSystem'
 
 interface FileExplorerProps {
   rootPath: string
-  mockMode?: boolean
 }
 
 /**
  * Main file explorer component
  * Provides tree view with lazy loading, virtual list, and quick open
  */
-export function FileExplorer({ rootPath, mockMode = false }: FileExplorerProps) {
+export function FileExplorer({ rootPath }: FileExplorerProps) {
   const [, setFileTree] = useAtom(fileTreeAtom)
   const setRootPath = useSetAtom(rootPathAtom)
   const openFile = useSetAtom(openFileAtom)
-  const { readDirectory, readFile, isLoading, error } = useFileSystem({ mockMode })
+  const { readDirectory, readFile, isLoading, error } = useFileSystem()
 
   // Load root directory on mount
   useEffect(() => {

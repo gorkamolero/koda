@@ -4,7 +4,6 @@ import { SpecBuilder } from './SpecBuilder'
 
 interface InterviewCompleteProps {
   workspaceId: string
-  mockMode?: boolean
   onBack: () => void
   onDone: () => void
 }
@@ -14,7 +13,6 @@ interface InterviewCompleteProps {
  */
 export function InterviewComplete({
   workspaceId,
-  mockMode = false,
   onBack,
   onDone,
 }: InterviewCompleteProps) {
@@ -39,7 +37,6 @@ export function InterviewComplete({
           workspaceId={workspaceId}
           initialSpec={generatedSpec ?? ''}
           initialFixPlan={generatedFixPlan ?? ''}
-          mockMode={mockMode}
           onBack={onBack}
           onDone={onDone}
         />

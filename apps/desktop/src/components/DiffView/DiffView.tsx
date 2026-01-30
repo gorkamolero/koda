@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
 import {
   diffFilesAtom,
@@ -6,8 +6,11 @@ import {
   selectedFileIdAtom,
   activeTabAtom,
   activeCommentInputAtom,
+  isLoadingAtom,
   type DiffFile,
 } from '@/store/diff'
+import { useCheckpoints, useCheckpointDiff, useWorkspace } from '@/hooks/useRpc'
+import { parseUnifiedDiff, getExtension, extensionToLanguage } from '@/lib/diffParser'
 import { FileTree } from './FileTree'
 import { DiffEditor } from './DiffEditor'
 import { InlineComments } from './InlineComments'
@@ -16,15 +19,13 @@ import { VisualComparison } from './VisualComparison'
 interface DiffViewProps {
   /** Workspace ID for loading diff data */
   workspaceId: string
-  /** Optional mock mode for testing */
-  mockMode?: boolean
 }
 
 /**
  * Main diff view component
  * Displays file tree, Monaco diff editor, and visual comparison
  */
-export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
+export function DiffView({ workspaceId }: DiffViewProps) {
   const setFiles = useSetAtom(diffFilesAtom)
   const selectedFileId = useAtomValue(selectedFileIdAtom)
   const setSelectedFileId = useSetAtom(selectedFileIdAtom)
@@ -33,26 +34,90 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
   const activeTab = useAtomValue(activeTabAtom)
   const setActiveTab = useSetAtom(activeTabAtom)
   const setActiveCommentInput = useSetAtom(activeCommentInputAtom)
+  const setIsLoading = useSetAtom(isLoadingAtom)
+  const isLoading = useAtomValue(isLoadingAtom)
 
-  // Load diff data on mount
-  useEffect(() => {
-    if (mockMode) {
-      // Load mock data for testing
-      setFiles(generateMockDiffFiles())
-    } else {
-      // TODO: Load real diff data from API
-      void loadDiffData(workspaceId).then(setFiles)
-    }
-  }, [workspaceId, mockMode, setFiles])
+  // Fetch workspace data
+  const { data: workspace } = useWorkspace(workspaceId)
 
-  // Select first file automatically
+  // Fetch checkpoints for this workspace
+  const { data: checkpoints, isLoading: loadingCheckpoints } = useCheckpoints(workspaceId)
+
+  // Get the two most recent checkpoints for diffing
+  const [checkpoint1Id, checkpoint2Id] = useMemo(() => {
+    if (!checkpoints || checkpoints.length < 2) return [null, null]
+    // Sort by creation time descending
+    const sorted = [...checkpoints].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    // Compare second most recent to most recent (to show what changed)
+    return [sorted[1]?.id ?? null, sorted[0]?.id ?? null]
+  }, [checkpoints])
+
+  // Get the worktree path from workspace
+  const repoPath = workspace?.directoryName
+    ? `/Users/gorkolas/.koda/worktrees/${workspace.directoryName}`
+    : ''
+
+  // Fetch the diff between checkpoints
+  const {
+    data: diffData,
+    isLoading: loadingDiff,
+    error: diffError,
+  } = useCheckpointDiff(
+    checkpoint1Id ?? '',
+    checkpoint2Id ?? '',
+    repoPath
+  )
+
+  // Convert checkpoint diff to DiffFile format
   useEffect(() => {
-    const files = generateMockDiffFiles()
-    const firstFile = files[0]
-    if (firstFile && !selectedFileId) {
-      setSelectedFileId(firstFile.id)
+    if (loadingCheckpoints || loadingDiff) {
+      setIsLoading(true)
+      return
     }
-  }, [selectedFileId, setSelectedFileId])
+
+    setIsLoading(false)
+
+    if (!diffData || !diffData.files.length) {
+      setFiles([])
+      return
+    }
+
+    // Convert FileDiff[] to DiffFile[]
+    const diffFiles: DiffFile[] = diffData.files.map((file, index) => {
+      const { originalContent, modifiedContent } = parseUnifiedDiff(file.diff)
+      const ext = getExtension(file.path)
+      const filename = file.path.split('/').pop() ?? file.path
+
+      return {
+        id: `file_${String(index)}`,
+        path: file.path,
+        filename,
+        status: file.status,
+        additions: file.additions ?? 0,
+        deletions: file.deletions ?? 0,
+        originalContent,
+        modifiedContent,
+        language: extensionToLanguage(ext),
+      }
+    })
+
+    setFiles(diffFiles)
+
+    // Auto-select first file if none selected
+    if (!selectedFileId && diffFiles.length > 0 && diffFiles[0]) {
+      setSelectedFileId(diffFiles[0].id)
+    }
+  }, [
+    diffData,
+    loadingCheckpoints,
+    loadingDiff,
+    setFiles,
+    setIsLoading,
+    selectedFileId,
+    setSelectedFileId,
+  ])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -93,7 +158,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => { window.removeEventListener('keydown', handleKeyDown) }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [
     selectedFileId,
     diffMode,
@@ -116,6 +183,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
     [selectedFileId, setActiveCommentInput]
   )
 
+  // Show empty state when no checkpoints
+  const hasNoCheckpoints = !loadingCheckpoints && (!checkpoints || checkpoints.length < 2)
+
   return (
     <div className="h-full flex" data-testid="diff-view-container">
       {/* File tree sidebar */}
@@ -131,7 +201,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => { setActiveTab('code') }}
+              onClick={() => {
+                setActiveTab('code')
+              }}
               className={`
                 px-3 py-1.5 text-sm rounded-md transition-colors
                 ${activeTab === 'code' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
@@ -141,7 +213,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('visual') }}
+              onClick={() => {
+                setActiveTab('visual')
+              }}
               className={`
                 px-3 py-1.5 text-sm rounded-md transition-colors
                 ${activeTab === 'visual' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
@@ -160,7 +234,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
             >
               <button
                 type="button"
-                onClick={() => { setDiffMode('split') }}
+                onClick={() => {
+                  setDiffMode('split')
+                }}
                 className={`
                   px-3 py-1 text-xs font-medium rounded transition-colors
                   ${diffMode === 'split' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
@@ -172,7 +248,9 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
               </button>
               <button
                 type="button"
-                onClick={() => { setDiffMode('unified') }}
+                onClick={() => {
+                  setDiffMode('unified')
+                }}
                 className={`
                   px-3 py-1 text-xs font-medium rounded transition-colors
                   ${diffMode === 'unified' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
@@ -188,218 +266,99 @@ export function DiffView({ workspaceId, mockMode = false }: DiffViewProps) {
 
         {/* Content area */}
         <div className="flex-1 relative overflow-hidden">
-          {activeTab === 'code' ? (
+          {/* Loading state */}
+          {isLoading && (
+            <div className="h-full flex items-center justify-center">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <svg
+                  className="w-5 h-5 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <span className="text-sm">Loading diff...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error state */}
+          {diffError && !isLoading && (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <svg
+                  className="w-12 h-12 mx-auto mb-4 text-destructive/50"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <p className="text-sm">Failed to load diff</p>
+                <p className="text-xs mt-1 text-destructive">
+                  {diffError instanceof Error ? diffError.message : 'Unknown error'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* No checkpoints state */}
+          {hasNoCheckpoints && !isLoading && !diffError && (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <svg
+                  className="w-16 h-16 mx-auto mb-4 opacity-30"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <p className="text-sm">No changes to show yet</p>
+                <p className="text-xs mt-1">
+                  Agent changes will appear here after the first turn
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Main content */}
+          {!isLoading && !diffError && !hasNoCheckpoints && (
             <>
-              <DiffEditor onLineClick={handleLineClick} />
-              <InlineComments />
+              {activeTab === 'code' ? (
+                <>
+                  <DiffEditor onLineClick={handleLineClick} />
+                  <InlineComments />
+                </>
+              ) : (
+                <VisualComparison />
+              )}
             </>
-          ) : (
-            <VisualComparison />
           )}
         </div>
       </div>
     </div>
   )
-}
-
-/**
- * Load diff data from API (placeholder)
- */
-function loadDiffData(_workspaceId: string): Promise<DiffFile[]> {
-  // TODO: Implement actual API call
-  return Promise.resolve(generateMockDiffFiles())
-}
-
-/**
- * Generate mock diff files for testing
- */
-function generateMockDiffFiles(): DiffFile[] {
-  return [
-    {
-      id: 'file_1',
-      path: 'src/components/Button.tsx',
-      filename: 'Button.tsx',
-      status: 'modified',
-      additions: 15,
-      deletions: 8,
-      language: 'typescript',
-      originalContent: `import { ButtonHTMLAttributes } from 'react'
-
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary'
-}
-
-export function Button({ variant = 'primary', children, ...props }: ButtonProps) {
-  return (
-    <button
-      className={\`btn btn-\${variant}\`}
-      {...props}
-    >
-      {children}
-    </button>
-  )
-}`,
-      modifiedContent: `import { ButtonHTMLAttributes, forwardRef } from 'react'
-
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost'
-  size?: 'sm' | 'md' | 'lg'
-  isLoading?: boolean
-}
-
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', isLoading, children, disabled, ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={\`btn btn-\${variant} btn-\${size}\`}
-        disabled={disabled || isLoading}
-        {...props}
-      >
-        {isLoading ? <Spinner /> : children}
-      </button>
-    )
-  }
-)
-
-Button.displayName = 'Button'`,
-      hasVisualDiff: true,
-      screenshotBefore: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50"><rect fill="%23333" width="200" height="50"/><text x="50%" y="50%" fill="white" text-anchor="middle" dominant-baseline="middle">Before</text></svg>',
-      screenshotAfter: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50"><rect fill="%23666" width="200" height="50"/><text x="50%" y="50%" fill="white" text-anchor="middle" dominant-baseline="middle">After</text></svg>',
-    },
-    {
-      id: 'file_2',
-      path: 'src/components/Input.tsx',
-      filename: 'Input.tsx',
-      status: 'added',
-      additions: 25,
-      deletions: 0,
-      language: 'typescript',
-      originalContent: '',
-      modifiedContent: `import { InputHTMLAttributes, forwardRef } from 'react'
-
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string
-  error?: string
-}
-
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className, ...props }, ref) => {
-    return (
-      <div className="input-wrapper">
-        {label && <label className="input-label">{label}</label>}
-        <input
-          ref={ref}
-          className={\`input \${error ? 'input-error' : ''} \${className || ''}\`}
-          {...props}
-        />
-        {error && <span className="input-error-message">{error}</span>}
-      </div>
-    )
-  }
-)
-
-Input.displayName = 'Input'`,
-    },
-    {
-      id: 'file_3',
-      path: 'src/hooks/useForm.ts',
-      filename: 'useForm.ts',
-      status: 'modified',
-      additions: 10,
-      deletions: 5,
-      language: 'typescript',
-      originalContent: `import { useState, useCallback } from 'react'
-
-export function useForm<T>(initialValues: T) {
-  const [values, setValues] = useState(initialValues)
-
-  const handleChange = useCallback((name: keyof T, value: T[keyof T]) => {
-    setValues(prev => ({ ...prev, [name]: value }))
-  }, [])
-
-  return { values, handleChange }
-}`,
-      modifiedContent: `import { useState, useCallback, useMemo } from 'react'
-
-interface UseFormOptions<T> {
-  initialValues: T
-  validate?: (values: T) => Partial<Record<keyof T, string>>
-}
-
-export function useForm<T>({ initialValues, validate }: UseFormOptions<T>) {
-  const [values, setValues] = useState(initialValues)
-  const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({})
-
-  const errors = useMemo(() => validate?.(values) ?? {}, [values, validate])
-
-  const handleChange = useCallback((name: keyof T, value: T[keyof T]) => {
-    setValues(prev => ({ ...prev, [name]: value }))
-  }, [])
-
-  const handleBlur = useCallback((name: keyof T) => {
-    setTouched(prev => ({ ...prev, [name]: true }))
-  }, [])
-
-  return { values, errors, touched, handleChange, handleBlur }
-}`,
-    },
-    {
-      id: 'file_4',
-      path: 'src/utils/helpers.ts',
-      filename: 'helpers.ts',
-      status: 'deleted',
-      additions: 0,
-      deletions: 12,
-      language: 'typescript',
-      originalContent: `export function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-export function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}`,
-      modifiedContent: '',
-    },
-    {
-      id: 'file_5',
-      path: 'src/styles/theme.css',
-      filename: 'theme.css',
-      status: 'modified',
-      additions: 20,
-      deletions: 10,
-      language: 'css',
-      originalContent: `:root {
-  --primary: #007bff;
-  --secondary: #6c757d;
-  --background: #ffffff;
-  --text: #212529;
-}`,
-      modifiedContent: `:root {
-  --primary: hsl(217, 91%, 60%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(210, 11%, 71%);
-  --secondary-foreground: hsl(222, 47%, 11%);
-  --background: hsl(0, 0%, 100%);
-  --foreground: hsl(222, 47%, 11%);
-  --muted: hsl(210, 40%, 96%);
-  --muted-foreground: hsl(215, 16%, 47%);
-  --accent: hsl(210, 40%, 96%);
-  --accent-foreground: hsl(222, 47%, 11%);
-  --border: hsl(214, 32%, 91%);
-  --radius: 0.5rem;
-}
-
-.dark {
-  --primary: hsl(217, 91%, 60%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --background: hsl(222, 47%, 11%);
-  --foreground: hsl(210, 40%, 98%);
-}`,
-    },
-  ]
 }

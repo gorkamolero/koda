@@ -17,7 +17,6 @@ import { InterviewComplete } from './InterviewComplete'
 
 interface InterviewModeProps {
   workspaceId: string
-  mockMode?: boolean
   onComplete?: () => void
 }
 
@@ -26,7 +25,6 @@ interface InterviewModeProps {
  */
 export function InterviewMode({
   workspaceId,
-  mockMode = false,
   onComplete,
 }: InterviewModeProps) {
   const setCurrentWorkspaceId = useSetAtom(currentInterviewWorkspaceIdAtom)
@@ -75,7 +73,6 @@ export function InterviewMode({
     return (
       <InterviewComplete
         workspaceId={workspaceId}
-        mockMode={mockMode}
         onBack={handleBack}
         onDone={handleComplete}
       />

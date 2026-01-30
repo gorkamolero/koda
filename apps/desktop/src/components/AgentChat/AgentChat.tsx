@@ -24,15 +24,13 @@ import { ContextMeter } from '@/components/ContextMeter'
 
 interface AgentChatProps {
   workspaceId: string
-  /** Optional mock mode for testing */
-  mockMode?: boolean
 }
 
 /**
  * Main agent chat component
  * Combines MessageList, InputArea, ModelSelector, and ContextMeter
  */
-export function AgentChat({ workspaceId, mockMode = false }: AgentChatProps) {
+export function AgentChat({ workspaceId }: AgentChatProps) {
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
   const addMessage = useSetAtom(addMessageAtom)
   const updateMessage = useSetAtom(updateMessageAtom)
@@ -152,34 +150,7 @@ export function AgentChat({ workspaceId, mockMode = false }: AgentChatProps) {
         model: selectedModel,
       })
 
-      if (mockMode) {
-        // Mock mode for E2E tests
-        setIsStreaming(true)
-
-        const messageId = generateMessageId()
-        currentMessageIdRef.current = messageId
-        addMessage({
-          role: 'assistant',
-          content: '',
-          status: 'streaming',
-          model: selectedModel,
-        })
-
-        await new Promise((resolve) => setTimeout(resolve, 500))
-
-        updateMessage({
-          id: messageId,
-          update: {
-            content: 'Mock agent response',
-            status: 'complete',
-          },
-        })
-
-        setIsStreaming(false)
-        return
-      }
-
-      // Real implementation - call sidecar
+      // Call sidecar to start Claude session
       setIsStreaming(true)
       accumulatedTextRef.current = ''
       messageIndexRef.current = 0
@@ -222,7 +193,7 @@ export function AgentChat({ workspaceId, mockMode = false }: AgentChatProps) {
         })
       }
     },
-    [mockMode, selectedModel, workspaceId, setIsStreaming, addMessage, updateMessage, pollMessages]
+    [selectedModel, workspaceId, setIsStreaming, addMessage, pollMessages]
   )
 
   return (

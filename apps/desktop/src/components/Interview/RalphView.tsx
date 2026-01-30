@@ -1,30 +1,27 @@
 import { useState } from 'react'
+import { useWorkspace } from '@/hooks/useRpc'
 import { InterviewMode } from './InterviewMode'
 
 interface RalphViewProps {
   workspaceId: string
-  mockMode?: boolean
-  specContent?: string | null
-  fixPlanContent?: string | null
 }
 
 /**
  * View for Ralph autonomous agent mode
  * Shows both spec and fix plan sections
  */
-export function RalphView({
-  workspaceId,
-  mockMode = false,
-  specContent,
-  fixPlanContent,
-}: RalphViewProps) {
+export function RalphView({ workspaceId }: RalphViewProps) {
   const [isInterviewing, setIsInterviewing] = useState(false)
+  const { data: workspace } = useWorkspace(workspaceId)
+
+  // Get spec and fix plan content from workspace if available
+  const specContent = (workspace as { specContent?: string })?.specContent
+  const fixPlanContent = (workspace as { fixPlanContent?: string })?.fixPlanContent
 
   if (isInterviewing) {
     return (
       <InterviewMode
         workspaceId={workspaceId}
-        mockMode={mockMode}
         onComplete={() => { setIsInterviewing(false) }}
       />
     )
