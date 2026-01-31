@@ -55,6 +55,9 @@ export const RPC_METHODS = {
   WORKTREE_DELETE: 'worktree.delete',
   WORKTREE_GET: 'worktree.get',
   WORKTREE_LIST: 'worktree.list',
+  // Sessions
+  SESSION_LIST: 'session.list',
+  SESSION_CREATE: 'session.create',
   // Claude agent
   CLAUDE_START: 'claude.start',
   CLAUDE_RESUME: 'claude.resume',

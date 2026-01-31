@@ -6,6 +6,7 @@ import { FileExplorer } from '@/components/FileExplorer'
 import { Editor } from '@/components/Editor'
 import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
+import { SessionSidebar } from '@/components/SessionSidebar'
 import {
   WorkspaceTypeSelector,
   InterviewMode,
@@ -15,7 +16,7 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useWorkspace } from '@/hooks/useRpc'
+import { useWorkspace, useSessions, useCreateSession } from '@/hooks/useRpc'
 
 type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec'
 
@@ -27,6 +28,23 @@ export function WorkspaceView() {
 
   // Fetch workspace data to get the real path
   const { data: workspace } = useWorkspace(id)
+
+  // Fetch sessions for this workspace
+  const { data: sessions, isLoading: loadingSessions } = useSessions(id)
+  const createSessionMutation = useCreateSession()
+
+  // Active session tracking
+  const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
+
+  // Set initial active session when sessions load
+  useEffect(() => {
+    if (sessions && sessions.length > 0 && !activeSessionId) {
+      // Select the most recent session or the first running one
+      const runningSession = sessions.find((s) => s.status === 'running')
+      const mostRecentSession = sessions[0]
+      setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
+    }
+  }, [sessions, activeSessionId])
 
   // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
@@ -87,6 +105,18 @@ export function WorkspaceView() {
     tabCount: tabs.length,
   })
 
+  // Handle new session creation
+  const handleNewSession = (model: string) => {
+    createSessionMutation.mutate(
+      { workspaceId: id, model },
+      {
+        onSuccess: (newSession) => {
+          setActiveSessionId(newSession.id)
+        },
+      }
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Command Palette (global) */}
@@ -96,7 +126,7 @@ export function WorkspaceView() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-lg font-semibold text-primary">
-              Workspace {id}
+              {workspace?.branch ?? workspace?.directoryName ?? `Workspace ${id}`}
             </h1>
             <p className="text-sm text-muted-foreground">{rootPath}</p>
           </div>
@@ -139,7 +169,24 @@ export function WorkspaceView() {
 
       <div className="flex-1 overflow-hidden bg-secondary/10">
         {activeTab === 'chat' && (
-          <AgentChat workspaceId={id} />
+          <div className="h-full flex">
+            {/* Session Sidebar */}
+            <div className="w-64 border-r border-border h-full overflow-hidden flex-shrink-0">
+              <SessionSidebar
+                workspace={workspace}
+                sessions={sessions ?? []}
+                activeSessionId={activeSessionId}
+                isLoading={loadingSessions}
+                onSessionSelect={setActiveSessionId}
+                onNewSession={handleNewSession}
+              />
+            </div>
+
+            {/* Chat Area */}
+            <div className="flex-1 h-full overflow-hidden">
+              <AgentChat workspaceId={id} sessionId={activeSessionId} />
+            </div>
+          </div>
         )}
 
         {activeTab === 'spec' && workspaceType === 'spec-driven' && (

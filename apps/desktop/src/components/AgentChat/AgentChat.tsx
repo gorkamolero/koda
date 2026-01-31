@@ -26,13 +26,16 @@ import { useNotifications } from '@/hooks/useNotifications'
 
 interface AgentChatProps {
   workspaceId: string
+  sessionId?: string
 }
 
 /**
  * Main agent chat component
  * Combines MessageList, InputArea, ModelSelector, and ContextMeter
  */
-export function AgentChat({ workspaceId }: AgentChatProps) {
+export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps) {
+  // TODO: Use sessionId to scope messages to specific session
+  void _sessionId
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
   const addMessage = useSetAtom(addMessageAtom)
   const updateMessage = useSetAtom(updateMessageAtom)
