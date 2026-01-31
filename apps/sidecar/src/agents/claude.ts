@@ -230,6 +230,16 @@ export class ClaudeHandler extends EventEmitter {
   }
 
   /**
+   * Build environment for Claude CLI - removes ANTHROPIC_API_KEY so Claude uses subscription auth
+   */
+  private buildEnv(): NodeJS.ProcessEnv {
+    const env = { ...globalThis.process.env };
+    delete env.ANTHROPIC_API_KEY;
+    env.CLAUDE_CODE_OUTPUT_FORMAT = 'stream-json';
+    return env;
+  }
+
+  /**
    * Start a new Claude session
    */
   async start(params: ClaudeStartParams): Promise<ClaudeStartResult> {
@@ -238,11 +248,7 @@ export class ClaudeHandler extends EventEmitter {
 
     const childProcess = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...globalThis.process.env,
-        // Ensure Claude uses JSON output
-        CLAUDE_CODE_OUTPUT_FORMAT: 'stream-json',
-      },
+      env: this.buildEnv(),
     });
 
     const session: ClaudeSession = {
@@ -284,10 +290,7 @@ export class ClaudeHandler extends EventEmitter {
 
     const newProcess = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...globalThis.process.env,
-        CLAUDE_CODE_OUTPUT_FORMAT: 'stream-json',
-      },
+      env: this.buildEnv(),
     });
 
     // Update session
@@ -388,7 +391,7 @@ export class ClaudeHandler extends EventEmitter {
    * Build CLI arguments for starting a session
    */
   private buildCliArgs(prompt: string, options?: ClaudeSessionOptions): string[] {
-    const args: string[] = ['--print', '--output-format', 'stream-json'];
+    const args: string[] = ['--print', '--output-format', 'stream-json', '--verbose'];
 
     if (options?.workingDirectory) {
       args.push('--cwd', options.workingDirectory);
@@ -414,8 +417,8 @@ export class ClaudeHandler extends EventEmitter {
       args.push('--dangerously-skip-permissions');
     }
 
-    // Add the prompt at the end
-    args.push('--prompt', prompt);
+    // Add the prompt as positional argument at the end
+    args.push(prompt);
 
     return args;
   }
@@ -424,7 +427,7 @@ export class ClaudeHandler extends EventEmitter {
    * Build CLI arguments for resuming a session
    */
   private buildResumeArgs(sessionId: string, prompt?: string, options?: ClaudeSessionOptions): string[] {
-    const args: string[] = ['--print', '--output-format', 'stream-json', '--resume', sessionId];
+    const args: string[] = ['--print', '--output-format', 'stream-json', '--verbose', '--resume', sessionId];
 
     if (options?.workingDirectory) {
       args.push('--cwd', options.workingDirectory);
@@ -435,7 +438,8 @@ export class ClaudeHandler extends EventEmitter {
     }
 
     if (prompt) {
-      args.push('--prompt', prompt);
+      // Add prompt as positional argument
+      args.push(prompt);
     }
 
     return args;

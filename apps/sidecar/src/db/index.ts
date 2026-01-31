@@ -7,8 +7,17 @@ import * as os from 'node:os';
 
 /**
  * Get the database path based on platform
+ * If KODA_TEST_DB env var is set, use that path instead (for E2E tests)
  */
 export function getDbPath(): string {
+  // Check for test database override
+  if (process.env.KODA_TEST_DB) {
+    const testDbPath = process.env.KODA_TEST_DB;
+    const testDbDir = path.dirname(testDbPath);
+    fs.mkdirSync(testDbDir, { recursive: true });
+    return testDbPath;
+  }
+
   const platform = os.platform();
 
   if (platform === 'darwin') {

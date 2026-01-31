@@ -526,8 +526,8 @@ Begin working on: "${task.title}"`;
       args.push('--system-prompt', this.config.agentOptions.systemPrompt);
     }
 
-    // Add the prompt
-    args.push('--prompt', prompt);
+    // Add the prompt as positional argument
+    args.push(prompt);
 
     return args;
   }
