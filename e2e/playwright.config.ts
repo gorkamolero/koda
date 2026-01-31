@@ -58,6 +58,7 @@ export default defineConfig({
 
   projects: [
     // Setup project - runs first to seed test data
+    // No browser needed for seeding - just runs the seed script
     {
       name: 'setup',
       testMatch: /seed\.setup\.ts/,

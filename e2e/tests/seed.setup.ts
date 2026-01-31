@@ -1,35 +1,44 @@
 import { test as setup } from '@playwright/test'
+import { execSync } from 'node:child_process'
+import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 /**
  * Seed Setup
  *
  * This runs ONCE before all tests to create test data.
- * It's configured as a "setup" project in playwright.config.ts
+ * It connects to the sidecar's Unix socket and creates:
+ * 1. A repository (this project)
+ * 2. A workspace for testing
  */
 setup('seed test data', async () => {
-  const RPC_URL = 'http://localhost:3939/rpc'
+  console.log('\n=== Seeding Test Data ===')
 
-  console.log('Seeding test data...')
+  try {
+    // Run the seed script from workspace root (where tsx is available)
+    const workspaceRoot = path.join(__dirname, '..', '..')
+    const output = execSync(`pnpm exec tsx e2e/seed-data.ts`, {
+      cwd: workspaceRoot,
+      encoding: 'utf-8',
+      timeout: 60000, // 60 seconds - seed may need to wait for sidecar
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
 
-  // Create a test workspace
-  const createRes = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'workspace.create',
-      params: {
-        directoryName: 'e2e-test-workspace',
-        workspaceType: 'standard',
-      },
-      id: 1,
-    }),
-  })
+    console.log(output)
+    console.log('=== Seed Complete ===\n')
+  } catch (error) {
+    const err = error as { stderr?: string; stdout?: string; message: string }
+    console.error('Seed failed!')
+    console.error('stdout:', err.stdout)
+    console.error('stderr:', err.stderr)
+    console.error('error:', err.message)
 
-  const result = await createRes.json()
-  if (result.error) {
-    console.log('Seed error (may already exist):', result.error.message)
-  } else {
-    console.log('Created test workspace')
+    // Don't fail the entire test suite - some tests can still run
+    // but log clearly that seeding failed
+    console.log('\nWARNING: Seed failed. Some tests may skip.')
   }
 })

@@ -1,7 +1,7 @@
 /**
  * Seed Test Data Script
  *
- * Connects to the sidecar's Unix socket and creates test data
+ * Connects to the sidecar (via HTTP or Unix socket) and creates test data
  * (repo + workspace) for E2E tests.
  *
  * Usage: npx tsx seed-data.ts
@@ -11,12 +11,16 @@ import * as net from 'node:net'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import * as fs from 'node:fs'
+import * as http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// HTTP port for RPC (sidecar runs HTTP server in dev mode)
+const HTTP_PORT = process.env.KODA_HTTP_PORT || '3847'
 
 // Socket path - matches what the app uses
 function getSocketPath(): string {
@@ -40,8 +44,78 @@ function getSocketPath(): string {
   throw new Error(`Unsupported platform: ${platform}`)
 }
 
-// JSON-RPC client
-class RpcClient {
+// JSON-RPC client interface
+interface RpcClient {
+  call<T>(method: string, params?: unknown): Promise<T>
+  close(): void
+}
+
+// HTTP RPC client (for E2E tests where socket may not be accessible)
+class HttpRpcClient implements RpcClient {
+  private baseUrl: string
+  private nextId = 1
+
+  constructor(port: string | number) {
+    this.baseUrl = `http://localhost:${port}/rpc`
+  }
+
+  async call<T>(method: string, params?: unknown): Promise<T> {
+    const id = this.nextId++
+    const request = {
+      jsonrpc: '2.0',
+      method,
+      params: params ?? null,
+      id,
+    }
+
+    return new Promise((resolve, reject) => {
+      const url = new URL(this.baseUrl)
+      const options: http.RequestOptions = {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      }
+
+      const req = http.request(options, (res) => {
+        let data = ''
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data)
+            if (response.error) {
+              reject(new Error(response.error.message))
+            } else {
+              resolve(response.result as T)
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse response: ${data}`))
+          }
+        })
+      })
+
+      req.on('error', reject)
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error(`HTTP request to ${method} timed out`))
+      })
+
+      req.write(JSON.stringify(request))
+      req.end()
+    })
+  }
+
+  close(): void {
+    // HTTP doesn't need cleanup
+  }
+}
+
+// Socket RPC client
+class SocketRpcClient implements RpcClient {
   private socket: net.Socket | null = null
   private buffer = ''
   private pendingRequests = new Map<
@@ -200,39 +274,55 @@ These files demonstrate the diff view functionality.
 }
 
 /**
- * Wait for sidecar to be ready with retries
+ * Try to connect via HTTP first, then fall back to socket
  */
-async function waitForSidecar(
-  client: RpcClient,
-  socketPath: string,
-  maxRetries = 30,
-  retryDelay = 1000
-): Promise<void> {
+async function getClient(): Promise<RpcClient> {
+  // Try HTTP first (more reliable for E2E tests)
+  const httpClient = new HttpRpcClient(HTTP_PORT)
+  try {
+    // Test connection with a ping
+    await httpClient.call('ping')
+    console.log(`Connected via HTTP on port ${HTTP_PORT}`)
+    return httpClient
+  } catch (httpError) {
+    console.log(`HTTP connection failed: ${httpError}`)
+  }
+
+  // Fall back to socket
+  const socketPath = getSocketPath()
+  console.log(`Trying socket connection: ${socketPath}`)
+  
+  const socketClient = new SocketRpcClient()
+  
+  // Wait for sidecar with retries
+  const maxRetries = 30
+  const retryDelay = 1000
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await client.connect(socketPath)
-      return
+      await socketClient.connect(socketPath)
+      return socketClient
     } catch (error) {
       if (attempt === maxRetries) {
-        throw error
+        throw new Error(`Failed to connect via HTTP (port ${HTTP_PORT}) or socket (${socketPath})`)
       }
-      console.log(
-        `Waiting for sidecar (attempt ${attempt}/${maxRetries})...`
-      )
+      console.log(`Waiting for sidecar (attempt ${attempt}/${maxRetries})...`)
       await new Promise((resolve) => setTimeout(resolve, retryDelay))
     }
   }
+  
+  throw new Error('Failed to connect to sidecar')
 }
 
 async function main() {
-  const socketPath = getSocketPath()
-  console.log(`Seeding test data via socket: ${socketPath}`)
+  console.log(`Seeding test data...`)
+  console.log(`HTTP port: ${HTTP_PORT}`)
+  console.log(`Socket: ${getSocketPath()}`)
 
-  const client = new RpcClient()
+  let client: RpcClient | null = null
 
   try {
-    // Wait for sidecar to be ready (it may still be starting up)
-    await waitForSidecar(client, socketPath)
+    client = await getClient()
 
     // Check existing repos
     const repos = await client.call<Repo[]>('repo.list')
@@ -313,7 +403,7 @@ async function main() {
     console.error('Seed failed:', error)
     process.exit(1)
   } finally {
-    client.close()
+    client?.close()
   }
 }
 
