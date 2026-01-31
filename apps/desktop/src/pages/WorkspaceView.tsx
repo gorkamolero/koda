@@ -7,6 +7,7 @@ import { Editor } from '@/components/Editor'
 import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
+import { TerminalPanel } from '@/components/Terminal'
 import {
   InterviewMode,
   SpecDrivenView,
@@ -159,12 +160,7 @@ export function WorkspaceView() {
         )}
 
         {activeTab === 'terminal' && (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <p className="text-sm">Terminal coming soon</p>
-              <p className="text-xs mt-2">xterm.js integration with pty support</p>
-            </div>
-          </div>
+          <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
         )}
       </div>
     </div>
