@@ -6,7 +6,6 @@ import { FileExplorer } from '@/components/FileExplorer'
 import { Editor } from '@/components/Editor'
 import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
-import { SessionSidebar } from '@/components/SessionSidebar'
 import {
   WorkspaceTypeSelector,
   InterviewMode,
@@ -16,7 +15,7 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useWorkspace, useSessions, useCreateSession } from '@/hooks/useRpc'
+import { useWorkspace, useSessions } from '@/hooks/useRpc'
 
 type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec'
 
@@ -30,8 +29,7 @@ export function WorkspaceView() {
   const { data: workspace } = useWorkspace(id)
 
   // Fetch sessions for this workspace
-  const { data: sessions, isLoading: loadingSessions } = useSessions(id)
-  const createSessionMutation = useCreateSession()
+  const { data: sessions } = useSessions(id)
 
   // Active session tracking
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
@@ -105,18 +103,6 @@ export function WorkspaceView() {
     tabCount: tabs.length,
   })
 
-  // Handle new session creation
-  const handleNewSession = (model: string) => {
-    createSessionMutation.mutate(
-      { workspaceId: id, model },
-      {
-        onSuccess: (newSession) => {
-          setActiveSessionId(newSession.id)
-        },
-      }
-    )
-  }
-
   return (
     <div className="h-full flex flex-col">
       {/* Command Palette (global) */}
@@ -169,23 +155,8 @@ export function WorkspaceView() {
 
       <div className="flex-1 overflow-hidden bg-secondary/10">
         {activeTab === 'chat' && (
-          <div className="h-full flex">
-            {/* Session Sidebar */}
-            <div className="w-64 border-r border-border h-full overflow-hidden flex-shrink-0">
-              <SessionSidebar
-                workspace={workspace}
-                sessions={sessions ?? []}
-                activeSessionId={activeSessionId}
-                isLoading={loadingSessions}
-                onSessionSelect={setActiveSessionId}
-                onNewSession={handleNewSession}
-              />
-            </div>
-
-            {/* Chat Area */}
-            <div className="flex-1 h-full overflow-hidden">
-              <AgentChat workspaceId={id} sessionId={activeSessionId} />
-            </div>
+          <div className="h-full">
+            <AgentChat workspaceId={id} sessionId={activeSessionId} />
           </div>
         )}
 

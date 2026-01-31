@@ -16,7 +16,6 @@ import {
   type ClaudeSessionInfo,
   type StoredMessage,
   type ClaudeGetMessagesParams,
-  type ClaudeMessageContent,
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
@@ -78,16 +77,15 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
       for (const msg of messages) {
         messageIndexRef.current = msg.index + 1
 
-        // Process the event
+        // Process the event based on Claude stream-json format
         const event = msg.event
 
-        if (event.type === 'assistant' && event.message?.content) {
-          // Extract text from content array (stream-json format)
-          const textContent = event.message.content.find(
-            (c: ClaudeMessageContent) => c.type === 'text'
-          )
-          if (textContent?.text) {
-            accumulatedTextRef.current += textContent.text
+        // Handle assistant messages (streaming text content)
+        if (event.type === 'assistant') {
+          // Stream-json format: message has 'text' directly, not content array
+          const message = event.message as { type?: string; text?: string } | undefined
+          if (message?.text) {
+            accumulatedTextRef.current += message.text
 
             if (currentMessageIdRef.current) {
               updateMessage({
@@ -100,22 +98,26 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
             }
           }
         } else if (event.type === 'result') {
-          // Check for errors (billing, auth, etc.)
-          if (event.is_error && event.result) {
+          // Session complete - result contains final text if not already accumulated
+          const resultText = (event as { result?: string }).result
+          const isError = (event as { is_error?: boolean }).is_error
+
+          if (isError && resultText) {
             showToast({
               type: 'error',
               title: 'Agent Error',
-              message: event.result ?? 'Unknown error',
+              message: resultText ?? 'Unknown error',
             })
           }
 
-          // Session complete
           if (currentMessageIdRef.current) {
+            // Use accumulated text if available, otherwise use result
+            const finalContent = accumulatedTextRef.current || resultText || 'Done'
             updateMessage({
               id: currentMessageIdRef.current,
               update: {
-                content: accumulatedTextRef.current || (event.is_error ? '' : event.result) || 'Done',
-                status: event.is_error ? 'error' : 'complete',
+                content: finalContent,
+                status: isError ? 'error' : 'complete',
               },
             })
           }
@@ -127,6 +129,29 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           }
           activeSessionRef.current = null
           setIsStreaming(false)
+        } else if (event.type === 'tool_use') {
+          // Tool call - append to accumulated text as indicator
+          const toolName = (event as { tool?: string }).tool ?? 'tool'
+          if (currentMessageIdRef.current) {
+            updateMessage({
+              id: currentMessageIdRef.current,
+              update: {
+                content: accumulatedTextRef.current || `Using ${toolName}...`,
+                status: 'streaming',
+              },
+            })
+          }
+        } else if (event.type === 'tool_result') {
+          // Tool result - just update status indicator
+          if (currentMessageIdRef.current && !accumulatedTextRef.current) {
+            updateMessage({
+              id: currentMessageIdRef.current,
+              update: {
+                content: 'Processing...',
+                status: 'streaming',
+              },
+            })
+          }
         }
       }
 

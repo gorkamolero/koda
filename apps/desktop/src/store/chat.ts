@@ -44,12 +44,76 @@ export type MessageRole = 'user' | 'assistant' | 'system'
 export type MessageStatus = 'pending' | 'streaming' | 'complete' | 'error'
 
 /**
+ * Content block types for rich message rendering
+ */
+export type ContentBlockType = 'text' | 'tool_use' | 'tool_result' | 'thinking'
+
+/**
+ * Base content block
+ */
+export interface BaseContentBlock {
+  type: ContentBlockType
+}
+
+/**
+ * Text content block
+ */
+export interface TextContentBlock extends BaseContentBlock {
+  type: 'text'
+  text: string
+}
+
+/**
+ * Tool use content block (agent calling a tool)
+ */
+export interface ToolUseContentBlock extends BaseContentBlock {
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+  status?: 'pending' | 'running' | 'success' | 'error'
+  durationMs?: number
+}
+
+/**
+ * Tool result content block (tool response)
+ */
+export interface ToolResultContentBlock extends BaseContentBlock {
+  type: 'tool_result'
+  toolUseId: string
+  toolName: string
+  output?: string
+  error?: string
+  isError?: boolean
+}
+
+/**
+ * Thinking content block (extended thinking)
+ */
+export interface ThinkingContentBlock extends BaseContentBlock {
+  type: 'thinking'
+  content: string
+  durationMs?: number
+}
+
+/**
+ * Union of all content block types
+ */
+export type ContentBlock =
+  | TextContentBlock
+  | ToolUseContentBlock
+  | ToolResultContentBlock
+  | ThinkingContentBlock
+
+/**
  * A single chat message
  */
 export interface ChatMessage {
   id: string
   role: MessageRole
   content: string
+  /** Structured content blocks for rich rendering */
+  contentBlocks?: ContentBlock[]
   timestamp: number
   status: MessageStatus
   model?: AgentModel

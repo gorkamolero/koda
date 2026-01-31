@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   rpcRequest,
   spawnSidecar,
@@ -30,6 +30,7 @@ import {
 export function useSidecar() {
   const [status, setStatus] = useState<SidecarStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Listen to sidecar status events
   useEffect(() => {
@@ -41,13 +42,30 @@ export function useSidecar() {
       unlistenStatus = await onSidecarStatus((newStatus) => {
         if (mounted) {
           setStatus(newStatus)
-          setError(null)
+          // Clear error when we get a successful status update
+          if (newStatus.running) {
+            setError(null)
+          }
         }
       })
 
       unlistenError = await onRpcError((err) => {
         if (mounted) {
+          // Only show persistent errors for critical connection issues
+          // Clear transient errors after 3 seconds
           setError(`RPC Error (${err.method}): ${err.error.message}`)
+          
+          // Clear previous timeout
+          if (errorTimeoutRef.current) {
+            clearTimeout(errorTimeoutRef.current)
+          }
+          
+          // Auto-clear error after 3 seconds for transient issues
+          errorTimeoutRef.current = setTimeout(() => {
+            if (mounted) {
+              setError(null)
+            }
+          }, 3000)
         }
       })
     }
@@ -58,6 +76,9 @@ export function useSidecar() {
       mounted = false
       unlistenStatus?.()
       unlistenError?.()
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current)
+      }
     }
   }, [])
 
