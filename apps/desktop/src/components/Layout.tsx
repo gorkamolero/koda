@@ -13,13 +13,19 @@ interface LayoutProps {
 
 /**
  * Sidecar connection status indicator.
+ * Only shows when there's a problem - stays hidden when connected.
  */
 function SidecarStatus() {
   const { status, error } = useSidecar()
 
+  // Don't show anything when connected and no errors
+  if (status?.running && !error) {
+    return null
+  }
+
   if (error) {
     return (
-      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-error">
+      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-error animate-in fade-in slide-in-from-bottom-2">
         Sidecar error
       </div>
     )
@@ -27,20 +33,13 @@ function SidecarStatus() {
 
   if (!status?.running) {
     return (
-      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-warning">
+      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-warning animate-in fade-in slide-in-from-bottom-2">
         Connecting...
       </div>
     )
   }
 
-  return (
-    <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-success">
-      <div className="flex items-center gap-2">
-        <span className="status-dot-ready" />
-        <span>Connected</span>
-      </div>
-    </div>
-  )
+  return null
 }
 
 /**
