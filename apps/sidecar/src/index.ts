@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as fs from 'node:fs';
 import { RpcServer } from './server.js';
 import { router } from './rpc/router.js';
+import { HttpRpcServer } from './httpServer.js';
 import { getDbPath } from './db/index.js';
 import { runMigrations } from './db/migrate.js';
 
@@ -208,16 +209,40 @@ async function main() {
     // Register RPC methods
     registerMethods();
 
-    // Start server
+    // Start Unix socket server
     const socketPath = getSocketPath();
     const server = new RpcServer(socketPath);
     await server.start();
+
+    // Start HTTP server for E2E testing and development
+    // In development, always start on default port unless explicitly disabled
+    // In production, only start if KODA_HTTP_PORT is explicitly set
+    let httpServer: HttpRpcServer | null = null;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const httpPort = process.env.KODA_HTTP_PORT;
+    const defaultDevPort = 3847;
+
+    if (httpPort) {
+      // Explicit port specified - use it
+      const port = parseInt(httpPort, 10);
+      if (!isNaN(port)) {
+        httpServer = new HttpRpcServer(port);
+        await httpServer.start();
+      }
+    } else if (!isProduction) {
+      // Development mode - start HTTP server on default port
+      httpServer = new HttpRpcServer(defaultDevPort);
+      await httpServer.start();
+    }
 
     console.log('Koda sidecar ready');
 
     // Graceful shutdown
     const shutdown = async () => {
       console.log('\nShutting down...');
+      if (httpServer) {
+        await httpServer.stop();
+      }
       await server.stop();
       process.exit(0);
     };

@@ -169,13 +169,15 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
   }, [notes.length, createNote])
 
   return (
-    <div className={cn('flex flex-col h-full bg-surface-sidebar', className)}>
+    <div className={cn('flex flex-col h-full bg-surface-sidebar', className)} data-testid="scratchpad-container">
       {/* Header with tabs */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle" data-testid="scratchpad-header">
         <div className="flex items-center gap-1">
           {/* Notes tab */}
           <button
             onClick={() => setActiveTab('notes')}
+            data-testid="scratchpad-tab-notes"
+            data-active={activeTab === 'notes'}
             className={cn(
               'flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors',
               activeTab === 'notes'
@@ -190,6 +192,8 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
           {/* History tab */}
           <button
             onClick={() => setActiveTab('history')}
+            data-testid="scratchpad-tab-history"
+            data-active={activeTab === 'history'}
             className={cn(
               'flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors',
               activeTab === 'history'
@@ -205,6 +209,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
         {activeTab === 'notes' && (
           <button
             onClick={createNote}
+            data-testid="scratchpad-new-note"
             className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
             title="New note"
           >

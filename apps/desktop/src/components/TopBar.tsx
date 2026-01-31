@@ -51,12 +51,13 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
       </div>
 
       {/* Center section: Navigation Tabs */}
-      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5">
+      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5" data-testid="topbar-tabs">
         {/* Chat tab with icon */}
         <TabButton
           active={activeTab === 'chat'}
           onClick={() => onTabChange('chat')}
           icon={<MessageSquare className="h-3.5 w-3.5" />}
+          testId="tab-chat"
         >
           Chat
         </TabButton>
@@ -65,6 +66,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         <TabButton
           active={activeTab === 'files'}
           onClick={() => onTabChange('files')}
+          testId="tab-files"
         >
           All files
         </TabButton>
@@ -73,6 +75,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           active={activeTab === 'diff'}
           onClick={() => onTabChange('diff')}
           badge={changedFilesCount > 0 ? changedFilesCount : undefined}
+          testId="tab-diff"
         >
           Changes
         </TabButton>
@@ -82,6 +85,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           active={activeTab === 'checks'}
           onClick={() => onTabChange('checks')}
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          testId="tab-checks"
         >
           Checks
         </TabButton>
@@ -91,6 +95,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           active={activeTab === 'review'}
           onClick={() => onTabChange('review')}
           icon={<Eye className="h-3.5 w-3.5" />}
+          testId="tab-review"
         >
           Review
         </TabButton>
@@ -100,6 +105,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           active={activeTab === 'terminal'}
           onClick={() => onTabChange('terminal')}
           icon={<Terminal className="h-3.5 w-3.5" />}
+          testId="tab-terminal"
         >
           Terminal
         </TabButton>
@@ -109,6 +115,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           active={activeTab === 'scratchpad'}
           onClick={() => onTabChange('scratchpad')}
           icon={<FileText className="h-3.5 w-3.5" />}
+          testId="tab-scratchpad"
         >
           Scratchpad
         </TabButton>
@@ -131,12 +138,15 @@ interface TabButtonProps {
   badge?: number
   icon?: React.ReactNode
   children: React.ReactNode
+  testId?: string
 }
 
-function TabButton({ active, onClick, badge, icon, children }: TabButtonProps) {
+function TabButton({ active, onClick, badge, icon, children, testId }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
+      data-testid={testId}
+      data-active={active}
       className={cn(
         'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors',
         active

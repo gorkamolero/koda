@@ -3,6 +3,49 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { SidecarStatus, JsonRpcError } from '@/lib/rpc'
 
 /**
+ * Check if we're running in Tauri context
+ * In E2E tests (Playwright), we run in regular Chromium and Tauri APIs aren't available
+ */
+function isTauriContext(): boolean {
+  return typeof window !== 'undefined' && '__TAURI__' in window
+}
+
+/**
+ * HTTP RPC port for E2E testing
+ * When running in browser context without Tauri, we use HTTP to reach the sidecar
+ */
+const HTTP_RPC_URL = 'http://localhost:3847/rpc'
+
+/**
+ * Send RPC request via HTTP (for E2E testing)
+ */
+async function httpRpcRequest<T = unknown>(
+  method: string,
+  params?: unknown
+): Promise<T> {
+  const response = await fetch(HTTP_RPC_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method,
+      params: params ?? null,
+    }),
+  })
+
+  const data = await response.json()
+
+  if (data.error) {
+    throw new Error(data.error.message || 'RPC error')
+  }
+
+  return data.result as T
+}
+
+/**
  * Type-safe wrapper for Tauri invoke commands
  */
 export async function invokeCommand<T>(
@@ -21,6 +64,10 @@ export interface HealthResponse {
  * Health check - verifies Tauri app is responsive
  */
 export async function healthCheck(): Promise<HealthResponse> {
+  if (!isTauriContext()) {
+    // In E2E tests, return a mock health response
+    return { status: 'ok', version: 'e2e-test' }
+  }
   return invokeCommand<HealthResponse>('health_check')
 }
 
@@ -28,6 +75,10 @@ export async function healthCheck(): Promise<HealthResponse> {
  * Spawn the Node.js sidecar process
  */
 export async function spawnSidecar(): Promise<SidecarStatus> {
+  if (!isTauriContext()) {
+    // In E2E tests, sidecar is already running
+    return { running: true, socket_path: 'http' }
+  }
   return invokeCommand<SidecarStatus>('spawn_sidecar')
 }
 
@@ -35,6 +86,15 @@ export async function spawnSidecar(): Promise<SidecarStatus> {
  * Get current sidecar status
  */
 export async function getSidecarStatus(): Promise<SidecarStatus> {
+  if (!isTauriContext()) {
+    // In E2E tests, check via HTTP ping
+    try {
+      await httpRpcRequest('ping')
+      return { running: true, socket_path: 'http' }
+    } catch {
+      return { running: false, socket_path: '' }
+    }
+  }
   return invokeCommand<SidecarStatus>('get_sidecar_status')
 }
 
@@ -42,6 +102,10 @@ export async function getSidecarStatus(): Promise<SidecarStatus> {
  * Stop the sidecar process
  */
 export async function stopSidecar(): Promise<SidecarStatus> {
+  if (!isTauriContext()) {
+    // In E2E tests, we don't control the sidecar
+    return { running: false, socket_path: '' }
+  }
   return invokeCommand<SidecarStatus>('stop_sidecar')
 }
 
@@ -49,16 +113,24 @@ export async function stopSidecar(): Promise<SidecarStatus> {
  * Connect to the Unix socket
  */
 export async function connectSocket(): Promise<string> {
+  if (!isTauriContext()) {
+    // In E2E tests, we use HTTP instead
+    return 'http'
+  }
   return invokeCommand<string>('connect_socket')
 }
 
 /**
  * Send RPC request through Tauri to the sidecar
+ * Falls back to HTTP when not in Tauri context (E2E tests)
  */
 export async function rpcRequest<T = unknown>(
   method: string,
   params?: unknown
 ): Promise<T> {
+  if (!isTauriContext()) {
+    return httpRpcRequest<T>(method, params)
+  }
   return invokeCommand<T>('send_rpc_request', {
     method,
     params: params ?? null,
@@ -85,6 +157,10 @@ export interface RpcErrorEvent {
 export async function onSidecarStatus(
   callback: (status: SidecarStatus) => void
 ): Promise<UnlistenFn> {
+  if (!isTauriContext()) {
+    // In E2E tests, return a no-op unlisten function
+    return () => {}
+  }
   return listen<SidecarStatus>('sidecar-status', (event) => {
     callback(event.payload)
   })
@@ -96,6 +172,10 @@ export async function onSidecarStatus(
 export async function onRpcError(
   callback: (error: RpcErrorEvent['payload']) => void
 ): Promise<UnlistenFn> {
+  if (!isTauriContext()) {
+    // In E2E tests, return a no-op unlisten function
+    return () => {}
+  }
   return listen<RpcErrorEvent['payload']>('rpc-error', (event) => {
     callback(event.payload)
   })

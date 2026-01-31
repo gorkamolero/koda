@@ -75,6 +75,7 @@ export function ModelSelector() {
       {isOpen && (
         <div
           role="listbox"
+          data-testid="model-selector-dropdown"
           className={cn(
             'absolute top-full left-0 mt-1 z-50',
             'w-72 glass-popover rounded-lg',
@@ -86,6 +87,7 @@ export function ModelSelector() {
             <button
               key={model.id}
               role="option"
+              data-testid={`model-option-${model.id}`}
               aria-selected={model.id === selectedModel}
               onClick={() => { handleSelect(model.id) }}
               className={cn(
