@@ -39,8 +39,8 @@ async function navigateToDiffTab(page: Page): Promise<'success' | 'no-workspace'
   await workspaceCards.first().click()
   await expect(page).toHaveURL(/\/workspace\//)
 
-  // Click Diff tab
-  await page.getByRole('button', { name: 'Diff' }).click()
+  // Click Diff tab (using testid for stability - actual label is "Changes")
+  await page.getByTestId('tab-diff').click()
 
   return 'success'
 }

@@ -56,9 +56,9 @@ test.describe('Agent Chat', () => {
       return
     }
 
-    // Chat tab should be active by default
-    const chatTab = page.getByRole('button', { name: 'Chat' })
-    await expect(chatTab).toHaveClass(/border-primary/)
+    // Chat tab should be active by default (using testid for stability)
+    const chatTab = page.getByTestId('tab-chat')
+    await expect(chatTab).toHaveAttribute('data-active', 'true')
 
     // Chat container should be visible
     await expect(page.getByTestId('agent-chat-container')).toBeVisible()
@@ -179,14 +179,14 @@ test.describe('Agent Chat', () => {
     // Should start on Chat tab
     await expect(page.getByTestId('agent-chat-container')).toBeVisible()
 
-    // Click Files tab
-    await page.getByRole('button', { name: 'Files' }).click()
+    // Click Files tab (using testid - actual label is "All files")
+    await page.getByTestId('tab-files').click()
 
     // Chat should be hidden
     await expect(page.getByTestId('agent-chat-container')).not.toBeVisible()
 
     // Click back to Chat
-    await page.getByRole('button', { name: 'Chat' }).click()
+    await page.getByTestId('tab-chat').click()
     await expect(page.getByTestId('agent-chat-container')).toBeVisible()
   })
 })
