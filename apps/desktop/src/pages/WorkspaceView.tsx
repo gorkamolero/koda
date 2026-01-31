@@ -9,6 +9,7 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
 import { TerminalPanel } from '@/components/Terminal'
 import { GitStatusBar } from '@/components/GitStatusBar'
+import { Scratchpad } from '@/components/Scratchpad'
 import {
   InterviewMode,
   SpecDrivenView,
@@ -19,7 +20,7 @@ import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorkspace, useSessions } from '@/hooks/useRpc'
 
-type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec'
+type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec' | 'scratchpad'
 
 export function WorkspaceView() {
   const { id } = useParams({ from: '/workspace/$id' })
@@ -76,6 +77,7 @@ export function WorkspaceView() {
       { id: 'files', label: 'Files' },
       { id: 'diff', label: 'Diff' },
       { id: 'terminal', label: 'Terminal' },
+      { id: 'scratchpad', label: 'Scratchpad' },
     ]
 
     // Add spec tab for spec-driven and ralph modes
@@ -162,6 +164,10 @@ export function WorkspaceView() {
 
         {activeTab === 'terminal' && (
           <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
+        )}
+
+        {activeTab === 'scratchpad' && (
+          <Scratchpad workspaceId={id} />
         )}
       </div>
 

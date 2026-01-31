@@ -1,12 +1,12 @@
-import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal } from 'lucide-react'
+import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspaceDiffStats } from '@/hooks/useRpc'
 import type { Workspace } from '@/lib/rpc'
 
 interface TopBarProps {
   workspace: Workspace | undefined
-  activeTab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec'
-  onTabChange: (tab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec') => void
+  activeTab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad'
+  onTabChange: (tab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad') => void
 }
 
 /**
@@ -84,6 +84,15 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           icon={<Terminal className="h-3.5 w-3.5" />}
         >
           Terminal
+        </TabButton>
+
+        {/* Scratchpad tab */}
+        <TabButton
+          active={activeTab === 'scratchpad'}
+          onClick={() => onTabChange('scratchpad')}
+          icon={<FileText className="h-3.5 w-3.5" />}
+        >
+          Scratchpad
         </TabButton>
       </div>
 
