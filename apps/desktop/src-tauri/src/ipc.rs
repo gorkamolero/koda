@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
 #[derive(Error, Debug)]
@@ -68,9 +68,11 @@ impl SocketClient {
         request_id: u64,
     ) -> Result<JsonRpcResponse, IpcError> {
         // Connect to Unix socket
-        let mut stream = UnixStream::connect(&self.socket_path)
+        let stream = UnixStream::connect(&self.socket_path)
             .await
             .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
+
+        let (reader, mut writer) = stream.into_split();
 
         // Build JSON-RPC request
         let request = JsonRpcRequest {
@@ -80,22 +82,20 @@ impl SocketClient {
             params,
         };
 
-        // Serialize and send
+        // Serialize and send (newline-delimited)
         let request_json = serde_json::to_string(&request)?;
         let request_bytes = format!("{}\n", request_json);
 
-        stream.write_all(request_bytes.as_bytes()).await?;
-        stream.flush().await?;
+        writer.write_all(request_bytes.as_bytes()).await?;
+        writer.flush().await?;
 
-        // Read response
-        let mut buffer = Vec::new();
-        stream.read_to_end(&mut buffer).await?;
+        // Read response line (server sends newline-delimited JSON)
+        let mut buf_reader = BufReader::new(reader);
+        let mut response_line = String::new();
+        buf_reader.read_line(&mut response_line).await?;
 
         // Parse response
-        let response_str = String::from_utf8(buffer)
-            .map_err(|e| IpcError::InvalidResponse(format!("Invalid UTF-8: {}", e)))?;
-
-        let response: JsonRpcResponse = serde_json::from_str(&response_str)?;
+        let response: JsonRpcResponse = serde_json::from_str(response_line.trim())?;
 
         Ok(response)
     }

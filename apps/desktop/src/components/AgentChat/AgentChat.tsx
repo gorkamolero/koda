@@ -21,6 +21,7 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ModelSelector } from './ModelSelector'
 import { ContextMeter } from '@/components/ContextMeter'
+import { useNotifications } from '@/hooks/useNotifications'
 
 interface AgentChatProps {
   workspaceId: string
@@ -36,6 +37,7 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
   const updateMessage = useSetAtom(updateMessageAtom)
   const setIsStreaming = useSetAtom(isStreamingAtom)
   const selectedModel = useAtomValue(selectedModelAtom)
+  const { showToast } = useNotifications()
   
   // Track active session for polling
   const activeSessionRef = useRef<string | null>(null)
@@ -89,13 +91,22 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
             })
           }
         } else if (event.type === 'result') {
+          // Check for errors (billing, auth, etc.)
+          if (event.is_error && event.result) {
+            showToast({
+              type: 'error',
+              title: 'Agent Error',
+              message: String(event.result),
+            })
+          }
+
           // Session complete
           if (currentMessageIdRef.current) {
             updateMessage({
               id: currentMessageIdRef.current,
               update: {
-                content: accumulatedTextRef.current || event.result || 'Done',
-                status: 'complete',
+                content: accumulatedTextRef.current || (event.is_error ? '' : event.result) || 'Done',
+                status: event.is_error ? 'error' : 'complete',
               },
             })
           }
@@ -138,7 +149,7 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
     } catch (error) {
       console.error('Failed to poll messages:', error)
     }
-  }, [updateMessage, setIsStreaming])
+  }, [updateMessage, setIsStreaming, showToast])
 
   const handleSendMessage = useCallback(
     async (content: string) => {

@@ -5,8 +5,14 @@ pub mod commands;
 pub mod ipc;
 
 use commands::SidecarState;
+use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::sync::Mutex;
 use tauri::{App, Manager};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+// Global sidecar process handle for cleanup
+static SIDECAR_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
 /// Initialize the Tauri application with plugins and setup
 pub fn run() {
@@ -63,10 +69,72 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let socket_path = get_socket_path(&app_dir);
     tracing::info!("Socket path: {}", socket_path);
 
-    // Register sidecar state
-    app.manage(SidecarState::new(socket_path));
+    // Clean up stale socket file from previous runs
+    let socket_file = std::path::Path::new(&socket_path);
+    if socket_file.exists() {
+        tracing::info!("Removing stale socket file");
+        std::fs::remove_file(socket_file).ok();
+    }
+
+    // Spawn sidecar immediately during setup (before frontend loads)
+    let sidecar_path = get_sidecar_path(app)?;
+    tracing::info!("Spawning sidecar from: {:?}", sidecar_path);
+
+    let child = Command::new("node")
+        .env("KODA_SOCKET", &socket_path)
+        .arg(sidecar_path.to_str().unwrap())
+        .arg("--app-dir")
+        .arg(app_dir.to_str().unwrap())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+
+    let pid = child.id();
+    tracing::info!("Sidecar spawned with PID: {}", pid);
+
+    // Store process handle for cleanup
+    *SIDECAR_PROCESS.lock().unwrap() = Some(child);
+
+    // Wait a moment for socket to be ready
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Register sidecar state with the PID
+    let state = SidecarState::new(socket_path);
+    {
+        // Set the PID in the state - we need to do this via a runtime
+        let pid_clone = pid;
+        let state_pid = state.pid.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                *state_pid.lock().await = Some(pid_clone);
+            });
+        });
+    }
+    app.manage(state);
 
     Ok(())
+}
+
+/// Get the sidecar path based on build mode
+fn get_sidecar_path(app: &App) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if cfg!(debug_assertions) {
+        // Dev mode: workspace relative path
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+        Ok(PathBuf::from(&manifest_dir)
+            .join("..")
+            .join("..")
+            .join("sidecar")
+            .join("dist")
+            .join("index.js"))
+    } else {
+        // Production: bundled in resources
+        Ok(app
+            .path()
+            .resource_dir()
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?
+            .join("sidecar")
+            .join("index.js"))
+    }
 }
 
 /// Get the Unix socket path based on platform

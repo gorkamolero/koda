@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { NotificationProvider } from './Toast'
 import { useSidecar } from '@/hooks/useRpc'
@@ -8,16 +8,9 @@ interface LayoutProps {
 }
 
 function SidecarStatus() {
-  const { status, error, spawn } = useSidecar()
-  const spawnAttempted = useRef(false)
+  const { status, error } = useSidecar()
 
-  // Auto-spawn sidecar on mount (only once)
-  useEffect(() => {
-    if (!spawnAttempted.current) {
-      spawnAttempted.current = true
-      spawn()
-    }
-  }, [spawn])
+  // Sidecar is now spawned by Rust during app setup - no need to spawn from frontend
 
   if (error) {
     return (
