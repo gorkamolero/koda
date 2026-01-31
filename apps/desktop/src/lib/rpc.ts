@@ -49,6 +49,7 @@ export const RPC_METHODS = {
   WORKSPACE_LIST: 'workspace.list',
   WORKSPACE_CREATE: 'workspace.create',
   WORKSPACE_GET: 'workspace.get',
+  WORKSPACE_GET_DIFF_STATS: 'workspace.getDiffStats',
   // Worktrees
   WORKTREE_CREATE: 'worktree.create',
   WORKTREE_DELETE: 'worktree.delete',
@@ -142,6 +143,15 @@ export interface DiffSummary {
   filesChanged: number
   additions: number
   deletions: number
+}
+
+/**
+ * Diff stats for a workspace
+ */
+export interface DiffStats {
+  additions: number
+  deletions: number
+  filesChanged: number
 }
 
 /**

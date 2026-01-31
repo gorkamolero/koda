@@ -20,6 +20,7 @@ import {
   type CreateWorktreeParams,
   type WorktreeResult,
   type CheckpointDiff,
+  type DiffStats,
 } from '@/lib/rpc'
 
 /**
@@ -150,6 +151,19 @@ export function useWorkspace(id: string) {
     queryFn: () => rpcRequest<Workspace>(RPC_METHODS.WORKSPACE_GET, { id }),
     enabled: !!id,
     retry: false,
+  })
+}
+
+/**
+ * Workspace diff stats hook
+ */
+export function useWorkspaceDiffStats(workspaceId: string) {
+  return useQuery({
+    queryKey: ['workspace-diff-stats', workspaceId],
+    queryFn: () => rpcRequest<DiffStats>(RPC_METHODS.WORKSPACE_GET_DIFF_STATS, { workspaceId }),
+    enabled: !!workspaceId,
+    retry: false,
+    staleTime: 30000, // Cache for 30 seconds
   })
 }
 

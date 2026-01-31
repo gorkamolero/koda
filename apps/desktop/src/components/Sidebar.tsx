@@ -1,20 +1,26 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useWorkspaces, useSidecar } from '@/hooks/useRpc'
+import { useWorkspaces, useRepos, useSidecar, useWorkspaceDiffStats } from '@/hooks/useRpc'
 import { cn } from '@/lib/utils'
-import type { Workspace } from '@/lib/rpc'
+import type { Workspace, Repo, WorkspaceStatus } from '@/lib/rpc'
+import { useState, useMemo } from 'react'
 import {
   Plus,
   Settings,
-  Folder,
-  GitBranch,
-  Loader2,
+  ChevronRight,
+  ChevronDown,
+  MoreHorizontal,
+  Check,
   AlertCircle,
-  Home,
+  Loader2,
+  HelpCircle,
+  Archive,
+  FolderPlus,
 } from 'lucide-react'
 
-/**
- * Usage bar showing session/weekly usage percentage.
- */
+// ============================================================================
+// Usage Bar (kept and restyled)
+// ============================================================================
+
 function UsageBar({
   label,
   value,
@@ -31,17 +37,17 @@ function UsageBar({
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-text-faint">{label}</span>
-        <span className={cn('text-text-muted', isHigh && 'text-status-warning')}>
-          {percent}%
+        <span className={cn('text-text-muted', isHigh && 'text-orange-400')}>
+          {String(percent)}%
         </span>
       </div>
-      <div className="h-1 rounded-full bg-surface-control overflow-hidden">
+      <div className="h-1 rounded-full bg-surface-inset overflow-hidden">
         <div
           className={cn(
             'h-full rounded-full transition-all',
             isHigh
-              ? 'bg-gradient-to-r from-status-warning to-status-error'
-              : 'bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3]'
+              ? 'bg-gradient-to-r from-orange-500 to-red-500'
+              : 'bg-gradient-to-r from-blue-500 to-emerald-500'
           )}
           style={{ width: `${String(percent)}%` }}
         />
@@ -50,61 +56,377 @@ function UsageBar({
   )
 }
 
-/**
- * Individual workspace card in the sidebar.
- */
-function WorkspaceCard({
+// ============================================================================
+// Status Indicators
+// ============================================================================
+
+function getStatusConfig(status?: WorkspaceStatus | null): {
+  icon: React.ReactNode
+  colorClass: string
+} {
+  switch (status) {
+    case 'done':
+      return {
+        icon: <Check className="w-3.5 h-3.5" />,
+        colorClass: 'text-green-500',
+      }
+    case 'blocked':
+    case 'needs-review':
+      return {
+        icon: <AlertCircle className="w-3.5 h-3.5" />,
+        colorClass: 'text-orange-500',
+      }
+    case 'in-progress':
+    default:
+      return {
+        icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
+        colorClass: 'text-text-dim',
+      }
+  }
+}
+
+// ============================================================================
+// Diff Stats Badge
+// ============================================================================
+
+function DiffStatsBadge({ workspaceId }: { workspaceId: string }) {
+  const { data: stats } = useWorkspaceDiffStats(workspaceId)
+
+  if (!stats || (stats.additions === 0 && stats.deletions === 0)) {
+    return null
+  }
+
+  return (
+    <div className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded bg-surface-inset">
+      {stats.additions > 0 && (
+        <span className="text-green-500">+{String(stats.additions)}</span>
+      )}
+      {stats.deletions > 0 && (
+        <span className="text-red-400 ml-0.5">-{String(stats.deletions)}</span>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Time Ago Helper
+// ============================================================================
+
+function formatTimeAgo(date: string | null | undefined): string {
+  if (!date) return ''
+
+  const now = Date.now()
+  const then = new Date(date).getTime()
+  const diffMs = now - then
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${String(diffMins)}m ago`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${String(diffHours)}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${String(diffDays)}d ago`
+}
+
+// ============================================================================
+// Workspace Row
+// ============================================================================
+
+function WorkspaceRow({
   workspace,
   isActive,
 }: {
   workspace: Workspace
   isActive: boolean
 }) {
-  // Get status dot class based on workspace state
-  // In a real implementation, status would come from workspace activity tracking
-  const getStatusClass = () => {
-    // Placeholder: always ready. Real implementation would check workspace.status
-    return 'status-dot-ready'
-  }
+  const status = workspace.manualStatus ?? workspace.derivedStatus
+  const { icon, colorClass } = getStatusConfig(status)
+  const timeAgo = formatTimeAgo(workspace.updatedAt)
 
   return (
     <Link
       to="/workspace/$id"
       params={{ id: workspace.id }}
       className={cn(
-        'block rounded-lg p-3 mb-1 transition-colors cursor-pointer',
+        'group flex items-start gap-2 px-3 py-2 rounded-md transition-colors',
         'hover:bg-surface-hover',
         isActive && 'bg-surface-active'
       )}
     >
-      <div className="flex items-center gap-2">
-        <span className={cn('status-dot', getStatusClass())} />
-        <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
-        <span className="text-text-primary text-sm font-medium truncate">
-          {workspace.directoryName}
-        </span>
+      {/* Status icon */}
+      <div className={cn('mt-1 flex-shrink-0 flex items-center justify-center w-4', colorClass)}>
+        {icon}
       </div>
-      {workspace.branch && (
-        <div className="flex items-center gap-1.5 mt-1 ml-6">
-          <GitBranch className="w-3 h-3 text-text-dim" />
-          <span className="text-text-faint text-xs truncate">
-            {workspace.branch}
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-text-primary text-sm font-medium truncate">
+            {workspace.branch ?? workspace.directoryName}
           </span>
+          <DiffStatsBadge workspaceId={workspace.id} />
         </div>
-      )}
+        <div className="flex items-center gap-1.5 text-xs text-text-faint">
+          <span className="truncate">{workspace.directoryName}</span>
+          {timeAgo && (
+            <>
+              <span>·</span>
+              <span>{timeAgo}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Archive action (visible on hover) */}
+      <button
+        className={cn(
+          'opacity-0 group-hover:opacity-100 transition-opacity',
+          'p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary',
+          'flex items-center gap-1 text-xs'
+        )}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          // TODO: Implement archive
+          console.log('Archive workspace:', workspace.id)
+        }}
+        title="Archive"
+      >
+        <Archive className="w-3.5 h-3.5" />
+        <span>Archive</span>
+      </button>
     </Link>
   )
 }
 
-/**
- * Workspace list section.
- */
+// ============================================================================
+// Repo Group
+// ============================================================================
+
+function RepoGroup({
+  repo,
+  workspaces,
+  activeWorkspaceId,
+}: {
+  repo: Repo
+  workspaces: Workspace[]
+  activeWorkspaceId?: string
+}) {
+  const [isExpanded, setIsExpanded] = useState(true)
+  const repoName = repo.name ?? repo.rootPath.split('/').pop() ?? 'Repository'
+  const initial = (repoName[0] ?? 'R').toUpperCase()
+
+  return (
+    <div className="mb-3">
+      {/* Repo header */}
+      <div className="flex items-center gap-1 group">
+        <button
+          onClick={() => { setIsExpanded(!isExpanded) }}
+          className="flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors"
+        >
+          {/* Avatar */}
+          <div className="w-6 h-6 rounded bg-surface-control flex items-center justify-center text-xs font-semibold text-text-muted">
+            {initial}
+          </div>
+
+          {/* Name */}
+          <span className="text-text-primary text-sm font-medium truncate flex-1 text-left">
+            {repoName}
+          </span>
+
+          {/* Chevron */}
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-text-dim flex-shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-text-dim flex-shrink-0" />
+          )}
+        </button>
+
+        {/* Actions (visible on hover) */}
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
+            title="More actions"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          <button
+            className="p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
+            title="New workspace"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Workspaces */}
+      {isExpanded && (
+        <div className="ml-2 mt-1">
+          {workspaces.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-text-faint italic">No workspaces</div>
+          ) : (
+            workspaces.map((ws) => (
+              <WorkspaceRow
+                key={ws.id}
+                workspace={ws}
+                isActive={ws.id === activeWorkspaceId}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Sidebar Header
+// ============================================================================
+
+function SidebarHeader() {
+  const navigate = useNavigate()
+
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center gap-2">
+        {/* Workspaces icon */}
+        <svg
+          className="w-5 h-5 text-text-muted"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+        <span className="text-text-primary font-semibold">Workspaces</span>
+      </div>
+      <div className="flex items-center gap-0.5">
+        <button
+          className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+          onClick={() => { void navigate({ to: '/' }) }}
+          title="Back"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" />
+        </button>
+        <button
+          className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+          title="Forward"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Sidebar Footer
+// ============================================================================
+
+function SidebarFooter() {
+  const { status } = useSidecar()
+  const navigate = useNavigate()
+
+  return (
+    <div className="border-t border-border-subtle">
+      {/* Usage stats (kept from original) */}
+      <div className="px-4 py-3 space-y-2 border-b border-border-subtle">
+        <UsageBar label="Session" value={45} max={100} />
+        <UsageBar label="Weekly" value={230} max={1000} />
+      </div>
+
+      {/* Add repository button */}
+      <button
+        className="flex items-center gap-2 w-full px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+        onClick={() => { void navigate({ to: '/' }) }}
+      >
+        <FolderPlus className="w-4 h-4" />
+        <span className="text-sm">Add repository</span>
+      </button>
+
+      {/* Bottom icons */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-border-subtle">
+        <div className="flex items-center gap-2">
+          {/* Sidecar status dot */}
+          <span
+            className={cn(
+              'w-2 h-2 rounded-full transition-colors',
+              status?.running ? 'bg-green-500' : 'bg-gray-500'
+            )}
+            title={status?.running ? 'Connected' : 'Disconnected'}
+          />
+          <span className="text-xs text-text-faint">
+            {status?.running ? 'Connected' : 'Offline'}
+          </span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button
+            className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            title="Help"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+          <Link
+            to="/settings"
+            className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Workspace List (grouped by repo)
+// ============================================================================
+
 function WorkspaceList() {
-  const { data: workspaces, isLoading, error } = useWorkspaces()
+  const { data: workspaces, isLoading: loadingWorkspaces } = useWorkspaces()
+  const { data: repos, isLoading: loadingRepos } = useRepos()
   const params = useParams({ strict: false })
   const activeId = (params as { id?: string }).id
 
-  if (isLoading) {
+  // Group workspaces by repository
+  const groupedWorkspaces = useMemo(() => {
+    if (!workspaces || !repos) return new Map<string, { repo: Repo; workspaces: Workspace[] }>()
+
+    const groups = new Map<string, { repo: Repo; workspaces: Workspace[] }>()
+
+    // Initialize groups for all repos
+    for (const repo of repos) {
+      groups.set(repo.id, { repo, workspaces: [] })
+    }
+
+    // Add workspaces to their repos (only non-archived)
+    for (const ws of workspaces) {
+      if (ws.state === 'archived') continue
+      if (ws.repositoryId && groups.has(ws.repositoryId)) {
+        groups.get(ws.repositoryId)?.workspaces.push(ws)
+      }
+    }
+
+    // Sort workspaces within each group by updatedAt (most recent first)
+    for (const group of groups.values()) {
+      group.workspaces.sort((a, b) => {
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+        return bTime - aTime
+      })
+    }
+
+    return groups
+  }, [workspaces, repos])
+
+  if (loadingWorkspaces || loadingRepos) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="w-5 h-5 text-text-muted animate-spin" />
@@ -112,144 +434,43 @@ function WorkspaceList() {
     )
   }
 
-  if (error) {
+  if (groupedWorkspaces.size === 0) {
     return (
-      <div className="p-4 text-center">
-        <AlertCircle className="w-8 h-8 text-status-error mx-auto mb-2" />
-        <p className="text-text-muted text-sm">Failed to load workspaces</p>
-      </div>
-    )
-  }
-
-  if (!workspaces || workspaces.length === 0) {
-    return (
-      <div className="p-4 text-center">
-        <Folder className="w-8 h-8 text-text-dim mx-auto mb-2" />
-        <p className="text-text-muted text-sm">No workspaces yet</p>
-        <p className="text-text-faint text-xs mt-1">
-          Create one to get started
-        </p>
+      <div className="px-4 py-8 text-center">
+        <FolderPlus className="w-10 h-10 text-text-dim mx-auto mb-3" />
+        <p className="text-text-muted text-sm mb-1">No repositories yet</p>
+        <p className="text-text-faint text-xs">Add a repository to get started</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-0.5">
-      {workspaces.map((workspace) => (
-        <WorkspaceCard
-          key={workspace.id}
-          workspace={workspace}
-          isActive={workspace.id === activeId}
+    <div className="px-2">
+      {Array.from(groupedWorkspaces.values()).map(({ repo, workspaces: repoWorkspaces }) => (
+        <RepoGroup
+          key={repo.id}
+          repo={repo}
+          workspaces={repoWorkspaces}
+          activeWorkspaceId={activeId}
         />
       ))}
     </div>
   )
 }
 
-/**
- * Navigation links at the top of the sidebar.
- */
-function NavLinks() {
-  return (
-    <div className="space-y-0.5 mb-4">
-      <Link
-        to="/"
-        className={cn(
-          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium',
-          'text-text-muted hover:text-text-primary hover:bg-surface-hover',
-          'transition-colors'
-        )}
-        activeProps={{
-          className: 'bg-surface-active text-text-strong',
-        }}
-      >
-        <Home className="w-4 h-4" />
-        <span>Home</span>
-      </Link>
-    </div>
-  )
-}
+// ============================================================================
+// Main Sidebar
+// ============================================================================
 
-/**
- * Footer with sidecar status and usage.
- */
-function SidebarFooter() {
-  const { status } = useSidecar()
-
-  return (
-    <div className="px-4 py-3 border-t border-border-subtle space-y-3">
-      {/* Usage bars (placeholder values) */}
-      <UsageBar label="Session" value={45} max={100} />
-      <UsageBar label="Weekly" value={230} max={1000} />
-
-      {/* Sidecar status */}
-      <div className="flex items-center gap-2 text-xs">
-        <span
-          className={cn(
-            'status-dot',
-            status?.running ? 'status-dot-ready' : 'status-dot-unknown'
-          )}
-        />
-        <span className="text-text-faint">
-          {status?.running ? 'Sidecar connected' : 'Sidecar offline'}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Main sidebar component with CodexMonitor-style aesthetic.
- */
 export function Sidebar() {
-  const navigate = useNavigate()
-
-  const handleCreateWorkspace = () => {
-    // Navigate to home where workspace creation is handled
-    void navigate({ to: '/' })
-  }
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-border-subtle">
-        <div>
-          <h1 className="text-text-strong text-lg font-semibold">Koda</h1>
-          <p className="text-text-dim text-xs">Review-First Agent IDE</p>
-        </div>
-        <button
-          onClick={handleCreateWorkspace}
-          className="btn-icon"
-          data-tooltip="New workspace"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
+    <div className="flex flex-col h-full bg-surface-base">
+      <SidebarHeader />
+
+      <div className="flex-1 overflow-y-auto py-2">
+        <WorkspaceList />
       </div>
 
-      {/* Navigation + Workspace list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 fade-mask-y">
-        <NavLinks />
-
-        <div className="mb-2">
-          <h2 className="text-text-faint text-xs font-medium uppercase tracking-wider px-3 mb-2">
-            Workspaces
-          </h2>
-          <WorkspaceList />
-        </div>
-      </div>
-
-      {/* Corner actions */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border-subtle">
-        <Link
-          to="/settings"
-          className="btn-icon"
-          data-tooltip="Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </Link>
-      </div>
-
-      {/* Footer */}
       <SidebarFooter />
     </div>
   )
