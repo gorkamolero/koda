@@ -198,7 +198,7 @@ describe('ClaudeHandler', () => {
       );
     });
 
-    it('should use print mode for streaming JSON output', async () => {
+    it('should use bidirectional stream-json mode', async () => {
       await handler.start({
         workspaceId: '123e4567-e89b-12d3-a456-426614174000',
         prompt: 'Hello!',
@@ -206,7 +206,10 @@ describe('ClaudeHandler', () => {
 
       expect(spawn).toHaveBeenCalledWith(
         expect.any(String),
-        expect.arrayContaining(['--print', '--output-format', 'stream-json']),
+        expect.arrayContaining([
+          '--output-format', 'stream-json',
+          '--input-format', 'stream-json',
+        ]),
         expect.any(Object)
       );
     });
@@ -512,9 +515,9 @@ describe('ClaudeHandler', () => {
       expect(resultEvents.length).toBe(1);
     });
 
-    it('should emit error events for stderr output', async () => {
-      const errorEvents: string[] = [];
-      handler.on('error', (event) => errorEvents.push(event));
+    it('should log stderr output without emitting error events', async () => {
+      // stderr is logged but not emitted as error since it often contains debug info
+      const consoleSpy = vi.spyOn(console, 'log');
 
       await handler.start({
         workspaceId: '123e4567-e89b-12d3-a456-426614174000',
@@ -525,8 +528,11 @@ describe('ClaudeHandler', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(errorEvents.length).toBe(1);
-      expect(errorEvents[0]).toContain('Something went wrong');
+      // Verify stderr was logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('stderr')
+      );
+      consoleSpy.mockRestore();
     });
   });
 

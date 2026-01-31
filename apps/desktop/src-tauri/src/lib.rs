@@ -54,6 +54,12 @@ fn setup_tracing() {
 fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Koda desktop application starting");
 
+    // Check if we're in test mode (env vars set by Playwright)
+    let is_test_mode = std::env::var("KODA_TEST_DB").is_ok();
+    if is_test_mode {
+        tracing::info!("Running in TEST mode - using test database and socket");
+    }
+
     // Get app data directory
     let app_dir = app
         .path()
@@ -65,9 +71,15 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("App data directory: {:?}", app_dir);
 
-    // Compute socket path based on platform
-    let socket_path = get_socket_path(&app_dir);
+    // Use socket path from env var if set (test mode), otherwise compute based on platform
+    let socket_path = std::env::var("KODA_SOCKET")
+        .unwrap_or_else(|_| get_socket_path(&app_dir));
     tracing::info!("Socket path: {}", socket_path);
+
+    // Ensure socket directory exists (for test mode)
+    if let Some(parent) = std::path::Path::new(&socket_path).parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
 
     // Clean up stale socket file from previous runs
     let socket_file = std::path::Path::new(&socket_path);
@@ -80,11 +92,21 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let sidecar_path = get_sidecar_path(app)?;
     tracing::info!("Spawning sidecar from: {:?}", sidecar_path);
 
-    let child = Command::new("node")
-        .env("KODA_SOCKET", &socket_path)
+    // Build sidecar command with env vars
+    // Inherit KODA_TEST_DB and KODA_SOCKET from parent process for test isolation
+    let mut cmd = Command::new("node");
+    cmd.env("KODA_SOCKET", &socket_path)
         .arg(sidecar_path.to_str().unwrap())
         .arg("--app-dir")
-        .arg(app_dir.to_str().unwrap())
+        .arg(app_dir.to_str().unwrap());
+
+    // Pass through test database path if set
+    if let Ok(test_db) = std::env::var("KODA_TEST_DB") {
+        tracing::info!("Using test database: {}", test_db);
+        cmd.env("KODA_TEST_DB", test_db);
+    }
+
+    let child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 

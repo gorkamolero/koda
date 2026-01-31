@@ -111,9 +111,9 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-surface-messages">
+    <div className="h-full flex flex-col bg-surface-messages" data-testid="checks-view-container">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-surface-topbar">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-surface-topbar" data-testid="checks-view-header">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-medium text-text-primary">CI/CD Checks</h2>
 
@@ -156,11 +156,14 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
             return (
               <div
                 key={check.id}
+                data-testid={`check-item-${check.id}`}
+                data-status={check.status}
                 className="border border-border-subtle rounded-lg bg-surface-control/30 overflow-hidden"
               >
                 {/* Check header */}
                 <button
                   onClick={() => toggleCheck(check.id)}
+                  data-testid={`check-button-${check.id}`}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
                 >
                   {/* Expand icon */}
