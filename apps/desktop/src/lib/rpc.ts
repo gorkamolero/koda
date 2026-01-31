@@ -209,13 +209,24 @@ export interface ClaudeSessionInfo {
   updatedAt: string
 }
 
+export interface ClaudeMessageContent {
+  type: string
+  text?: string
+  name?: string
+  input?: unknown
+}
+
 export interface ClaudeStreamEvent {
   type: string
-  message?: { type: string; text?: string; name?: string; input?: unknown }
+  message?: {
+    role?: string
+    content?: ClaudeMessageContent[]
+  }
   tool?: string
   input?: unknown
   output?: unknown
   result?: string
+  is_error?: boolean
   [key: string]: unknown
 }
 
