@@ -10,6 +10,8 @@ import { TopBar } from '@/components/TopBar'
 import { TerminalPanel } from '@/components/Terminal'
 import { GitStatusBar } from '@/components/GitStatusBar'
 import { Scratchpad } from '@/components/Scratchpad'
+import { ChecksView } from '@/components/ChecksView'
+import { ReviewView } from '@/components/ReviewView'
 import {
   InterviewMode,
   SpecDrivenView,
@@ -20,7 +22,7 @@ import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorkspace, useSessions } from '@/hooks/useRpc'
 
-type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec' | 'scratchpad'
+type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec' | 'scratchpad' | 'checks' | 'review'
 
 export function WorkspaceView() {
   const { id } = useParams({ from: '/workspace/$id' })
@@ -76,6 +78,8 @@ export function WorkspaceView() {
       { id: 'chat', label: 'Chat' },
       { id: 'files', label: 'Files' },
       { id: 'diff', label: 'Diff' },
+      { id: 'checks', label: 'Checks' },
+      { id: 'review', label: 'Review' },
       { id: 'terminal', label: 'Terminal' },
       { id: 'scratchpad', label: 'Scratchpad' },
     ]
@@ -168,6 +172,14 @@ export function WorkspaceView() {
 
         {activeTab === 'scratchpad' && (
           <Scratchpad workspaceId={id} />
+        )}
+
+        {activeTab === 'checks' && (
+          <ChecksView workspaceId={id} />
+        )}
+
+        {activeTab === 'review' && (
+          <ReviewView workspaceId={id} />
         )}
       </div>
 
