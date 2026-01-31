@@ -1,12 +1,12 @@
-import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal, FileText } from 'lucide-react'
+import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal, FileText, CheckCircle2, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspaceDiffStats } from '@/hooks/useRpc'
 import type { Workspace } from '@/lib/rpc'
 
 interface TopBarProps {
   workspace: Workspace | undefined
-  activeTab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad'
-  onTabChange: (tab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad') => void
+  activeTab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review'
+  onTabChange: (tab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review') => void
 }
 
 /**
@@ -75,6 +75,24 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           badge={changedFilesCount > 0 ? changedFilesCount : undefined}
         >
           Changes
+        </TabButton>
+
+        {/* Checks tab */}
+        <TabButton
+          active={activeTab === 'checks'}
+          onClick={() => onTabChange('checks')}
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+        >
+          Checks
+        </TabButton>
+
+        {/* Review tab */}
+        <TabButton
+          active={activeTab === 'review'}
+          onClick={() => onTabChange('review')}
+          icon={<Eye className="h-3.5 w-3.5" />}
+        >
+          Review
         </TabButton>
 
         {/* Terminal tab with icon */}
