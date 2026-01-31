@@ -145,7 +145,14 @@ export interface DiffSummary {
 }
 
 /**
- * Workspace types - aligned with sidecar schema
+ * Workspace status types (Conductor-style)
+ */
+export type WorkspaceStatus = 'in-progress' | 'done' | 'blocked' | 'needs-review'
+export type WorkspaceState = 'active' | 'archived'
+export type WorkspaceType = 'standard' | 'spec-driven' | 'ralph' | 'openprose'
+
+/**
+ * Workspace types - aligned with sidecar schema (with Conductor-style fields)
  */
 export interface Workspace {
   id: string
@@ -153,7 +160,21 @@ export interface Workspace {
   ownerUserId?: string
   directoryName: string
   branch?: string
-  workspaceType?: 'standard' | 'spec-driven' | 'ralph' | 'openprose'
+  workspaceType?: WorkspaceType
+  state?: WorkspaceState
+  specContent?: string
+  fixPlanContent?: string
+  ralphEnabled?: boolean
+  // Conductor-style fields
+  derivedStatus?: WorkspaceStatus
+  manualStatus?: WorkspaceStatus | null
+  pinnedAt?: string | null
+  notes?: string | null
+  linkedWorkspaceIds?: string | null // JSON array
+  unread?: number
+  activeSessionId?: string | null
+  bigTerminalMode?: boolean
+  intendedTargetBranch?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -178,7 +199,37 @@ export interface ListWorkspacesParams {
 /**
  * Claude session types
  */
-export type SessionStatus = 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled'
+export type SessionStatus = 'idle' | 'running' | 'paused' | 'compacting' | 'completed' | 'error' | 'cancelled'
+export type PermissionMode = 'default' | 'plan' | 'auto-approve'
+export type AgentType = 'claude' | 'codex' | 'kimi' | 'other'
+
+/**
+ * Session - Conductor-style with all fields
+ */
+export interface Session {
+  id: string
+  workspaceId?: string
+  agentType?: AgentType
+  model?: string
+  status?: SessionStatus
+  contextTokenCount?: number
+  forkedFromSessionId?: string | null
+  // Conductor-style fields
+  title?: string
+  claudeSessionId?: string | null
+  permissionMode?: PermissionMode
+  thinkingEnabled?: boolean
+  codexThinkingLevel?: 'high' | 'medium' | 'low' | null
+  contextUsedPercent?: string | null
+  isCompacting?: boolean
+  freshlyCompacted?: boolean
+  isHidden?: boolean
+  unreadCount?: number
+  lastUserMessageAt?: string | null
+  resumeSessionAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
 
 export interface ClaudeStartParams {
   workspaceId: string

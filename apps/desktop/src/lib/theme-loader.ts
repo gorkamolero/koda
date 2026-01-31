@@ -278,7 +278,7 @@ export function loadCustomThemes(): TranslatedTheme[] {
   try {
     const stored = localStorage.getItem(CUSTOM_THEMES_KEY)
     if (stored) {
-      return JSON.parse(stored)
+      return JSON.parse(stored) as TranslatedTheme[]
     }
   } catch {
     console.warn('Failed to load custom themes')
@@ -322,13 +322,18 @@ export function initializeTheme(): { themeId: string; theme: TranslatedTheme } {
 
   // Fall back to default (always exists)
   if (!theme) {
-    theme = BUNDLED_THEMES[DEFAULT_THEME]!
+    const defaultTheme = BUNDLED_THEMES[DEFAULT_THEME]
+    const firstTheme = Object.values(BUNDLED_THEMES)[0]
+    theme = defaultTheme ?? firstTheme
+    if (!theme) {
+      throw new Error('No bundled themes available')
+    }
   }
 
   // Apply the theme
   applyTheme(theme)
 
-  return { themeId, theme: theme as TranslatedTheme }
+  return { themeId, theme }
 }
 
 // ============================================================================

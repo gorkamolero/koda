@@ -48,7 +48,7 @@ function BranchSelector({ branch }: { branch?: string }) {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen) }}
         className={cn(
           'flex items-center gap-1.5 px-2 py-1 rounded-md text-sm',
           'text-text-muted hover:text-text-primary hover:bg-surface-hover',
@@ -100,15 +100,15 @@ function MoreActionsMenu({ workspaceId: _workspaceId }: { workspaceId: string })
   }, [isOpen])
 
   const menuItems = [
-    { icon: ExternalLink, label: 'Open in VS Code', action: () => console.log('Open in VS Code') },
-    { icon: RefreshCw, label: 'Sync with remote', action: () => console.log('Sync') },
-    { icon: Settings, label: 'Workspace settings', action: () => console.log('Settings') },
+    { icon: ExternalLink, label: 'Open in VS Code', action: () => { console.log('Open in VS Code') } },
+    { icon: RefreshCw, label: 'Sync with remote', action: () => { console.log('Sync') } },
+    { icon: Settings, label: 'Workspace settings', action: () => { console.log('Settings') } },
   ]
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen) }}
         className="btn-icon"
         data-tooltip="More actions"
       >
@@ -170,9 +170,9 @@ function Breadcrumb({ workspace, title }: { workspace?: { directoryName: string 
  * Shows workspace info, branch selector, and actions.
  */
 export function MainHeader({ title, actions }: MainHeaderProps) {
-  const params = useParams({ strict: false }) as { id?: string }
-  const workspaceId = params.id
-  const { data: workspace, isLoading } = useWorkspace(workspaceId || '')
+  const params = useParams({ strict: false })
+  const workspaceId = (params as { id?: string }).id
+  const { data: workspace, isLoading } = useWorkspace(workspaceId ?? '')
 
   // If we're not in a workspace and no title, don't render
   if (!workspaceId && !title) {

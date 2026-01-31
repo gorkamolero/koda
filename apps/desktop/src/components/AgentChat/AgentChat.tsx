@@ -102,7 +102,7 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
             showToast({
               type: 'error',
               title: 'Agent Error',
-              message: String(event.result),
+              message: event.result ?? 'Unknown error',
             })
           }
 

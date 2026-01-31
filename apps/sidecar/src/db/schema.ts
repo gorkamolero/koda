@@ -47,6 +47,11 @@ export const gitIdentities = sqliteTable('git_identities', {
 /**
  * Repositories
  * Root repository configurations with setup/run scripts
+ *
+ * Conductor-style additions:
+ * - archiveScript: Run when archiving workspace
+ * - runScriptMode: 'concurrent' or 'sequential'
+ * - Per-task custom prompts
  */
 export const repos = sqliteTable('repos', {
   id: text('id').primaryKey(),
@@ -57,7 +62,14 @@ export const repos = sqliteTable('repos', {
   gitIdentityId: text('git_identity_id').references(() => gitIdentities.id),
   setupScript: text('setup_script'),
   runScript: text('run_script'),
-  customPrompt: text('custom_prompt'),
+  archiveScript: text('archive_script'), // Conductor-style
+  runScriptMode: text('run_script_mode').default('concurrent'), // 'concurrent', 'sequential'
+  customPrompt: text('custom_prompt'), // General custom prompt
+  customPromptCodeReview: text('custom_prompt_code_review'),
+  customPromptCreatePr: text('custom_prompt_create_pr'),
+  customPromptRenameBranch: text('custom_prompt_rename_branch'),
+  conductorConfig: text('conductor_config'), // JSON config from .koda/config.json
+  displayOrder: integer('display_order').default(0),
   createdAt: timestamp(),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -70,6 +82,10 @@ export const repos = sqliteTable('repos', {
  * - spec-driven: Has attached spec, agents work toward it
  * - ralph: Fresh agent loop until spec complete
  * - openprose: Running a .prose program with multiple agents
+ *
+ * Status system (Conductor-style):
+ * - derivedStatus: Auto-computed from session activity
+ * - manualStatus: User override for status
  */
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(),
@@ -82,6 +98,16 @@ export const workspaces = sqliteTable('workspaces', {
   specContent: text('spec_content'), // The feature spec (for spec-driven/ralph)
   fixPlanContent: text('fix_plan_content'), // Current task list (for ralph)
   ralphEnabled: integer('ralph_enabled', { mode: 'boolean' }).default(false),
+  // Conductor-style fields
+  derivedStatus: text('derived_status').default('in-progress'), // 'in-progress', 'done', 'blocked', 'needs-review'
+  manualStatus: text('manual_status'), // User override, null means use derived
+  pinnedAt: text('pinned_at'), // Timestamp when pinned, null = not pinned
+  notes: text('notes'), // User notes for this workspace
+  linkedWorkspaceIds: text('linked_workspace_ids'), // JSON array of related workspace IDs
+  unread: integer('unread').default(0), // Unread message count
+  activeSessionId: text('active_session_id'), // Currently active session
+  bigTerminalMode: integer('big_terminal_mode', { mode: 'boolean' }).default(false),
+  intendedTargetBranch: text('intended_target_branch'), // For PR creation
   createdAt: timestamp(),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -113,6 +139,12 @@ export const workspaceShares = sqliteTable('workspace_shares', {
  * - other: Terminal-only CLI agents
  *
  * Supports conversation forking via forkedFromSessionId
+ *
+ * Conductor-style additions:
+ * - title: Human-readable session name
+ * - permissionMode: Controls agent autonomy
+ * - thinkingEnabled: Extended thinking toggle
+ * - isCompacting: Currently reducing context
  */
 export const sessions = sqliteTable(
   'sessions',
@@ -121,9 +153,22 @@ export const sessions = sqliteTable(
     workspaceId: text('workspace_id').references(() => workspaces.id),
     agentType: text('agent_type'), // 'claude', 'codex', 'kimi', 'other'
     model: text('model'),
-    status: text('status').default('idle'), // 'idle', 'running', 'paused'
+    status: text('status').default('idle'), // 'idle', 'running', 'paused', 'compacting'
     contextTokenCount: integer('context_token_count').default(0),
     forkedFromSessionId: text('forked_from_session_id'),
+    // Conductor-style fields
+    title: text('title').default('Untitled'),
+    claudeSessionId: text('claude_session_id'), // Claude CLI session ID for resume
+    permissionMode: text('permission_mode').default('default'), // 'default', 'plan', 'auto-approve'
+    thinkingEnabled: integer('thinking_enabled', { mode: 'boolean' }).default(true),
+    codexThinkingLevel: text('codex_thinking_level'), // 'high', 'medium', 'low' for Codex
+    contextUsedPercent: text('context_used_percent'), // Float as text (0.0-1.0)
+    isCompacting: integer('is_compacting', { mode: 'boolean' }).default(false),
+    freshlyCompacted: integer('freshly_compacted', { mode: 'boolean' }).default(false),
+    isHidden: integer('is_hidden', { mode: 'boolean' }).default(false),
+    unreadCount: integer('unread_count').default(0),
+    lastUserMessageAt: text('last_user_message_at'),
+    resumeSessionAt: text('resume_session_at'), // For session resumption
     createdAt: timestamp(),
     updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
   },
@@ -134,25 +179,45 @@ export const sessions = sqliteTable(
  * Session Messages
  * Stores full conversation history
  * turn_id groups messages that belong to the same agent turn
+ *
+ * Conductor-style additions:
+ * - sentAt: Null = queued, set = sent to agent
+ * - cancelledAt: Message was cancelled
+ * - model: Per-message model tracking
  */
 export const sessionMessages = sqliteTable(
   'session_messages',
   {
     id: text('id').primaryKey(),
     sessionId: text('session_id').references(() => sessions.id),
-    role: text('role'), // 'user', 'assistant'
+    role: text('role'), // 'user', 'assistant', 'system'
     content: text('content'),
     fullMessageJson: text('full_message_json'), // Complete message object as JSON
     turnId: text('turn_id'),
+    // Conductor-style fields
+    fullMessage: text('full_message'), // Expanded content (for slash commands)
+    model: text('model'), // Model used for this message
+    sentAt: text('sent_at'), // Null = queued, set = sent
+    cancelledAt: text('cancelled_at'), // Null = not cancelled
+    sdkMessageId: text('sdk_message_id'), // From Claude SDK
+    lastAssistantMessageId: text('last_assistant_message_id'),
     createdAt: timestamp(),
   },
-  (table) => [index('session_messages_session_id_idx').on(table.sessionId)]
+  (table) => [
+    index('session_messages_session_id_idx').on(table.sessionId),
+    index('session_messages_sent_at_idx').on(table.sessionId, table.sentAt),
+  ]
 );
 
 /**
  * Diff Comments - PR-style review
  * Users can comment on specific lines in diffs
  * Comments can be marked as resolved
+ *
+ * Conductor-style additions:
+ * - threadId: For comment threads
+ * - replyToCommentId: For replies
+ * - location: Additional location context
  */
 export const diffComments = sqliteTable('diff_comments', {
   id: text('id').primaryKey(),
@@ -162,8 +227,40 @@ export const diffComments = sqliteTable('diff_comments', {
   lineNumber: integer('line_number'),
   body: text('body'),
   resolved: integer('resolved', { mode: 'boolean' }).default(false),
+  // Conductor-style fields
+  state: text('state').default('active'), // 'active', 'resolved', 'outdated'
+  location: text('location'), // Additional location context
+  author: text('author'), // Author name/handle
+  threadId: text('thread_id'), // For threading
+  replyToCommentId: text('reply_to_comment_id'),
+  remoteUrl: text('remote_url'), // If synced from GitHub/GitLab
+  updateMemory: integer('update_memory', { mode: 'boolean' }).default(false),
   createdAt: timestamp(),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
+
+/**
+ * Attachments - Files attached to sessions/messages
+ * Conductor-style file attachment support
+ */
+export const attachments = sqliteTable(
+  'attachments',
+  {
+    id: text('id').primaryKey(),
+    type: text('type'), // 'file', 'image', 'url'
+    originalName: text('original_name'),
+    path: text('path'),
+    isLoading: integer('is_loading', { mode: 'boolean' }).default(false),
+    isDraft: integer('is_draft', { mode: 'boolean' }).default(true),
+    sessionId: text('session_id').references(() => sessions.id),
+    sessionMessageId: text('session_message_id').references(() => sessionMessages.id),
+    createdAt: timestamp(),
+  },
+  (table) => [
+    index('attachments_session_id_idx').on(table.sessionId),
+    index('attachments_session_message_id_idx').on(table.sessionMessageId),
+  ]
+);
 
 /**
  * Visual Snapshots - Before/after UI screenshots
@@ -239,6 +336,9 @@ export type NewGitCheckpoint = typeof gitCheckpoints.$inferInsert;
 
 export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
+
+export type Attachment = typeof attachments.$inferSelect;
+export type NewAttachment = typeof attachments.$inferInsert;
 
 /**
  * Session Recordings - Video-like playback of agent sessions
