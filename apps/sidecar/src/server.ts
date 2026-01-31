@@ -7,13 +7,20 @@ import {
   type JsonRpcResponse,
 } from './types/rpc.js';
 import { router } from './rpc/router.js';
+import { getNotificationEmitter } from './rpc/notifications.js';
+import { getFrontendRpcClient } from './rpc/frontendRpc.js';
 
 /**
  * JSON-RPC 2.0 server over Unix domain socket
+ *
+ * Supports bidirectional communication:
+ * - Frontend → Sidecar: Normal RPC requests/responses
+ * - Sidecar → Frontend: Notifications (one-way) and RPC requests (bidirectional)
  */
 export class RpcServer {
   private server: net.Server | null = null;
   private socketPath: string;
+  private activeSocket: net.Socket | null = null;
 
   constructor(socketPath: string) {
     this.socketPath = socketPath;
@@ -78,6 +85,19 @@ export class RpcServer {
   private handleConnection(socket: net.Socket): void {
     let buffer = '';
 
+    // Store as active socket for bidirectional communication
+    this.activeSocket = socket;
+
+    // Register with notification emitter for broadcasting
+    const notificationEmitter = getNotificationEmitter();
+    notificationEmitter.addSocket(socket);
+
+    // Attach to frontend RPC client for bidirectional calls
+    const frontendRpc = getFrontendRpcClient();
+    frontendRpc.attach(socket);
+
+    console.log('[RpcServer] Client connected, bidirectional RPC enabled');
+
     socket.on('data', async (data) => {
       buffer += data.toString();
 
@@ -87,6 +107,18 @@ export class RpcServer {
 
       for (const line of lines) {
         if (line.trim()) {
+          // Check if this is a response to a pending frontend RPC request
+          // (responses have 'result' or 'error' but no 'method')
+          try {
+            const parsed = JSON.parse(line.trim());
+            if ('id' in parsed && !('method' in parsed)) {
+              // This is a response, not a request - frontend RPC client will handle it
+              continue;
+            }
+          } catch {
+            // Not valid JSON, will be handled below
+          }
+
           const response = await this.handleMessage(line);
           socket.write(JSON.stringify(response) + '\n');
         }
@@ -94,11 +126,20 @@ export class RpcServer {
     });
 
     socket.on('error', (err) => {
-      console.error('Socket error:', err);
+      console.error('[RpcServer] Socket error:', err);
+    });
+
+    socket.on('close', () => {
+      console.log('[RpcServer] Client disconnected');
+      notificationEmitter.removeSocket(socket);
+      frontendRpc.detach();
+      if (this.activeSocket === socket) {
+        this.activeSocket = null;
+      }
     });
 
     socket.on('end', () => {
-      // Connection closed
+      // Connection closed gracefully
     });
   }
 
