@@ -121,8 +121,8 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
 
   if (turns.length === 0) {
     return (
-      <div className={cn('flex flex-col h-full bg-surface-sidebar', className)}>
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border-subtle">
+      <div className={cn('flex flex-col h-full bg-surface-sidebar', className)} data-testid="conversation-history">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border-subtle" data-testid="conversation-history-header">
           <Clock className="w-4 h-4 text-text-muted" />
           <span className="text-sm font-medium text-text-primary">History</span>
         </div>
@@ -134,9 +134,9 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
   }
 
   return (
-    <div className={cn('flex flex-col h-full bg-surface-sidebar', className)}>
+    <div className={cn('flex flex-col h-full bg-surface-sidebar', className)} data-testid="conversation-history">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle" data-testid="conversation-history-header">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-text-muted" />
           <span className="text-sm font-medium text-text-primary">History</span>

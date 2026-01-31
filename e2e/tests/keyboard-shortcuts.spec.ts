@@ -50,8 +50,8 @@ test.describe('Cmd+Enter - Send Message', () => {
       return
     }
 
-    // Make sure we're on the chat tab
-    const chatTab = page.getByRole('button', { name: 'Chat' })
+    // Make sure we're on the chat tab (using testid for stability)
+    const chatTab = page.getByTestId('tab-chat')
     await chatTab.click()
 
     const input = page.getByTestId('chat-input')
@@ -187,8 +187,8 @@ test.describe('Cmd+P - Quick Open File', () => {
       return
     }
 
-    // Go to Files tab
-    await page.getByRole('button', { name: 'Files' }).click()
+    // Go to Files tab (using testid - actual label is "All files")
+    await page.getByTestId('tab-files').click()
 
     // Wait for file explorer to be visible
     const fileExplorer = page.getByTestId('file-explorer')
@@ -216,7 +216,7 @@ test.describe('Cmd+P - Quick Open File', () => {
       return
     }
 
-    await page.getByRole('button', { name: 'Files' }).click()
+    await page.getByTestId('tab-files').click()
 
     const fileExplorer = page.getByTestId('file-explorer')
     if (!(await fileExplorer.isVisible({ timeout: 3000 }).catch(() => false))) {
@@ -246,7 +246,7 @@ test.describe('Cmd+B - Toggle Sidebar', () => {
       return
     }
 
-    await page.getByRole('button', { name: 'Files' }).click()
+    await page.getByTestId('tab-files').click()
 
     const sidebar = page.getByTestId('file-explorer-sidebar')
     const hasSidebar = await sidebar
@@ -281,13 +281,13 @@ test.describe('Cmd+1/2/3 - Switch Tabs', () => {
     }
 
     // Start on a different tab
-    await page.getByRole('button', { name: 'Files' }).click()
+    await page.getByTestId('tab-files').click()
 
     // Switch to Chat with Cmd+1
     await page.keyboard.press('Meta+1')
 
-    const chatTab = page.getByRole('button', { name: 'Chat' })
-    await expect(chatTab).toHaveClass(/border-primary/)
+    const chatTab = page.getByTestId('tab-chat')
+    await expect(chatTab).toHaveAttribute('data-active', 'true')
   })
 
   test('switches to Files tab with Cmd+2', async ({ page }) => {
@@ -307,8 +307,8 @@ test.describe('Cmd+1/2/3 - Switch Tabs', () => {
     // Switch to Files with Cmd+2
     await page.keyboard.press('Meta+2')
 
-    const filesTab = page.getByRole('button', { name: 'Files' })
-    await expect(filesTab).toHaveClass(/border-primary/)
+    const filesTab = page.getByTestId('tab-files')
+    await expect(filesTab).toHaveAttribute('data-active', 'true')
   })
 
   test('switches to Diff tab with Cmd+3', async ({ page }) => {
@@ -324,8 +324,8 @@ test.describe('Cmd+1/2/3 - Switch Tabs', () => {
 
     await page.keyboard.press('Meta+3')
 
-    const diffTab = page.getByRole('button', { name: 'Diff' })
-    await expect(diffTab).toHaveClass(/border-primary/)
+    const diffTab = page.getByTestId('tab-diff')
+    await expect(diffTab).toHaveAttribute('data-active', 'true')
   })
 
   test('handles tabs with Ctrl+number', async ({ page }) => {
@@ -339,12 +339,12 @@ test.describe('Cmd+1/2/3 - Switch Tabs', () => {
       return
     }
 
-    await page.getByRole('button', { name: 'Files' }).click()
+    await page.getByTestId('tab-files').click()
 
     await page.keyboard.press('Control+1')
 
-    const chatTab = page.getByRole('button', { name: 'Chat' })
-    await expect(chatTab).toHaveClass(/border-primary/)
+    const chatTab = page.getByTestId('tab-chat')
+    await expect(chatTab).toHaveAttribute('data-active', 'true')
   })
 })
 

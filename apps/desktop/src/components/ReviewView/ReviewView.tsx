@@ -108,16 +108,18 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
   const resolvedCount = comments.filter((c) => c.resolved).length
 
   return (
-    <div className="h-full flex flex-col bg-surface-messages">
+    <div className="h-full flex flex-col bg-surface-messages" data-testid="review-view-container">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-surface-topbar">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-surface-topbar" data-testid="review-view-header">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-medium text-text-primary">Code Review</h2>
 
           {/* Filter tabs */}
-          <div className="flex items-center gap-1 bg-surface-control rounded-md p-0.5">
+          <div className="flex items-center gap-1 bg-surface-control rounded-md p-0.5" data-testid="review-filter-tabs">
             <button
               onClick={() => setFilter('all')}
+              data-testid="review-filter-all"
+              data-active={filter === 'all'}
               className={cn(
                 'px-2 py-1 text-xs rounded transition-colors',
                 filter === 'all'
@@ -129,6 +131,8 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
             </button>
             <button
               onClick={() => setFilter('open')}
+              data-testid="review-filter-open"
+              data-active={filter === 'open'}
               className={cn(
                 'px-2 py-1 text-xs rounded transition-colors',
                 filter === 'open'
@@ -140,6 +144,8 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
             </button>
             <button
               onClick={() => setFilter('resolved')}
+              data-testid="review-filter-resolved"
+              data-active={filter === 'resolved'}
               className={cn(
                 'px-2 py-1 text-xs rounded transition-colors',
                 filter === 'resolved'
@@ -168,6 +174,8 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
             return (
               <div
                 key={comment.id}
+                data-testid={`review-comment-${comment.id}`}
+                data-resolved={comment.resolved}
                 className={cn(
                   'border rounded-lg overflow-hidden transition-colors',
                   comment.resolved
@@ -178,6 +186,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                 {/* Comment header */}
                 <button
                   onClick={() => toggleComment(comment.id)}
+                  data-testid={`review-comment-toggle-${comment.id}`}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
                 >
                   {/* Expand icon */}
@@ -226,6 +235,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleResolved(comment.id)}
+                        data-testid={`review-comment-${comment.resolved ? 'reopen' : 'resolve'}-${comment.id}`}
                         className={cn(
                           'flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors',
                           comment.resolved

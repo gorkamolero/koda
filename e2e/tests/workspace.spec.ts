@@ -18,6 +18,33 @@ async function waitForWorkspacesPage(page: import('@playwright/test').Page): Pro
 }
 
 /**
+ * Helper to get modal heading (h2 element)
+ */
+function getModalHeading(page: import('@playwright/test').Page, text: string) {
+  return page.locator('h2').filter({ hasText: text })
+}
+
+/**
+ * Helper to click the New Workspace button (handles both header and empty state)
+ */
+async function clickNewWorkspaceButton(page: import('@playwright/test').Page): Promise<boolean> {
+  const headerButton = page.getByTestId('new-workspace-button')
+  const emptyStateButton = page.getByTestId('new-workspace-button-empty')
+
+  const hasHeaderButton = await headerButton.isVisible().catch(() => false)
+  const hasEmptyButton = await emptyStateButton.isVisible().catch(() => false)
+
+  if (!hasHeaderButton && !hasEmptyButton) {
+    return false
+  }
+
+  const btn = hasHeaderButton ? headerButton : emptyStateButton
+  await btn.click()
+  await page.waitForTimeout(500)
+  return true
+}
+
+/**
  * Workspace CRUD Tests
  *
  * Tests for creating, listing, opening, and managing workspaces.
@@ -38,8 +65,8 @@ test.describe('Workspace CRUD', () => {
       ).toBeVisible()
 
       // Should show either workspace cards or empty state
-      const emptyState = page.getByText('No workspaces yet')
-      const workspaceGrid = page.locator('.grid')
+      const emptyState = page.getByTestId('empty-state')
+      const workspaceGrid = page.getByTestId('workspace-grid')
 
       const hasEmptyState = await emptyState.isVisible().catch(() => false)
       const hasGrid = await workspaceGrid.isVisible().catch(() => false)
@@ -63,7 +90,6 @@ test.describe('Workspace CRUD', () => {
       if (cardCount > 0) {
         // Each card should have at least one paragraph (branch name or metadata)
         const firstCard = workspaceCards.first()
-        // Use .first() to avoid strict mode violation when multiple <p> elements exist
         await expect(firstCard.locator('p').first()).toBeVisible()
       }
     })
@@ -77,20 +103,15 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      // Find and click the New Workspace button
-      const newWorkspaceButton = page.getByRole('button', { name: 'New Workspace' })
-      const hasButton = await newWorkspaceButton.first().isVisible().catch(() => false)
-      if (!hasButton) {
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
         test.skip(true, 'New Workspace button not visible')
         return
       }
 
-      await newWorkspaceButton.first().click()
-
-      // Should show repo selection
-      await expect(
-        page.getByRole('heading', { name: 'Select Repository' })
-      ).toBeVisible()
+      // Should show repo selection (h2 element)
+      const modalHeading = getModalHeading(page, 'Select Repository')
+      await expect(modalHeading).toBeVisible({ timeout: 5000 })
       await expect(page.getByText('Add Git Repository')).toBeVisible()
     })
 
@@ -101,33 +122,26 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      const newWorkspaceButton = page.getByRole('button', { name: 'New Workspace' })
-      const hasButton = await newWorkspaceButton.first().isVisible().catch(() => false)
-      if (!hasButton) {
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
         test.skip(true, 'New Workspace button not visible')
         return
       }
 
-      await newWorkspaceButton.first().click()
-
       // Wait for modal content
-      await expect(
-        page.getByRole('heading', { name: 'Select Repository' })
-      ).toBeVisible()
+      const modalHeading = getModalHeading(page, 'Select Repository')
+      await expect(modalHeading).toBeVisible({ timeout: 5000 })
 
       // If repos exist, "Recent Repositories" section will be visible
-      const recentRepos = page.getByText('Recent Repositories')
-      const hasRepos = await recentRepos.isVisible().catch(() => false)
+      const repoList = page.getByTestId('repo-list')
+      const hasRepos = await repoList.isVisible().catch(() => false)
 
       // Either way, add repo button should exist
       await expect(page.getByText('Add Git Repository')).toBeVisible()
 
       if (hasRepos) {
-        // Repo list should be present
-        const repoButtons = page
-          .locator('.space-y-2')
-          .first()
-          .locator('button')
+        // Repo list should be present with buttons
+        const repoButtons = repoList.locator('button')
         expect(await repoButtons.count()).toBeGreaterThan(0)
       }
     })
@@ -139,37 +153,33 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      const newWorkspaceButton = page.getByRole('button', { name: 'New Workspace' })
-      const hasButton = await newWorkspaceButton.first().isVisible().catch(() => false)
-      if (!hasButton) {
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
         test.skip(true, 'New Workspace button not visible')
         return
       }
 
-      await newWorkspaceButton.first().click()
-      await expect(
-        page.getByRole('heading', { name: 'Select Repository' })
-      ).toBeVisible()
+      const selectRepoHeading = getModalHeading(page, 'Select Repository')
+      await expect(selectRepoHeading).toBeVisible({ timeout: 5000 })
 
       // Check if there are existing repos to select
-      const recentRepos = page.getByText('Recent Repositories')
-      const hasRepos = await recentRepos.isVisible().catch(() => false)
+      const repoList = page.getByTestId('repo-list')
+      const hasRepos = await repoList.isVisible().catch(() => false)
 
       if (hasRepos) {
-        // Click first repo
-        const repoButtons = page
-          .locator('.space-y-2')
-          .first()
-          .locator('button')
+        // Click first repo button using testid pattern
+        const repoButtons = repoList.locator('button')
         await repoButtons.first().click()
+        await page.waitForTimeout(300)
 
         // Should show branch creation step
-        await expect(
-          page.getByRole('heading', { name: 'Create Branch' })
-        ).toBeVisible()
-        await expect(page.getByLabel('Branch Name')).toBeVisible()
+        const branchHeading = getModalHeading(page, 'Create Branch')
+        await expect(branchHeading).toBeVisible({ timeout: 5000 })
+
+        // Check for branch name input
+        const branchInput = page.locator('input[placeholder*="feature"]')
+        await expect(branchInput).toBeVisible()
       } else {
-        // Skip this test if no repos - can't test branch step without a repo
         test.skip(true, 'No repos available to select')
       }
     })
@@ -181,36 +191,31 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      const newWorkspaceButton = page.getByRole('button', { name: 'New Workspace' })
-      const hasButton = await newWorkspaceButton.first().isVisible().catch(() => false)
-      if (!hasButton) {
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
         test.skip(true, 'New Workspace button not visible')
         return
       }
 
-      await newWorkspaceButton.first().click()
-
-      const recentRepos = page.getByText('Recent Repositories')
-      const hasRepos = await recentRepos.isVisible().catch(() => false)
+      const repoList = page.getByTestId('repo-list')
+      const hasRepos = await repoList.isVisible().catch(() => false)
 
       if (hasRepos) {
         // Go to branch step
-        const repoButtons = page
-          .locator('.space-y-2')
-          .first()
-          .locator('button')
+        const repoButtons = repoList.locator('button')
         await repoButtons.first().click()
-        await expect(
-          page.getByRole('heading', { name: 'Create Branch' })
-        ).toBeVisible()
+        await page.waitForTimeout(300)
 
-        // Click back
-        await page.getByRole('button', { name: 'Back' }).click()
+        const branchHeading = getModalHeading(page, 'Create Branch')
+        await expect(branchHeading).toBeVisible({ timeout: 5000 })
+
+        // Click back using testid
+        await page.getByTestId('modal-back-button').click()
+        await page.waitForTimeout(300)
 
         // Should be back at repo selection
-        await expect(
-          page.getByRole('heading', { name: 'Select Repository' })
-        ).toBeVisible()
+        const selectRepoHeading = getModalHeading(page, 'Select Repository')
+        await expect(selectRepoHeading).toBeVisible({ timeout: 5000 })
       } else {
         test.skip(true, 'No repos available')
       }
@@ -225,23 +230,15 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      // Find workspace cards
       const workspaceCards = page.locator('button').filter({
         has: page.locator('h3'),
       })
 
       const cardCount = await workspaceCards.count()
       if (cardCount > 0) {
-        // Click first workspace
         await workspaceCards.first().click()
-
-        // Should navigate to workspace page
         await expect(page).toHaveURL(/\/workspace\//)
-
-        // Workspace view header should be visible
-        await expect(
-          page.getByRole('heading', { name: /Workspace/ })
-        ).toBeVisible()
+        await expect(page.getByTestId('topbar-tabs')).toBeVisible()
       } else {
         test.skip(true, 'No workspaces to open')
       }
@@ -262,10 +259,10 @@ test.describe('Workspace CRUD', () => {
         await workspaceCards.first().click()
         await expect(page).toHaveURL(/\/workspace\//)
 
-        // Should show tab navigation
-        await expect(page.getByRole('button', { name: 'Chat' })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Files' })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Diff' })).toBeVisible()
+        // Should show tab navigation (using testid for stability)
+        await expect(page.getByTestId('tab-chat')).toBeVisible()
+        await expect(page.getByTestId('tab-files')).toBeVisible()
+        await expect(page.getByTestId('tab-diff')).toBeVisible()
       } else {
         test.skip(true, 'No workspaces')
       }

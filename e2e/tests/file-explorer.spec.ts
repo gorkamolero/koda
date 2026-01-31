@@ -39,8 +39,8 @@ async function navigateToFilesTab(page: Page): Promise<'success' | 'no-workspace
   await workspaceCards.first().click()
   await expect(page).toHaveURL(/\/workspace\//)
 
-  // Click Files tab
-  await page.getByRole('button', { name: 'Files' }).click()
+  // Click Files tab (using testid - actual label is "All files")
+  await page.getByTestId('tab-files').click()
 
   return 'success'
 }

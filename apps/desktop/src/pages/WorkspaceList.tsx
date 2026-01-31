@@ -109,6 +109,7 @@ export function WorkspaceList() {
         </div>
         <button
           onClick={() => { setIsCreateOpen(true); }}
+          data-testid="new-workspace-button"
           className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors"
         >
           New Workspace
@@ -133,11 +134,12 @@ export function WorkspaceList() {
                 {hasRepos && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-2">Recent Repositories</label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="space-y-2 max-h-48 overflow-y-auto" data-testid="repo-list">
                       {repos.map((repo) => (
                         <button
                           key={repo.id}
                           onClick={() => { handleRepoSelect(repo.id); }}
+                          data-testid={`repo-button-${repo.id}`}
                           className="w-full text-left p-3 border border-border rounded-md hover:border-primary hover:bg-accent/50 transition-colors"
                         >
                           <div className="font-medium">{repo.name}</div>
@@ -208,6 +210,7 @@ export function WorkspaceList() {
                 <div className="flex justify-between mt-6">
                   <button
                     onClick={() => { setCreateMode('repo'); }}
+                    data-testid="modal-back-button"
                     className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Back
@@ -236,7 +239,7 @@ export function WorkspaceList() {
 
       {/* Workspace List or Empty State */}
       {hasWorkspaces ? (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3" data-testid="workspace-grid">
           {workspaces.map((workspace) => (
             <button
               key={workspace.id}
@@ -256,7 +259,7 @@ export function WorkspaceList() {
           ))}
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center" data-testid="empty-state">
           <div className="text-center max-w-md">
             <div className="mb-4">
               <svg
@@ -281,6 +284,7 @@ export function WorkspaceList() {
             </p>
             <button
               onClick={() => { setIsCreateOpen(true); }}
+              data-testid="new-workspace-button-empty"
               className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors"
             >
               New Workspace
