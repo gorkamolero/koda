@@ -6,8 +6,8 @@ import { FileExplorer } from '@/components/FileExplorer'
 import { Editor } from '@/components/Editor'
 import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
+import { TopBar } from '@/components/TopBar'
 import {
-  WorkspaceTypeSelector,
   InterviewMode,
   SpecDrivenView,
   RalphView,
@@ -108,56 +108,16 @@ export function WorkspaceView() {
       {/* Command Palette (global) */}
       <CommandPalette />
 
-      <header className="border-b border-border bg-background px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-primary">
-              {workspace?.branch ?? workspace?.directoryName ?? `Workspace ${id}`}
-            </h1>
-            <p className="text-sm text-muted-foreground">{rootPath}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <WorkspaceTypeSelector
-              workspaceId={id}
-            />
-            <button className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 transition-colors">
-              Open in VS Code
-            </button>
-            <button className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 transition-colors">
-              Review Changes
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Conductor-style top bar */}
+      <TopBar
+        workspace={workspace}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
-      <div className="border-b border-border bg-background">
-        <nav className="flex px-6" aria-label="Tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveTab(tab.id)
-              }}
-              className={`
-                px-4 py-3 text-sm font-medium border-b-2 transition-colors
-                ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <div className="flex-1 overflow-hidden bg-secondary/10">
+      <div className="flex-1 overflow-hidden">
         {activeTab === 'chat' && (
-          <div className="h-full">
-            <AgentChat workspaceId={id} sessionId={activeSessionId} />
-          </div>
+          <AgentChat workspaceId={id} sessionId={activeSessionId} />
         )}
 
         {activeTab === 'spec' && workspaceType === 'spec-driven' && (
