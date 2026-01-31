@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue } from 'jotai'
 import { messagesAtom } from '@/store/chat'
 import { MessageItem } from './MessageItem'
+import { MessageCircle } from 'lucide-react'
 
 /**
  * Virtualized message list for efficient rendering of large chat histories
@@ -43,11 +44,16 @@ export function MessageList() {
       <div
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full flex items-center justify-center"
+        className="h-full flex flex-col items-center justify-center bg-surface-messages"
       >
-        <div className="text-center text-muted-foreground">
-          <p className="text-sm">No messages yet</p>
-          <p className="text-xs mt-1">Start a conversation with the agent</p>
+        <div className="text-center p-8">
+          <div className="w-16 h-16 rounded-2xl bg-surface-card-strong flex items-center justify-center mx-auto mb-4">
+            <MessageCircle className="w-8 h-8 text-text-dim" />
+          </div>
+          <h3 className="text-text-muted text-sm font-medium mb-1">No messages yet</h3>
+          <p className="text-text-faint text-xs max-w-[200px]">
+            Start a conversation with the agent to begin
+          </p>
         </div>
       </div>
     )
@@ -58,7 +64,7 @@ export function MessageList() {
       ref={parentRef}
       data-testid="message-list"
       data-virtualized="true"
-      className="h-full overflow-auto"
+      className="h-full overflow-auto bg-surface-messages fade-mask-y"
       onScroll={handleScroll}
     >
       <div

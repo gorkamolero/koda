@@ -1,6 +1,7 @@
 import { useAtomValue } from 'jotai'
 import { generatedSpecAtom, generatedFixPlanAtom } from '@/store/interview'
 import { SpecBuilder } from './SpecBuilder'
+import { CheckCircle } from 'lucide-react'
 
 interface InterviewCompleteProps {
   workspaceId: string
@@ -20,15 +21,22 @@ export function InterviewComplete({
   const generatedFixPlan = useAtomValue(generatedFixPlanAtom)
 
   return (
-    <div data-testid="interview-complete" className="h-full flex flex-col">
+    <div data-testid="interview-complete" className="h-full flex flex-col bg-surface-messages">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4">
-        <h2 className="text-lg font-semibold text-primary">
-          Interview Complete
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review your feature specification before saving
-        </p>
+      <div className="border-b border-border-subtle px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-status-success/20 flex items-center justify-center">
+            <CheckCircle className="w-5 h-5 text-status-success" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-text-strong">
+              Interview Complete
+            </h2>
+            <p className="text-sm text-text-muted">
+              Review your feature specification before saving
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Content */}

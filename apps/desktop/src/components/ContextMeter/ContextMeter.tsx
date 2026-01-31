@@ -1,11 +1,12 @@
 import { useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   totalTokensAtom,
   contextLimitAtom,
-  contextUsagePercentAtom,
   inputValueAtom,
   estimateTokenCount,
 } from '@/store/chat'
+import { AlertTriangle } from 'lucide-react'
 
 /**
  * Visual context usage meter
@@ -14,25 +15,16 @@ import {
 export function ContextMeter() {
   const totalTokens = useAtomValue(totalTokensAtom)
   const contextLimit = useAtomValue(contextLimitAtom)
-  const usagePercent = useAtomValue(contextUsagePercentAtom)
   const inputValue = useAtomValue(inputValueAtom)
 
   // Include pending input in the displayed count
   const pendingTokens = estimateTokenCount(inputValue)
   const displayTokens = totalTokens + pendingTokens
+  const displayPercent = Math.min(100, Math.round((displayTokens / contextLimit) * 100))
 
-  // Determine color based on usage
-  const getUsageColor = (percent: number): string => {
-    if (percent >= 90) return 'bg-red-500'
-    if (percent >= 70) return 'bg-yellow-500'
-    return 'bg-green-500'
-  }
-
-  const getUsageTextColor = (percent: number): string => {
-    if (percent >= 90) return 'text-red-500'
-    if (percent >= 70) return 'text-yellow-500'
-    return 'text-muted-foreground'
-  }
+  // Thresholds for visual warnings
+  const isWarning = displayPercent >= 70
+  const isCritical = displayPercent >= 90
 
   return (
     <div
@@ -40,21 +32,41 @@ export function ContextMeter() {
       className="flex items-center gap-3"
     >
       {/* Progress bar */}
-      <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+      <div className="w-32 h-1.5 bg-surface-control rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-300 ease-out ${getUsageColor(usagePercent)}`}
+          className={cn(
+            'h-full rounded-full transition-all duration-300',
+            isCritical
+              ? 'bg-gradient-to-r from-status-warning to-status-error'
+              : isWarning
+                ? 'bg-gradient-to-r from-[#62b7ff] to-status-warning'
+                : 'bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3]'
+          )}
           style={{
-            width: `${String(usagePercent)}%`,
-            // Use GPU-accelerated transform for smooth animation
-            transform: 'translateZ(0)',
+            width: `${String(displayPercent)}%`,
           }}
         />
       </div>
 
       {/* Token count */}
-      <div className={`text-xs ${getUsageTextColor(usagePercent)}`}>
-        <span className="font-mono">{formatTokenCount(displayTokens)}</span>
-        <span className="text-muted-foreground"> / {formatTokenCount(contextLimit)}</span>
+      <div className="flex items-center gap-1.5 text-xs">
+        {isCritical && (
+          <AlertTriangle className="w-3.5 h-3.5 text-status-error" />
+        )}
+        <span
+          className={cn(
+            'font-mono',
+            isCritical
+              ? 'text-status-error'
+              : isWarning
+                ? 'text-status-warning'
+                : 'text-text-muted'
+          )}
+        >
+          {formatTokenCount(displayTokens)}
+        </span>
+        <span className="text-text-dim">/</span>
+        <span className="text-text-dim">{formatTokenCount(contextLimit)}</span>
       </div>
     </div>
   )

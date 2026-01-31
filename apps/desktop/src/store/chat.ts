@@ -220,7 +220,7 @@ export function estimateTokenCount(text: string): number {
  */
 export const addMessageAtom = atom(
   null,
-  (get, set, message: Omit<ChatMessage, 'timestamp' | 'tokenCount'> & { id?: string }) => {
+  (get, set, message: Omit<ChatMessage, 'id' | 'timestamp' | 'tokenCount'> & { id?: string }) => {
     const messages = get(messagesAtom)
     const newMessage: ChatMessage = {
       ...message,

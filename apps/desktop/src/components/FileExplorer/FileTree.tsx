@@ -7,6 +7,7 @@ import {
   type FlattenedEntry,
 } from '@/store/fileExplorer'
 import { FileTreeItem } from './FileTreeItem'
+import { Folder } from 'lucide-react'
 
 interface FileTreeProps {
   onFileOpen: (entry: FlattenedEntry) => void
@@ -75,9 +76,10 @@ export function FileTree({ onFileOpen }: FileTreeProps) {
       <div
         data-testid="file-tree"
         data-virtualized="true"
-        className="h-full flex items-center justify-center text-muted-foreground text-sm"
+        className="h-full flex flex-col items-center justify-center text-center p-8"
       >
-        No files loaded
+        <Folder className="w-10 h-10 text-text-dim mb-3" />
+        <p className="text-text-muted text-sm">No files loaded</p>
       </div>
     )
   }
