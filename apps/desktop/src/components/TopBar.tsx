@@ -1,4 +1,4 @@
-import { ChevronDown, GitBranch, ExternalLink } from 'lucide-react'
+import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useWorkspaceDiffStats } from '@/hooks/useRpc'
 import type { Workspace } from '@/lib/rpc'
@@ -50,8 +50,18 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         </button>
       </div>
 
-      {/* Center section: Tabs */}
-      <div className="flex items-center">
+      {/* Center section: Navigation Tabs */}
+      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5">
+        {/* Chat tab with icon */}
+        <TabButton
+          active={activeTab === 'chat'}
+          onClick={() => onTabChange('chat')}
+          icon={<MessageSquare className="h-3.5 w-3.5" />}
+        >
+          Chat
+        </TabButton>
+
+        {/* Code tabs */}
         <TabButton
           active={activeTab === 'files'}
           onClick={() => onTabChange('files')}
@@ -64,21 +74,16 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
           onClick={() => onTabChange('diff')}
           badge={changedFilesCount > 0 ? changedFilesCount : undefined}
         >
-          Changed
+          Changes
         </TabButton>
 
+        {/* Terminal tab with icon */}
         <TabButton
-          active={false}
-          onClick={() => {}}
+          active={activeTab === 'terminal'}
+          onClick={() => onTabChange('terminal')}
+          icon={<Terminal className="h-3.5 w-3.5" />}
         >
-          Checks
-        </TabButton>
-
-        <TabButton
-          active={false}
-          onClick={() => {}}
-        >
-          Review
+          Terminal
         </TabButton>
       </div>
 
@@ -97,20 +102,22 @@ interface TabButtonProps {
   active: boolean
   onClick: () => void
   badge?: number
+  icon?: React.ReactNode
   children: React.ReactNode
 }
 
-function TabButton({ active, onClick, badge, children }: TabButtonProps) {
+function TabButton({ active, onClick, badge, icon, children }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
+        'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors',
         active
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground'
+          ? 'bg-background text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
       )}
     >
+      {icon}
       {children}
       {badge !== undefined && (
         <span className={cn(

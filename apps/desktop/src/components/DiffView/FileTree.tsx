@@ -1,19 +1,22 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useMemo } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
 import {
-  diffTreeAtom,
+  filteredTreeAtom,
   expandedFoldersAtom,
   selectedFileIdAtom,
   toggleFolderAtom,
   flattenTree,
   isDiffFolder,
+  fileFilterAtom,
+  fileCountsByStatusAtom,
   type DiffTreeNode,
   type DiffFile,
   type FileStatus,
+  type DiffFileFilter,
 } from '@/store/diff'
-import { ChevronRight, File, Folder } from 'lucide-react'
+import { ChevronRight, Folder, Plus, Minus, FileEdit, Files } from 'lucide-react'
 
 /**
  * File status badge colors - using design tokens
@@ -43,24 +46,40 @@ interface FileTreeProps {
 }
 
 /**
+ * Filter tab configuration
+ */
+const FILTER_TABS: Array<{
+  id: DiffFileFilter
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  color: string
+}> = [
+  { id: 'all', label: 'All', icon: Files, color: 'text-text-muted' },
+  { id: 'added', label: 'Added', icon: Plus, color: 'text-[--git-green]' },
+  { id: 'modified', label: 'Modified', icon: FileEdit, color: 'text-[--git-yellow]' },
+  { id: 'deleted', label: 'Deleted', icon: Minus, color: 'text-[--git-red]' },
+]
+
+/**
  * Virtualized file tree for diff navigation
  */
 export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
-  const tree = useAtomValue(diffTreeAtom)
+  const tree = useAtomValue(filteredTreeAtom)
   const expandedFolders = useAtomValue(expandedFoldersAtom)
   const selectedFileId = useAtomValue(selectedFileIdAtom)
   const setSelectedFileId = useSetAtom(selectedFileIdAtom)
   const toggleFolder = useSetAtom(toggleFolderAtom)
+  const activeFilter = useAtomValue(fileFilterAtom)
+  const setFileFilter = useSetAtom(fileFilterAtom)
+  const fileCounts = useAtomValue(fileCountsByStatusAtom)
 
   const parentRef = useRef<HTMLDivElement>(null)
 
   // Flatten tree for virtual list
-  const flattenedItems = flattenTree(tree, expandedFolders)
-
-  // Count total files (not folders)
-  const fileCount = flattenedItems.filter(
-    ({ node }) => !isDiffFolder(node)
-  ).length
+  const flattenedItems = useMemo(
+    () => flattenTree(tree, expandedFolders),
+    [tree, expandedFolders]
+  )
 
   const virtualizer = useVirtualizer({
     count: flattenedItems.length,
@@ -163,15 +182,58 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
 
   return (
     <div className="flex flex-col h-full bg-surface-sidebar" data-testid="diff-file-tree">
-      {/* Header with file count */}
+      {/* Header with title */}
       <div className="px-3 py-2 border-b border-border-subtle">
         <span className="text-sm font-medium text-text-primary">Changed Files</span>
         <span
           className="ml-2 text-xs text-text-faint bg-surface-control px-1.5 py-0.5 rounded"
           data-testid="diff-file-count"
         >
-          {fileCount}
+          {fileCounts.all}
         </span>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="px-2 py-2 border-b border-border-subtle flex flex-wrap gap-1">
+        {FILTER_TABS.map((tab) => {
+          const count = fileCounts[tab.id]
+          const isActive = activeFilter === tab.id
+          const Icon = tab.icon
+
+          // Don't show tabs with 0 count (except 'all')
+          if (count === 0 && tab.id !== 'all') return null
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setFileFilter(tab.id)}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
+                isActive
+                  ? 'bg-surface-active text-text-strong'
+                  : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
+              )}
+              data-testid={`filter-${tab.id}`}
+              data-active={isActive}
+            >
+              <Icon className={cn('w-3 h-3', isActive && tab.color)} />
+              <span>{tab.label}</span>
+              {count > 0 && (
+                <span
+                  className={cn(
+                    'px-1 py-0.5 text-[10px] rounded',
+                    isActive
+                      ? 'bg-surface-control text-text-primary'
+                      : 'bg-surface-control/50 text-text-faint'
+                  )}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Virtualized list */}
@@ -288,7 +350,7 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
     <button
       type="button"
       className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 transition-colors text-left',
+        'w-full flex items-center gap-2 px-2 py-1.5 transition-colors text-left group',
         isSelected
           ? 'bg-surface-active text-text-strong'
           : 'hover:bg-surface-hover'
@@ -300,26 +362,10 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
       role="treeitem"
       aria-selected={isSelected}
     >
-      {/* File icon */}
-      <File className="w-4 h-4 text-text-dim flex-shrink-0" />
-
-      {/* Filename */}
-      <span className="text-sm truncate flex-1 text-text-primary">{file.filename}</span>
-
-      {/* Change stats */}
-      <div className="flex items-center gap-1 text-xs flex-shrink-0">
-        {file.additions > 0 && (
-          <span className="text-status-success">+{file.additions}</span>
-        )}
-        {file.deletions > 0 && (
-          <span className="text-status-error">-{file.deletions}</span>
-        )}
-      </div>
-
-      {/* Status badge */}
+      {/* Status badge - show first like Conductor */}
       <span
         className={cn(
-          'px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0',
+          'w-4 h-4 flex items-center justify-center rounded text-[10px] font-bold flex-shrink-0',
           statusColor.bg,
           statusColor.text
         )}
@@ -328,6 +374,21 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
       >
         {statusLabel}
       </span>
+
+      {/* Full file path - like Conductor */}
+      <span className="text-sm truncate flex-1 text-text-primary font-mono">
+        {file.path}
+      </span>
+
+      {/* Change stats - colored like Conductor */}
+      <div className="flex items-center gap-1.5 text-xs flex-shrink-0 tabular-nums">
+        {file.additions > 0 && (
+          <span className="text-[--git-green]">+{file.additions}</span>
+        )}
+        {file.deletions > 0 && (
+          <span className="text-[--git-red]">-{file.deletions}</span>
+        )}
+      </div>
     </button>
   )
 }

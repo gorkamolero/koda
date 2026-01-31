@@ -64,6 +64,14 @@
     --status-ready: #3fe47e;
     --status-unread: #4da3ff;
 
+    /* === GIT DIFF COLORS (from Conductor) === */
+    --git-green: hsl(142 69% 58%);
+    --git-red: hsl(0 91% 71%);
+    --git-yellow: hsl(50 100% 75%);
+    --git-gray: hsl(23 5% 63%);
+    --git-new-line: hsl(142 76% 44%);
+    --git-removed-line: hsl(0 100% 45%);
+
     /* === REVIEW COLORS === */
     --surface-review: rgba(255, 144, 200, 0.1);
     --border-review: rgba(255, 144, 200, 0.35);
