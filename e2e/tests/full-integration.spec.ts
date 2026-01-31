@@ -81,7 +81,7 @@ test.describe('Full Integration Flow', () => {
     }
   })
 
-  test('sidebar shows workspace list', async ({ page }) => {
+  test('workspace view shows topbar with tabs', async ({ page }) => {
     await page.goto('/')
     const loaded = await waitForPageLoad(page)
     if (!loaded) {
@@ -101,9 +101,8 @@ test.describe('Full Integration Flow', () => {
     await workspaceCards.first().click()
     await expect(page).toHaveURL(/\/workspace\//)
 
-    // Sidebar should show workspace info
-    // This may vary based on implementation
-    const sidebar = page.locator('[role="complementary"]')
-    await expect(sidebar).toBeVisible()
+    // Workspace view should show topbar with navigation tabs
+    const topbarTabs = page.getByTestId('topbar-tabs')
+    await expect(topbarTabs).toBeVisible()
   })
 })
