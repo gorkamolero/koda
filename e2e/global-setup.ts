@@ -4,87 +4,79 @@ import * as os from 'node:os'
 
 // Test database path (same as in playwright.config.ts)
 const TEST_DB_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.db')
+const TEST_SOCKET_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.sock')
 
 /**
  * Global setup for E2E tests
  *
- * This runs ONCE before all tests to:
- * 1. Delete the test database (fresh start)
- * 2. The sidecar will auto-create it with migrations
- * 3. We seed test data via RPC after sidecar starts
+ * Two modes of operation:
+ *
+ * 1. SKIP_WEBSERVER=1 (testing against running app):
+ *    - Don't set test env vars
+ *    - Use the real app's database and socket
+ *    - Seed data goes to the real database
+ *
+ * 2. Normal (Playwright starts the app):
+ *    - Set test env vars for isolation
+ *    - Create fresh test database
+ *    - App starts with test socket
  */
 export default async function globalSetup() {
-  // Set the env var for this process and child processes
-  process.env.KODA_TEST_DB = TEST_DB_PATH
+  const skipWebServer = !!process.env.SKIP_WEBSERVER
 
-  console.log(`E2E Test Setup: Using test database at ${TEST_DB_PATH}`)
+  console.log('\n' + '='.repeat(60))
+  console.log('E2E Test Setup')
+  console.log('='.repeat(60))
 
-  // Delete the test database if it exists (fresh start)
-  if (fs.existsSync(TEST_DB_PATH)) {
-    console.log('Deleting existing test database...')
-    fs.unlinkSync(TEST_DB_PATH)
+  if (skipWebServer) {
+    // Testing against already-running app - use its real database
+    console.log('Mode: Testing against RUNNING APP (SKIP_WEBSERVER=1)')
+    console.log('Using real database and socket')
+    console.log('NOTE: Tests will use/modify the real app database!')
 
-    // Also delete WAL and SHM files if they exist
-    const walPath = TEST_DB_PATH + '-wal'
-    const shmPath = TEST_DB_PATH + '-shm'
-    if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
-    if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
-  }
+    // Make sure test env vars are NOT set so seed uses real socket
+    delete process.env.KODA_TEST_DB
+    delete process.env.KODA_SOCKET
+  } else {
+    // Playwright will start the app - use isolated test database
+    console.log('Mode: ISOLATED test database')
+    console.log(`Test database: ${TEST_DB_PATH}`)
+    console.log(`Test socket:   ${TEST_SOCKET_PATH}`)
 
-  // Ensure the directory exists
-  const dbDir = path.dirname(TEST_DB_PATH)
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true })
-  }
+    // Set the env vars for child processes (the app we'll start)
+    process.env.KODA_TEST_DB = TEST_DB_PATH
+    process.env.KODA_SOCKET = TEST_SOCKET_PATH
+    process.env.NODE_ENV = 'test'
 
-  console.log('Test database will be created fresh by sidecar')
-}
-
-/**
- * Seed test data after the sidecar has started
- * Called from a test fixture or beforeAll hook
- */
-export async function seedTestData(): Promise<void> {
-  const RPC_URL = 'http://localhost:3939/rpc'
-
-  // Wait for sidecar to be ready
-  let retries = 10
-  while (retries > 0) {
-    try {
-      const healthRes = await fetch(RPC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'health.ping', id: 1 }),
-      })
-      if (healthRes.ok) break
-    } catch {
-      // Sidecar not ready yet
+    // Ensure the test directory exists
+    const testDir = path.dirname(TEST_DB_PATH)
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true })
+      console.log(`Created test directory: ${testDir}`)
     }
-    retries--
-    await new Promise((r) => setTimeout(r, 1000))
+
+    // Delete the test database if it exists (fresh start)
+    const filesToDelete = [
+      TEST_DB_PATH,
+      TEST_DB_PATH + '-wal',
+      TEST_DB_PATH + '-shm',
+      TEST_SOCKET_PATH,
+    ]
+
+    let deletedCount = 0
+    for (const file of filesToDelete) {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file)
+        deletedCount++
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`Cleaned up ${deletedCount} existing test file(s)`)
+    }
+
+    console.log('Test database will be created fresh by sidecar')
   }
 
-  if (retries === 0) {
-    console.log('Warning: Could not connect to sidecar for seeding')
-    return
-  }
-
-  // Create a test workspace
-  const createRes = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'workspace.create',
-      params: {
-        directoryName: 'e2e-test-workspace',
-        workspaceType: 'standard',
-      },
-      id: 2,
-    }),
-  })
-
-  if (createRes.ok) {
-    console.log('Created test workspace: e2e-test-workspace')
-  }
+  console.log('='.repeat(60) + '\n')
 }
