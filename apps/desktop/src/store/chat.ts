@@ -216,14 +216,15 @@ export function estimateTokenCount(text: string): number {
 
 /**
  * Add message action atom
+ * Accepts optional id to allow pre-generating IDs for later updates
  */
 export const addMessageAtom = atom(
   null,
-  (get, set, message: Omit<ChatMessage, 'id' | 'timestamp' | 'tokenCount'>) => {
+  (get, set, message: Omit<ChatMessage, 'timestamp' | 'tokenCount'> & { id?: string }) => {
     const messages = get(messagesAtom)
     const newMessage: ChatMessage = {
       ...message,
-      id: generateMessageId(),
+      id: message.id ?? generateMessageId(),
       timestamp: Date.now(),
       tokenCount: estimateTokenCount(message.content),
     }

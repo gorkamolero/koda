@@ -1,16 +1,17 @@
 /**
  * Claude Code Handler
  *
- * Manages Claude Code CLI sessions, providing:
- * - Session start/resume/cancel
- * - Message streaming with JSON parsing
- * - Token usage tracking
- * - Claude settings integration
+ * Manages Claude Code CLI sessions using bidirectional stream-json mode.
+ * This is the same approach used by Conductor - no PTY needed.
+ *
+ * Key: --input-format stream-json allows writing JSON to stdin
+ *      --output-format stream-json provides JSON responses on stdout
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -235,20 +236,75 @@ export class ClaudeHandler extends EventEmitter {
   private buildEnv(): NodeJS.ProcessEnv {
     const env = { ...globalThis.process.env };
     delete env.ANTHROPIC_API_KEY;
-    env.CLAUDE_CODE_OUTPUT_FORMAT = 'stream-json';
     return env;
   }
 
   /**
-   * Start a new Claude session
+   * Find claude binary path
+   */
+  private findClaudeBinary(): string {
+    const home = os.homedir();
+    const candidates = [
+      path.join(home, '.local', 'bin', 'claude'),
+      '/usr/local/bin/claude',
+      '/opt/homebrew/bin/claude',
+    ];
+
+    for (const candidate of candidates) {
+      if (fsSync.existsSync(candidate)) {
+        console.log(`[Claude] Found binary at: ${candidate}`);
+        return candidate;
+      }
+    }
+
+    console.log(`[Claude] Binary not found in common locations, falling back to PATH`);
+    return 'claude';
+  }
+
+  /**
+   * Start a new Claude session using bidirectional stream-json mode
+   * This is the same approach used by Conductor - no PTY needed
    */
   async start(params: ClaudeStartParams): Promise<ClaudeStartResult> {
     const sessionId = randomUUID();
-    const args = this.buildCliArgs(params.prompt, params.options);
+    const claudeBin = this.findClaudeBinary();
 
-    const childProcess = spawn('claude', args, {
+    // Build args with bidirectional stream-json (like Conductor does)
+    const args = [
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--input-format', 'stream-json',
+    ];
+
+    // Add optional args
+    if (params.options?.workingDirectory) {
+      args.push('--cwd', params.options.workingDirectory);
+    }
+    if (params.options?.model) {
+      args.push('--model', params.options.model);
+    }
+    if (params.options?.maxTokens) {
+      args.push('--max-turns', String(params.options.maxTokens));
+    }
+    if (params.options?.allowedTools?.length) {
+      args.push('--allowedTools', params.options.allowedTools.join(','));
+    }
+    if (params.options?.systemPrompt) {
+      args.push('--system-prompt', params.options.systemPrompt);
+    }
+    if (params.options?.dangerouslySkipPermissions) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    console.log(`[Claude] Starting session ${sessionId} with bidirectional stream-json`);
+    console.log(`[Claude] Binary: ${claudeBin}`);
+    console.log(`[Claude] Args: ${args.join(' ')}`);
+
+    // Spawn with regular pipes - no PTY needed with stream-json input mode
+    const childProcess = spawn(claudeBin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: this.buildEnv(),
+      cwd: params.options?.workingDirectory || globalThis.process.cwd(),
     });
 
     const session: ClaudeSession = {
@@ -270,6 +326,18 @@ export class ClaudeHandler extends EventEmitter {
 
     this.setupProcessHandlers(sessionId, childProcess);
 
+    // Send the initial prompt via stdin as JSON (stream-json input format)
+    const userMessage = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: params.prompt,
+      },
+    };
+    
+    console.log(`[Claude] Sending initial prompt via stdin`);
+    childProcess.stdin?.write(JSON.stringify(userMessage) + '\n');
+
     return {
       sessionId,
       status: 'running',
@@ -285,21 +353,45 @@ export class ClaudeHandler extends EventEmitter {
       throw new Error('Session not found');
     }
 
-    // Build args for resume
-    const args = this.buildResumeArgs(params.sessionId, params.prompt, session.options);
+    const claudeBin = this.findClaudeBinary();
+    const args = [
+      '--output-format', 'stream-json',
+      '--verbose', 
+      '--input-format', 'stream-json',
+      '--resume', params.sessionId,
+    ];
 
-    const newProcess = spawn('claude', args, {
+    if (session.options?.workingDirectory) {
+      args.push('--cwd', session.options.workingDirectory);
+    }
+    if (session.options?.model) {
+      args.push('--model', session.options.model);
+    }
+
+    const childProcess = spawn(claudeBin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: this.buildEnv(),
+      cwd: session.options?.workingDirectory || globalThis.process.cwd(),
     });
 
-    // Update session
-    session.process = newProcess;
+    session.process = childProcess;
     session.status = 'running';
     session.updatedAt = new Date();
 
     this.streamBuffers.set(params.sessionId, '');
-    this.setupProcessHandlers(params.sessionId, newProcess);
+    this.setupProcessHandlers(params.sessionId, childProcess);
+
+    // Send follow-up prompt if provided
+    if (params.prompt) {
+      const userMessage = {
+        type: 'user',
+        message: {
+          role: 'user',
+          content: params.prompt,
+        },
+      };
+      childProcess.stdin?.write(JSON.stringify(userMessage) + '\n');
+    }
 
     return {
       sessionId: params.sessionId,
@@ -316,7 +408,6 @@ export class ClaudeHandler extends EventEmitter {
       throw new Error('Session not found');
     }
 
-    // Set status BEFORE killing to prevent close handler from emitting duplicate event
     session.status = 'cancelled';
     session.updatedAt = new Date();
 
@@ -374,97 +465,51 @@ export class ClaudeHandler extends EventEmitter {
    * Dispose of all sessions
    */
   async dispose(): Promise<void> {
-    const cancelPromises = Array.from(this.sessions.keys()).map((sessionId) => {
+    const killPromises = Array.from(this.sessions.keys()).map((sessionId) => {
       const session = this.sessions.get(sessionId);
-      if (session && session.process && !session.process.killed) {
+      if (session?.process && !session.process.killed) {
         session.process.kill('SIGTERM');
       }
       return Promise.resolve();
     });
 
-    await Promise.all(cancelPromises);
+    await Promise.all(killPromises);
     this.sessions.clear();
     this.streamBuffers.clear();
   }
 
   /**
-   * Build CLI arguments for starting a session
-   */
-  private buildCliArgs(prompt: string, options?: ClaudeSessionOptions): string[] {
-    const args: string[] = ['--print', '--output-format', 'stream-json', '--verbose'];
-
-    if (options?.workingDirectory) {
-      args.push('--cwd', options.workingDirectory);
-    }
-
-    if (options?.model) {
-      args.push('--model', options.model);
-    }
-
-    if (options?.maxTokens) {
-      args.push('--max-turns', String(options.maxTokens));
-    }
-
-    if (options?.allowedTools && options.allowedTools.length > 0) {
-      args.push('--allowedTools', options.allowedTools.join(','));
-    }
-
-    if (options?.systemPrompt) {
-      args.push('--system-prompt', options.systemPrompt);
-    }
-
-    if (options?.dangerouslySkipPermissions) {
-      args.push('--dangerously-skip-permissions');
-    }
-
-    // Add the prompt as positional argument at the end
-    args.push(prompt);
-
-    return args;
-  }
-
-  /**
-   * Build CLI arguments for resuming a session
-   */
-  private buildResumeArgs(sessionId: string, prompt?: string, options?: ClaudeSessionOptions): string[] {
-    const args: string[] = ['--print', '--output-format', 'stream-json', '--verbose', '--resume', sessionId];
-
-    if (options?.workingDirectory) {
-      args.push('--cwd', options.workingDirectory);
-    }
-
-    if (options?.model) {
-      args.push('--model', options.model);
-    }
-
-    if (prompt) {
-      // Add prompt as positional argument
-      args.push(prompt);
-    }
-
-    return args;
-  }
-
-  /**
-   * Setup event handlers for the Claude process
+   * Setup event handlers for the process
    */
   private setupProcessHandlers(sessionId: string, childProcess: ChildProcess): void {
-    childProcess.stdout?.on('data', (data: Buffer) => {
-      this.handleStdout(sessionId, data.toString());
+    console.log(`[Claude] Setting up handlers for session ${sessionId}, PID: ${childProcess.pid}`);
+
+    if (!childProcess.stdout) {
+      console.error(`[Claude] ERROR: stdout is null for session ${sessionId}`);
+      return;
+    }
+
+    childProcess.stdout.on('data', (data: Buffer) => {
+      const text = data.toString();
+      console.log(`[Claude] stdout (${sessionId}): ${text.substring(0, 300)}${text.length > 300 ? '...' : ''}`);
+      this.handleStdout(sessionId, text);
     });
 
     childProcess.stderr?.on('data', (data: Buffer) => {
       const errorText = data.toString().trim();
       if (errorText) {
-        this.emit('error', errorText);
+        console.log(`[Claude] stderr (${sessionId}): ${errorText}`);
+        // Don't emit as error - stderr often contains debug info
       }
     });
 
     childProcess.on('close', (code: number | null) => {
+      console.log(`[Claude] Process close (${sessionId}): code=${code}`);
       this.handleProcessClose(sessionId, code);
     });
 
     childProcess.on('error', (err: Error) => {
+      console.error(`[Claude] Process error (${sessionId}):`, err.message);
       this.emit('error', err.message);
       const session = this.sessions.get(sessionId);
       if (session) {

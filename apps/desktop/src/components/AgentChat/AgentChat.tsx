@@ -16,6 +16,7 @@ import {
   type ClaudeSessionInfo,
   type StoredMessage,
   type ClaudeGetMessagesParams,
+  type ClaudeMessageContent,
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
@@ -73,22 +74,27 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
 
       for (const msg of messages) {
         messageIndexRef.current = msg.index + 1
-        
+
         // Process the event
         const event = msg.event
-        
-        if (event.type === 'assistant' && event.message?.text) {
-          // Accumulate assistant text
-          accumulatedTextRef.current += event.message.text
-          
-          if (currentMessageIdRef.current) {
-            updateMessage({
-              id: currentMessageIdRef.current,
-              update: {
-                content: accumulatedTextRef.current,
-                status: 'streaming',
-              },
-            })
+
+        if (event.type === 'assistant' && event.message?.content) {
+          // Extract text from content array (stream-json format)
+          const textContent = event.message.content.find(
+            (c: ClaudeMessageContent) => c.type === 'text'
+          )
+          if (textContent?.text) {
+            accumulatedTextRef.current += textContent.text
+
+            if (currentMessageIdRef.current) {
+              updateMessage({
+                id: currentMessageIdRef.current,
+                update: {
+                  content: accumulatedTextRef.current,
+                  status: 'streaming',
+                },
+              })
+            }
           }
         } else if (event.type === 'result') {
           // Check for errors (billing, auth, etc.)
@@ -167,10 +173,11 @@ export function AgentChat({ workspaceId }: AgentChatProps) {
       messageIndexRef.current = 0
 
       try {
-        // Create placeholder for assistant response
+        // Create placeholder for assistant response with known ID for later updates
         const messageId = generateMessageId()
         currentMessageIdRef.current = messageId
         addMessage({
+          id: messageId,
           role: 'assistant',
           content: '',
           status: 'streaming',
