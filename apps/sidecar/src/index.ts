@@ -12,8 +12,10 @@ import {
   createWorkspace,
   getWorkspace,
   listWorkspaces,
+  getDiffStats,
   CreateWorkspaceSchema,
   GetWorkspaceSchema,
+  GetDiffStatsSchema,
 } from './handlers/workspace.js';
 
 // Import repo handlers
@@ -144,6 +146,7 @@ function registerMethods() {
   router.register('workspace.create', createWorkspace, CreateWorkspaceSchema);
   router.register('workspace.get', getWorkspace, GetWorkspaceSchema);
   router.register('workspace.list', listWorkspaces);
+  router.register('workspace.getDiffStats', getDiffStats, GetDiffStatsSchema);
 
   // Codex agent
   router.register('codex.start', startCodexSession, StartSessionSchema);
