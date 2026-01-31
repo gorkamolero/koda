@@ -322,3 +322,81 @@ export const updateMessageAtom = atom(
     set(messagesAtom, updatedMessages)
   }
 )
+
+/**
+ * Plan mode types
+ */
+export interface PlanStep {
+  id: string
+  title: string
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped'
+  description?: string
+}
+
+export interface PlanModeState {
+  isActive: boolean
+  planTitle: string
+  steps: PlanStep[]
+  currentStepIndex: number
+}
+
+/**
+ * Plan mode state atom
+ */
+export const planModeAtom = atom<PlanModeState>({
+  isActive: false,
+  planTitle: '',
+  steps: [],
+  currentStepIndex: 0,
+})
+
+/**
+ * Enter plan mode action
+ */
+export const enterPlanModeAtom = atom(
+  null,
+  (_get, set, { title, steps }: { title: string; steps?: PlanStep[] }) => {
+    set(planModeAtom, {
+      isActive: true,
+      planTitle: title,
+      steps: steps ?? [],
+      currentStepIndex: 0,
+    })
+  }
+)
+
+/**
+ * Update plan step action
+ */
+export const updatePlanStepAtom = atom(
+  null,
+  (get, set, { stepId, status, description }: { stepId: string; status: PlanStep['status']; description?: string }) => {
+    const state = get(planModeAtom)
+    const steps = state.steps.map((step, index) => {
+      if (step.id === stepId) {
+        // If marking as in_progress, also update currentStepIndex
+        if (status === 'in_progress') {
+          set(planModeAtom, { ...state, currentStepIndex: index })
+        }
+        return { ...step, status, description: description ?? step.description }
+      }
+      return step
+    })
+    set(planModeAtom, { ...get(planModeAtom), steps })
+  }
+)
+
+/**
+ * Exit plan mode action
+ */
+export const exitPlanModeAtom = atom(
+  null,
+  (_get, set) => {
+    set(planModeAtom, {
+      isActive: false,
+      planTitle: '',
+      steps: [],
+      currentStepIndex: 0,
+    })
+  }
+)

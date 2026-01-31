@@ -93,6 +93,11 @@ export interface VisualDiffState {
 }
 
 /**
+ * File filter options for the diff panel
+ */
+export type DiffFileFilter = 'all' | 'added' | 'modified' | 'deleted' | 'renamed'
+
+/**
  * Diff view state
  */
 export interface DiffViewState {
@@ -120,6 +125,8 @@ export interface DiffViewState {
   isLoading: boolean
   /** Active tab */
   activeTab: 'code' | 'visual'
+  /** File filter */
+  fileFilter: DiffFileFilter
 }
 
 /**
@@ -143,6 +150,7 @@ function createInitialDiffState(): DiffViewState {
     },
     isLoading: false,
     activeTab: 'code',
+    fileFilter: 'all',
   }
 }
 
@@ -322,6 +330,50 @@ export const isLoadingAtom = atom(
     set(diffStateAtom, { ...state, isLoading })
   }
 )
+
+/**
+ * File filter atom (derived)
+ */
+export const fileFilterAtom = atom(
+  (get) => get(diffStateAtom).fileFilter,
+  (get, set, filter: DiffFileFilter) => {
+    const state = get(diffStateAtom)
+    set(diffStateAtom, { ...state, fileFilter: filter })
+  }
+)
+
+/**
+ * File counts by status (derived)
+ */
+export const fileCountsByStatusAtom = atom((get) => {
+  const files = get(diffStateAtom).files
+  return {
+    all: files.length,
+    added: files.filter(f => f.status === 'added').length,
+    modified: files.filter(f => f.status === 'modified').length,
+    deleted: files.filter(f => f.status === 'deleted').length,
+    renamed: files.filter(f => f.status === 'renamed').length,
+  }
+})
+
+/**
+ * Filtered files atom (derived) - filters files based on current filter
+ */
+export const filteredFilesAtom = atom((get) => {
+  const state = get(diffStateAtom)
+  const { files, fileFilter } = state
+
+  if (fileFilter === 'all') return files
+  return files.filter(f => f.status === fileFilter)
+})
+
+/**
+ * Filtered tree atom (derived) - rebuilds tree with only filtered files
+ */
+export const filteredTreeAtom = atom((get) => {
+  const filteredFiles = get(filteredFilesAtom)
+  return buildFileTree(filteredFiles)
+})
 
 /**
  * Add comment action

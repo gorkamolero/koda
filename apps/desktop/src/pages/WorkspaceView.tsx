@@ -8,6 +8,7 @@ import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
 import { TerminalPanel } from '@/components/Terminal'
+import { GitStatusBar } from '@/components/GitStatusBar'
 import {
   InterviewMode,
   SpecDrivenView,
@@ -163,6 +164,9 @@ export function WorkspaceView() {
           <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
         )}
       </div>
+
+      {/* Git status bar at bottom */}
+      <GitStatusBar workspace={workspace} />
     </div>
   )
 }

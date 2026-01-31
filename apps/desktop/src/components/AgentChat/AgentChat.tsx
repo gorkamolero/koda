@@ -7,6 +7,8 @@ import {
   isStreamingAtom,
   selectedModelAtom,
   generateMessageId,
+  planModeAtom,
+  exitPlanModeAtom,
 } from '@/store/chat'
 import { rpcRequest } from '@/lib/tauri'
 import {
@@ -20,6 +22,7 @@ import {
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { ModelSelector } from './ModelSelector'
+import { PlanModeIndicator } from './PlanModeIndicator'
 import { ContextMeter } from '@/components/ContextMeter'
 import { useNotifications } from '@/hooks/useNotifications'
 
@@ -40,6 +43,8 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
   const updateMessage = useSetAtom(updateMessageAtom)
   const setIsStreaming = useSetAtom(isStreamingAtom)
   const selectedModel = useAtomValue(selectedModelAtom)
+  const planMode = useAtomValue(planModeAtom)
+  const exitPlanMode = useSetAtom(exitPlanModeAtom)
   const { showToast } = useNotifications()
   
   // Track active session for polling
@@ -252,6 +257,15 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         <ModelSelector />
         <ContextMeter />
       </div>
+
+      {/* Plan mode indicator */}
+      <PlanModeIndicator
+        isActive={planMode.isActive}
+        planTitle={planMode.planTitle}
+        steps={planMode.steps}
+        currentStepIndex={planMode.currentStepIndex}
+        onExitPlanMode={exitPlanMode}
+      />
 
       {/* Message list */}
       <div className="flex-1 overflow-hidden">
