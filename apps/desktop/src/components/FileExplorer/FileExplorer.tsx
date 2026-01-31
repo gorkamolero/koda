@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useAtom, useSetAtom } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   fileTreeAtom,
   rootPathAtom,
@@ -10,6 +11,7 @@ import {
 import { FileTree } from './FileTree'
 import { QuickOpen } from './QuickOpen'
 import { useFileSystem } from '@/hooks/useFileSystem'
+import { Folder, RefreshCw, AlertCircle } from 'lucide-react'
 
 interface FileExplorerProps {
   rootPath: string
@@ -89,46 +91,33 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
   )
 
   return (
-    <div data-testid="file-explorer" className="h-full flex flex-col">
+    <div data-testid="file-explorer" className="h-full flex flex-col bg-surface-sidebar">
       {/* Header */}
       <div
         data-testid="file-explorer-root"
-        className="flex items-center justify-between px-3 py-2 border-b border-border bg-background"
+        className="flex items-center justify-between px-3 py-2 border-b border-border-subtle"
       >
         <div className="flex items-center gap-2 min-w-0">
-          <svg
-            className="w-4 h-4 text-muted-foreground flex-shrink-0"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-          </svg>
-          <span className="text-sm font-medium truncate">
+          <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
+          <span className="text-sm font-medium text-text-primary truncate">
             {rootPath.split('/').pop() ?? 'Files'}
           </span>
         </div>
 
         {/* Refresh button */}
         <button
-          className="p-1 hover:bg-accent rounded transition-colors"
+          className="btn-icon"
           title="Refresh"
           onClick={handleRefresh}
         >
-          <svg
-            className={`w-4 h-4 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M21 12a9 9 0 11-9-9" />
-          </svg>
+          <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
         </button>
       </div>
 
       {/* Error state */}
       {error && (
-        <div className="px-3 py-2 text-xs text-red-500 bg-red-500/10">
+        <div className="px-3 py-2 flex items-center gap-2 text-xs text-status-error bg-status-error/10 border-b border-status-error/20">
+          <AlertCircle className="w-3.5 h-3.5" />
           {error}
         </div>
       )}
@@ -139,7 +128,7 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
           {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className="h-6 bg-muted/50 rounded animate-pulse"
+              className="h-6 bg-surface-control rounded shimmer"
               style={{ width: `${String(60 + Math.random() * 30)}%` }}
             />
           ))}
@@ -148,7 +137,7 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
 
       {/* File tree */}
       {!isLoading && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden fade-mask-y">
           <FileTree onFileOpen={handleFileOpen} />
         </div>
       )}

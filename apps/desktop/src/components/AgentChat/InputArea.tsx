@@ -1,5 +1,6 @@
 import { useRef, useCallback, type KeyboardEvent, type ChangeEvent } from 'react'
 import { useAtom, useSetAtom, useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   inputValueAtom,
   isStreamingAtom,
@@ -7,13 +8,14 @@ import {
   selectedModelAtom,
   estimateTokenCount,
 } from '@/store/chat'
+import { Send, Loader2 } from 'lucide-react'
 
 interface InputAreaProps {
   onSendMessage?: (message: string) => void
 }
 
 /**
- * Chat input area with textarea, send button, and attachment support
+ * Chat input area (Composer) with textarea, send button, and token counter
  */
 export function InputArea({ onSendMessage }: InputAreaProps) {
   const [inputValue, setInputValue] = useAtom(inputValueAtom)
@@ -81,9 +83,26 @@ export function InputArea({ onSendMessage }: InputAreaProps) {
   const inputTokenCount = estimateTokenCount(inputValue)
 
   return (
-    <div className="border-t border-border bg-background p-4">
+    <div className="glass bg-surface-composer border-t border-border-subtle px-4 py-3">
       <div className="max-w-4xl mx-auto">
-        <div className="flex gap-3">
+        {/* Meta bar */}
+        <div className="flex items-center gap-3 mb-2 text-xs">
+          <span className="text-text-faint">
+            Model: <span className="text-text-muted">{selectedModel}</span>
+          </span>
+          {isStreaming && (
+            <>
+              <span className="text-text-dim">•</span>
+              <span className="text-text-accent animate-pulse flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Generating...
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Input row */}
+        <div className="flex items-end gap-3">
           {/* Textarea */}
           <div className="flex-1 relative">
             <textarea
@@ -92,23 +111,24 @@ export function InputArea({ onSendMessage }: InputAreaProps) {
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message... (Enter or Cmd+Enter to send)"
+              placeholder="Message..."
               disabled={isStreaming}
               rows={1}
-              className="
-                w-full resize-none rounded-md
-                border border-border bg-background
-                px-4 py-3 text-sm
-                placeholder:text-muted-foreground
-                focus:outline-none focus:ring-2 focus:ring-primary/50
-                disabled:opacity-50 disabled:cursor-not-allowed
-              "
-              style={{ minHeight: '44px', maxHeight: '200px' }}
+              className={cn(
+                'w-full resize-none rounded-xl',
+                'bg-surface-control border border-border-subtle',
+                'px-4 py-3 text-sm text-text-primary',
+                'placeholder:text-text-dim',
+                'focus:outline-none focus:border-border-accent focus:ring-1 focus:ring-border-accent-soft',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-colors'
+              )}
+              style={{ minHeight: '48px', maxHeight: '200px' }}
             />
 
             {/* Token count indicator */}
             {inputValue.length > 0 && (
-              <div className="absolute bottom-2 right-3 text-xs text-muted-foreground">
+              <div className="absolute bottom-3 right-3 text-xs text-text-dim">
                 ~{inputTokenCount} tokens
               </div>
             )}
@@ -119,72 +139,40 @@ export function InputArea({ onSendMessage }: InputAreaProps) {
             data-testid="send-button"
             onClick={handleSend}
             disabled={!inputValue.trim() || isStreaming}
-            className="
-              inline-flex items-center justify-center
-              rounded-md px-4 py-2
-              bg-primary text-primary-foreground
-              hover:bg-primary/90
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-colors
-            "
+            className={cn(
+              'btn-primary h-12 px-5',
+              'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none'
+            )}
             title={`Send message using ${selectedModel}`}
           >
             {isStreaming ? (
-              <LoadingIcon className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <SendIcon className="w-5 h-5" />
+              <Send className="w-5 h-5" />
             )}
           </button>
         </div>
 
         {/* Hint text */}
-        <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
-          <span>
-            Press <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs">Enter</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs">Cmd+Enter</kbd> to send, <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs">Shift+Enter</kbd> for new line
+        <div className="mt-2 text-xs text-text-dim flex items-center justify-between">
+          <span className="flex items-center gap-1">
+            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
+              Enter
+            </kbd>
+            <span className="text-text-faint">or</span>
+            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
+              ⌘↵
+            </kbd>
+            <span className="text-text-faint">to send</span>
           </span>
-          {isStreaming && (
-            <span className="text-primary animate-pulse">Agent is responding...</span>
-          )}
+          <span className="text-text-faint">
+            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
+              ⇧↵
+            </kbd>
+            <span className="ml-1">for new line</span>
+          </span>
         </div>
       </div>
     </div>
-  )
-}
-
-function SendIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      className={className}
-    >
-      <path d="M3.105 2.289a.75.75 0 00-.826.95l1.414 4.925A1.5 1.5 0 005.135 9.25h6.115a.75.75 0 010 1.5H5.135a1.5 1.5 0 00-1.442 1.086l-1.414 4.926a.75.75 0 00.826.95 28.896 28.896 0 0015.293-7.154.75.75 0 000-1.115A28.897 28.897 0 003.105 2.289z" />
-    </svg>
-  )
-}
-
-function LoadingIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      className={className}
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
   )
 }

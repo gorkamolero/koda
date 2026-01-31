@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { cn } from '@/lib/utils'
 import {
   diffTreeAtom,
   expandedFoldersAtom,
@@ -12,15 +13,16 @@ import {
   type DiffFile,
   type FileStatus,
 } from '@/store/diff'
+import { ChevronRight, File, Folder } from 'lucide-react'
 
 /**
- * File status badge colors
+ * File status badge colors - using design tokens
  */
 const STATUS_COLORS: Record<FileStatus, { bg: string; text: string }> = {
-  added: { bg: 'bg-green-500/20', text: 'text-green-500' },
-  modified: { bg: 'bg-yellow-500/20', text: 'text-yellow-500' },
-  deleted: { bg: 'bg-red-500/20', text: 'text-red-500' },
-  renamed: { bg: 'bg-blue-500/20', text: 'text-blue-500' },
+  added: { bg: 'bg-status-success/20', text: 'text-status-success' },
+  modified: { bg: 'bg-status-warning/20', text: 'text-status-warning' },
+  deleted: { bg: 'bg-status-error/20', text: 'text-status-error' },
+  renamed: { bg: 'bg-text-accent/20', text: 'text-text-accent' },
 }
 
 /**
@@ -160,22 +162,22 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
   }, [selectedFileId, flattenedItems, virtualizer])
 
   return (
-    <div className="flex flex-col h-full" data-testid="diff-file-tree">
+    <div className="flex flex-col h-full bg-surface-sidebar" data-testid="diff-file-tree">
       {/* Header with file count */}
-      <div className="px-3 py-2 border-b border-border bg-secondary/30">
-        <span className="text-sm font-medium text-foreground">Changed Files</span>
+      <div className="px-3 py-2 border-b border-border-subtle">
+        <span className="text-sm font-medium text-text-primary">Changed Files</span>
         <span
-          className="ml-2 text-xs text-muted-foreground"
+          className="ml-2 text-xs text-text-faint bg-surface-control px-1.5 py-0.5 rounded"
           data-testid="diff-file-count"
         >
-          ({fileCount})
+          {fileCount}
         </span>
       </div>
 
       {/* Virtualized list */}
       <div
         ref={parentRef}
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto fade-mask-y"
         data-virtualized="true"
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -247,7 +249,7 @@ function FolderItem({ folder, depth, isExpanded, onClick }: FolderItemProps) {
   return (
     <button
       type="button"
-      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-accent/50 transition-colors text-left"
+      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-surface-hover transition-colors text-left"
       style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
       onClick={onClick}
       data-testid="diff-folder-item"
@@ -256,32 +258,17 @@ function FolderItem({ folder, depth, isExpanded, onClick }: FolderItemProps) {
       role="treeitem"
     >
       {/* Expand/collapse icon */}
-      <svg
-        className={`w-4 h-4 text-muted-foreground transition-transform ${
-          isExpanded ? 'rotate-90' : ''
-        }`}
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 5l7 7-7 7"
-        />
-      </svg>
+      <ChevronRight
+        className={cn(
+          'w-4 h-4 text-text-dim transition-transform',
+          isExpanded && 'rotate-90'
+        )}
+      />
 
       {/* Folder icon */}
-      <svg
-        className="w-4 h-4 text-yellow-500"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-      >
-        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-      </svg>
+      <Folder className="w-4 h-4 text-status-warning" />
 
-      <span className="text-sm text-foreground truncate">{folder.name}</span>
+      <span className="text-sm text-text-primary truncate">{folder.name}</span>
     </button>
   )
 }
@@ -300,10 +287,12 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
   return (
     <button
       type="button"
-      className={`
-        w-full flex items-center gap-2 px-2 py-1.5 transition-colors text-left
-        ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}
-      `}
+      className={cn(
+        'w-full flex items-center gap-2 px-2 py-1.5 transition-colors text-left',
+        isSelected
+          ? 'bg-surface-active text-text-strong'
+          : 'hover:bg-surface-hover'
+      )}
       style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
       onClick={onClick}
       data-testid="diff-file-item"
@@ -312,39 +301,28 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
       aria-selected={isSelected}
     >
       {/* File icon */}
-      <svg
-        className="w-4 h-4 text-muted-foreground flex-shrink-0"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        />
-      </svg>
+      <File className="w-4 h-4 text-text-dim flex-shrink-0" />
 
       {/* Filename */}
-      <span className="text-sm truncate flex-1">{file.filename}</span>
+      <span className="text-sm truncate flex-1 text-text-primary">{file.filename}</span>
 
       {/* Change stats */}
       <div className="flex items-center gap-1 text-xs flex-shrink-0">
         {file.additions > 0 && (
-          <span className="text-green-500">+{file.additions}</span>
+          <span className="text-status-success">+{file.additions}</span>
         )}
         {file.deletions > 0 && (
-          <span className="text-red-500">-{file.deletions}</span>
+          <span className="text-status-error">-{file.deletions}</span>
         )}
       </div>
 
       {/* Status badge */}
       <span
-        className={`
-          px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0
-          ${statusColor.bg} ${statusColor.text}
-        `}
+        className={cn(
+          'px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0',
+          statusColor.bg,
+          statusColor.text
+        )}
         data-testid="file-status-badge"
         data-status={file.status}
       >

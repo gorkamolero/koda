@@ -1,11 +1,13 @@
 import { memo, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   type FlattenedEntry,
   toggleExpandedAtom,
   selectedPathAtom,
 } from '@/store/fileExplorer'
 import { FileIcon } from './FileIcon'
+import { ChevronRight, Loader2 } from 'lucide-react'
 
 interface FileTreeItemProps {
   entry: FlattenedEntry
@@ -71,12 +73,12 @@ export const FileTreeItem = memo(function FileTreeItem({
       tabIndex={0}
       role="treeitem"
       aria-expanded={isDirectory ? entry.isExpanded : undefined}
-      className={`
-        flex items-center gap-1 px-2 py-1 cursor-pointer
-        hover:bg-accent/50 transition-colors
-        ${isSelected ? 'bg-accent text-accent-foreground' : ''}
-        focus:outline-none focus:ring-1 focus:ring-primary/50
-      `}
+      className={cn(
+        'flex items-center gap-1 px-2 py-1 cursor-pointer',
+        'hover:bg-surface-hover transition-colors',
+        'focus:outline-none focus:ring-1 focus:ring-border-accent-soft',
+        isSelected && 'bg-surface-active text-text-strong'
+      )}
       style={{ paddingLeft: `${String(entry.depth * 16 + 8)}px` }}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -85,19 +87,16 @@ export const FileTreeItem = memo(function FileTreeItem({
       {isDirectory ? (
         <button
           data-testid="expand-button"
-          className="p-0.5 hover:bg-accent rounded transition-colors"
+          className="p-0.5 hover:bg-surface-control rounded transition-colors"
           onClick={handleExpandClick}
           aria-label={entry.isExpanded ? 'Collapse' : 'Expand'}
         >
-          <svg
-            className={`w-3 h-3 text-muted-foreground transition-transform ${
-              entry.isExpanded ? 'rotate-90' : ''
-            }`}
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
-          </svg>
+          <ChevronRight
+            className={cn(
+              'w-3 h-3 text-text-dim transition-transform',
+              entry.isExpanded && 'rotate-90'
+            )}
+          />
         </button>
       ) : (
         <span className="w-4" /> // Spacer for alignment
@@ -111,28 +110,16 @@ export const FileTreeItem = memo(function FileTreeItem({
       />
 
       {/* Name */}
-      <span className="text-sm truncate flex-1">{entry.name}</span>
+      <span className={cn(
+        'text-sm truncate flex-1',
+        isSelected ? 'text-text-strong' : 'text-text-primary'
+      )}>
+        {entry.name}
+      </span>
 
       {/* Loading indicator */}
       {entry.isLoading && (
-        <svg
-          className="w-3 h-3 animate-spin text-muted-foreground"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-            fill="none"
-            opacity="0.25"
-          />
-          <path
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          />
-        </svg>
+        <Loader2 className="w-3 h-3 animate-spin text-text-dim" />
       )}
     </div>
   )

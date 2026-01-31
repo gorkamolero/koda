@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
+import { cn } from '@/lib/utils'
 import type { InterviewQuestion, InterviewAnswer } from '@/store/interview'
+import { Check } from 'lucide-react'
 
 interface QuestionCardProps {
   question: InterviewQuestion
@@ -52,15 +54,15 @@ export function QuestionCard({
       <div className="mb-6">
         <h3
           data-testid="interview-question"
-          className="text-xl font-semibold text-primary mb-2"
+          className="text-xl font-semibold text-text-strong mb-2"
         >
           {question.question}
           {question.required && (
-            <span className="text-destructive ml-1">*</span>
+            <span className="text-status-error ml-1">*</span>
           )}
         </h3>
         {question.description && (
-          <p className="text-muted-foreground">{question.description}</p>
+          <p className="text-text-muted">{question.description}</p>
         )}
       </div>
 
@@ -71,7 +73,14 @@ export function QuestionCard({
             value={textValue}
             onChange={handleTextChange}
             placeholder={question.placeholder}
-            className="w-full min-h-[120px] rounded-md border border-border bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
+            className={cn(
+              'w-full min-h-[120px] rounded-xl',
+              'bg-surface-control border border-border-subtle',
+              'px-4 py-3 text-sm text-text-primary',
+              'placeholder:text-text-dim',
+              'focus:outline-none focus:border-border-accent focus:ring-1 focus:ring-border-accent-soft',
+              'resize-y transition-colors'
+            )}
           />
         </div>
       )}
@@ -86,36 +95,24 @@ export function QuestionCard({
                 data-testid="interview-choice-option"
                 data-selected={isSelected}
                 onClick={() => { handleChoiceToggle(choice) }}
-                className={`
-                  w-full text-left px-4 py-3 rounded-md border transition-colors
-                  ${
-                    isSelected
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-background hover:border-primary/50 hover:bg-accent'
-                  }
-                `}
+                className={cn(
+                  'w-full text-left px-4 py-3 rounded-xl border transition-all',
+                  isSelected
+                    ? 'border-border-accent bg-surface-active text-text-strong'
+                    : 'border-border-subtle bg-surface-card hover:border-border-accent/50 hover:bg-surface-hover'
+                )}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`
-                    w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
-                    ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground'}
-                  `}
+                    className={cn(
+                      'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+                      isSelected
+                        ? 'border-border-accent bg-gradient-to-br from-[#62b7ff] to-[#4fe3a3]'
+                        : 'border-text-dim'
+                    )}
                   >
                     {isSelected && (
-                      <svg
-                        className="w-3 h-3 text-primary-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <Check className="w-3 h-3 text-[#0b0f1a]" strokeWidth={3} />
                     )}
                   </div>
                   <span className="text-sm font-medium">{choice}</span>

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   currentInterviewWorkspaceIdAtom,
   currentQuestionAtom,
@@ -14,6 +15,7 @@ import {
 import { QuestionCard } from './QuestionCard'
 import { ProgressIndicator } from './ProgressIndicator'
 import { InterviewComplete } from './InterviewComplete'
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 
 interface InterviewModeProps {
   workspaceId: string
@@ -79,15 +81,18 @@ export function InterviewMode({
     )
   }
 
+  const isLastQuestion = progress.current === progress.total
+  const isFirstQuestion = progress.current === 1
+
   return (
     <div
       data-testid="interview-container"
-      className="h-full flex flex-col bg-background"
+      className="h-full flex flex-col bg-surface-messages"
     >
       {/* Header with progress */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="border-b border-border-subtle px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-primary">
+          <h2 className="text-lg font-semibold text-text-strong">
             Feature Interview
           </h2>
           <ProgressIndicator
@@ -96,9 +101,10 @@ export function InterviewMode({
             percent={progress.percent}
           />
         </div>
-        <div className="w-full bg-secondary rounded-full h-2">
+        {/* Progress bar */}
+        <div className="w-full h-1.5 bg-surface-control rounded-full overflow-hidden">
           <div
-            className="bg-primary h-2 rounded-full transition-all duration-300"
+            className="h-full rounded-full bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3] transition-all duration-300"
             style={{ width: `${String(progress.percent)}%` }}
           />
         </div>
@@ -116,23 +122,40 @@ export function InterviewMode({
       </div>
 
       {/* Navigation buttons */}
-      <div className="border-t border-border px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="border-t border-border-subtle px-6 py-4">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
           <button
             data-testid="interview-back-button"
             onClick={handleBack}
-            disabled={progress.current === 1}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            disabled={isFirstQuestion}
+            className={cn(
+              'btn-ghost',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
           >
+            <ChevronLeft className="w-4 h-4 mr-1" />
             Back
           </button>
           <button
             data-testid="interview-next-button"
             onClick={handleNext}
             disabled={!hasValidAnswer && currentQuestion?.required}
-            className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+            className={cn(
+              isLastQuestion ? 'btn-primary' : 'btn-secondary',
+              'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none'
+            )}
           >
-            {progress.current === progress.total ? 'Complete' : 'Next'}
+            {isLastQuestion ? (
+              <>
+                <Check className="w-4 h-4 mr-1" />
+                Complete
+              </>
+            ) : (
+              <>
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </>
+            )}
           </button>
         </div>
       </div>

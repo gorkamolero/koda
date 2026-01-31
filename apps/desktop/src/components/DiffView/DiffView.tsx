@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useMemo } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
 import {
   diffFilesAtom,
   diffModeAtom,
@@ -15,6 +16,7 @@ import { FileTree } from './FileTree'
 import { DiffEditor } from './DiffEditor'
 import { InlineComments } from './InlineComments'
 import { VisualComparison } from './VisualComparison'
+import { Loader2, AlertCircle, FileText } from 'lucide-react'
 
 interface DiffViewProps {
   /** Workspace ID for loading diff data */
@@ -187,27 +189,29 @@ export function DiffView({ workspaceId }: DiffViewProps) {
   const hasNoCheckpoints = !loadingCheckpoints && (!checkpoints || checkpoints.length < 2)
 
   return (
-    <div className="h-full flex" data-testid="diff-view-container">
+    <div className="h-full flex bg-surface-messages" data-testid="diff-view-container">
       {/* File tree sidebar */}
-      <div className="w-72 border-r border-border flex-shrink-0">
+      <div className="w-72 border-r border-border-subtle flex-shrink-0">
         <FileTree />
       </div>
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-secondary/30">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle bg-surface-topbar">
           {/* Tabs */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 bg-surface-control rounded-lg p-0.5">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('code')
               }}
-              className={`
-                px-3 py-1.5 text-sm rounded-md transition-colors
-                ${activeTab === 'code' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
-              `}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md transition-colors',
+                activeTab === 'code'
+                  ? 'bg-surface-active text-text-strong'
+                  : 'text-text-muted hover:text-text-primary'
+              )}
             >
               Code
             </button>
@@ -216,10 +220,12 @@ export function DiffView({ workspaceId }: DiffViewProps) {
               onClick={() => {
                 setActiveTab('visual')
               }}
-              className={`
-                px-3 py-1.5 text-sm rounded-md transition-colors
-                ${activeTab === 'visual' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
-              `}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-md transition-colors',
+                activeTab === 'visual'
+                  ? 'bg-surface-active text-text-strong'
+                  : 'text-text-muted hover:text-text-primary'
+              )}
               data-testid="diff-visual-tab"
             >
               Visual
@@ -229,7 +235,7 @@ export function DiffView({ workspaceId }: DiffViewProps) {
           {/* Mode toggle (only for code tab) */}
           {activeTab === 'code' && (
             <div
-              className="flex items-center gap-1 bg-secondary rounded-md p-0.5"
+              className="flex items-center gap-1 bg-surface-control rounded-lg p-0.5"
               data-testid="diff-mode-toggle"
             >
               <button
@@ -237,10 +243,12 @@ export function DiffView({ workspaceId }: DiffViewProps) {
                 onClick={() => {
                   setDiffMode('split')
                 }}
-                className={`
-                  px-3 py-1 text-xs font-medium rounded transition-colors
-                  ${diffMode === 'split' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
-                `}
+                className={cn(
+                  'px-3 py-1 text-xs font-medium rounded transition-colors',
+                  diffMode === 'split'
+                    ? 'bg-surface-active text-text-strong'
+                    : 'text-text-muted hover:text-text-primary'
+                )}
                 data-testid="diff-mode-split"
                 data-active={diffMode === 'split'}
               >
@@ -251,10 +259,12 @@ export function DiffView({ workspaceId }: DiffViewProps) {
                 onClick={() => {
                   setDiffMode('unified')
                 }}
-                className={`
-                  px-3 py-1 text-xs font-medium rounded transition-colors
-                  ${diffMode === 'unified' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}
-                `}
+                className={cn(
+                  'px-3 py-1 text-xs font-medium rounded transition-colors',
+                  diffMode === 'unified'
+                    ? 'bg-surface-active text-text-strong'
+                    : 'text-text-muted hover:text-text-primary'
+                )}
                 data-testid="diff-mode-unified"
                 data-active={diffMode === 'unified'}
               >
@@ -269,26 +279,8 @@ export function DiffView({ workspaceId }: DiffViewProps) {
           {/* Loading state */}
           {isLoading && (
             <div className="h-full flex items-center justify-center">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <svg
-                  className="w-5 h-5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
+              <div className="flex items-center gap-2 text-text-muted">
+                <Loader2 className="w-5 h-5 animate-spin" />
                 <span className="text-sm">Loading diff...</span>
               </div>
             </div>
@@ -297,22 +289,10 @@ export function DiffView({ workspaceId }: DiffViewProps) {
           {/* Error state */}
           {diffError && !isLoading && (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <svg
-                  className="w-12 h-12 mx-auto mb-4 text-destructive/50"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                <p className="text-sm">Failed to load diff</p>
-                <p className="text-xs mt-1 text-destructive">
+              <div className="text-center">
+                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-status-error/50" />
+                <p className="text-sm text-text-muted">Failed to load diff</p>
+                <p className="text-xs mt-1 text-status-error">
                   {diffError instanceof Error ? diffError.message : 'Unknown error'}
                 </p>
               </div>
@@ -322,22 +302,10 @@ export function DiffView({ workspaceId }: DiffViewProps) {
           {/* No checkpoints state */}
           {hasNoCheckpoints && !isLoading && !diffError && (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <svg
-                  className="w-16 h-16 mx-auto mb-4 opacity-30"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <p className="text-sm">No changes to show yet</p>
-                <p className="text-xs mt-1">
+              <div className="text-center">
+                <FileText className="w-16 h-16 mx-auto mb-4 text-text-dim" />
+                <p className="text-sm text-text-muted">No changes to show yet</p>
+                <p className="text-xs mt-1 text-text-faint">
                   Agent changes will appear here after the first turn
                 </p>
               </div>
