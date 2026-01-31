@@ -21,6 +21,7 @@ import {
   type WorktreeResult,
   type CheckpointDiff,
   type DiffStats,
+  type Session,
 } from '@/lib/rpc'
 
 /**
@@ -320,5 +321,37 @@ export function useCheckpoints(workspaceId: string) {
       ),
     enabled: !!workspaceId,
     retry: false,
+  })
+}
+
+// ============================================================================
+// Session Hooks
+// ============================================================================
+
+/**
+ * List sessions for a workspace
+ */
+export function useSessions(workspaceId: string) {
+  return useQuery({
+    queryKey: ['sessions', workspaceId],
+    queryFn: () => rpcRequest<Session[]>(RPC_METHODS.SESSION_LIST, { workspaceId }),
+    enabled: !!workspaceId,
+    retry: false,
+    refetchInterval: 5000, // Poll every 5 seconds to catch status changes
+  })
+}
+
+/**
+ * Create a new session
+ */
+export function useCreateSession() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { workspaceId: string; model?: string; agentType?: string }) =>
+      rpcRequest<Session>(RPC_METHODS.SESSION_CREATE, params),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['sessions', variables.workspaceId] })
+    },
   })
 }
