@@ -95,7 +95,7 @@ export function useResizable(config: ResizableConfig): ResizableState {
 
   // Update CSS variable when size changes
   useEffect(() => {
-    document.documentElement.style.setProperty(cssVar, `${size}px`)
+    document.documentElement.style.setProperty(cssVar, `${String(size)}px`)
   }, [cssVar, size])
 
   // Persist size to storage

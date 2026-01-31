@@ -283,7 +283,7 @@ export function parseColor(color: string): { r: number; g: number; b: number; a:
     const hex = color.slice(1)
     if (hex.length === 3) {
       // #RGB
-      const r = hex[0]!, g = hex[1]!, b = hex[2]!
+      const r = hex.charAt(0), g = hex.charAt(1), b = hex.charAt(2)
       return {
         r: parseInt(r + r, 16),
         g: parseInt(g + g, 16),
@@ -292,7 +292,7 @@ export function parseColor(color: string): { r: number; g: number; b: number; a:
       }
     } else if (hex.length === 4) {
       // #RGBA
-      const r = hex[0]!, g = hex[1]!, b = hex[2]!, a = hex[3]!
+      const r = hex.charAt(0), g = hex.charAt(1), b = hex.charAt(2), a = hex.charAt(3)
       return {
         r: parseInt(r + r, 16),
         g: parseInt(g + g, 16),
@@ -340,7 +340,7 @@ export function toRgba(color: string, opacity?: number): string {
   if (!parsed) return color
 
   const a = opacity !== undefined ? opacity : parsed.a
-  return `rgba(${parsed.r}, ${parsed.g}, ${parsed.b}, ${a})`
+  return `rgba(${String(parsed.r)}, ${String(parsed.g)}, ${String(parsed.b)}, ${String(a)})`
 }
 
 /**
@@ -368,7 +368,7 @@ export function adjustBrightness(color: string, factor: number): string {
   const g = Math.min(255, Math.round(parsed.g * factor))
   const b = Math.min(255, Math.round(parsed.b * factor))
 
-  return `rgba(${r}, ${g}, ${b}, ${parsed.a})`
+  return `rgba(${String(r)}, ${String(g)}, ${String(b)}, ${String(parsed.a)})`
 }
 
 /**
@@ -547,7 +547,7 @@ export function parseThemeJson(json: string): VSCodeTheme | null {
     // VS Code themes sometimes have comments (jsonc format)
     // Remove single-line comments
     const cleanJson = json.replace(/\/\/.*$/gm, '')
-    const parsed = JSON.parse(cleanJson)
+    const parsed: unknown = JSON.parse(cleanJson)
 
     if (validateTheme(parsed)) {
       return parsed

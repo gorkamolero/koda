@@ -43,7 +43,7 @@ function UsageBar({
               ? 'bg-gradient-to-r from-status-warning to-status-error'
               : 'bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3]'
           )}
-          style={{ width: `${percent}%` }}
+          style={{ width: `${String(percent)}%` }}
         />
       </div>
     </div>
@@ -101,8 +101,8 @@ function WorkspaceCard({
  */
 function WorkspaceList() {
   const { data: workspaces, isLoading, error } = useWorkspaces()
-  const params = useParams({ strict: false }) as { id?: string }
-  const activeId = params.id
+  const params = useParams({ strict: false })
+  const activeId = (params as { id?: string }).id
 
   if (isLoading) {
     return (

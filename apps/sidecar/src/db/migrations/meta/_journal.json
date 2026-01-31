@@ -22,6 +22,13 @@
       "when": 1769810340000,
       "tag": "0002_session_recordings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1769900000000,
+      "tag": "0003_conductor_fields",
+      "breakpoints": true
     }
   ]
 }
