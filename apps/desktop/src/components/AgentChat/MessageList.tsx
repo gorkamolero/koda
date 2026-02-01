@@ -92,7 +92,7 @@ export function MessageList() {
                   transform: `translateY(${String(virtualItem.start)}px)`,
                 }}
               >
-                <MessageItem message={message} />
+                <MessageItem message={message} turnIndex={virtualItem.index} />
               </div>
             )
           })}
