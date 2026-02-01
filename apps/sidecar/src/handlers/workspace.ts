@@ -1,22 +1,16 @@
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { getDb } from '../db/index.js';
-import { workspaces, repos } from '../db/schema.js';
+import { workspaces, workspaceRepos, worktrees, repos } from '../db/schema.js';
 import { randomUUID } from 'node:crypto';
 
-const execAsync = promisify(exec);
-
 /**
- * Workspace schemas
+ * Workspace schemas (containers)
  */
 export const CreateWorkspaceSchema = z.object({
-  repositoryId: z.string().optional(),
+  name: z.string().min(1),
+  description: z.string().optional(),
   ownerUserId: z.string().optional(),
-  directoryName: z.string().min(1),
-  branch: z.string().optional(),
-  workspaceType: z.enum(['standard', 'spec-driven', 'ralph', 'openprose']).optional(),
 });
 
 export const GetWorkspaceSchema = z.object({
@@ -28,34 +22,55 @@ export const ListWorkspacesSchema = z.object({
   offset: z.number().int().nonnegative().optional().default(0),
 });
 
-export const GetDiffStatsSchema = z.object({
-  workspaceId: z.string().uuid(),
+export const UpdateWorkspaceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
 });
 
 export type CreateWorkspaceInput = z.infer<typeof CreateWorkspaceSchema>;
 export type GetWorkspaceInput = z.infer<typeof GetWorkspaceSchema>;
 export type ListWorkspacesInput = z.infer<typeof ListWorkspacesSchema>;
-export type GetDiffStatsInput = z.infer<typeof GetDiffStatsSchema>;
+export type UpdateWorkspaceInput = z.infer<typeof UpdateWorkspaceSchema>;
 
-export interface DiffStats {
-  additions: number;
-  deletions: number;
-  filesChanged: number;
+/**
+ * Extended workspace with repos and worktrees
+ */
+export interface WorkspaceWithContents {
+  id: string;
+  name: string;
+  description: string | null;
+  ownerUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  repos: Array<{
+    id: string;
+    name: string | null;
+    rootPath: string | null;
+    remoteUrl: string | null;
+    defaultBranch: string | null;
+  }>;
+  worktrees: Array<{
+    id: string;
+    repoId: string;
+    branch: string | null;
+    worktreePath: string | null;
+    state: string | null;
+    derivedStatus: string | null;
+  }>;
 }
 
 /**
- * Create a new workspace
+ * Create a new workspace (pure container)
  */
 export async function createWorkspace(input: CreateWorkspaceInput) {
   const db = getDb();
 
   const workspace = {
     id: randomUUID(),
-    repositoryId: input.repositoryId,
-    ownerUserId: input.ownerUserId,
-    directoryName: input.directoryName,
-    branch: input.branch,
-    workspaceType: input.workspaceType,
+    name: input.name,
+    description: input.description ?? null,
+    ownerUserId: input.ownerUserId ?? null,
   };
 
   await db.insert(workspaces).values(workspace);
@@ -80,6 +95,61 @@ export async function getWorkspace(input: GetWorkspaceInput) {
 }
 
 /**
+ * Get workspace with all its repos and worktrees
+ */
+export async function getWorkspaceWithContents(input: GetWorkspaceInput): Promise<WorkspaceWithContents> {
+  const db = getDb();
+
+  // Get workspace
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, input.id),
+  });
+
+  if (!workspace) {
+    throw new Error(`Workspace not found: ${input.id}`);
+  }
+
+  // Get attached repos
+  const attachedRepos = await db
+    .select({
+      id: repos.id,
+      name: repos.name,
+      rootPath: repos.rootPath,
+      remoteUrl: repos.remoteUrl,
+      defaultBranch: repos.defaultBranch,
+    })
+    .from(workspaceRepos)
+    .innerJoin(repos, eq(workspaceRepos.repoId, repos.id))
+    .where(eq(workspaceRepos.workspaceId, input.id));
+
+  // Get worktrees that are in this workspace
+  // Parse workspace_ids JSON array and filter
+  const allWorktrees = await db.query.worktrees.findMany();
+  const workspaceWorktrees = allWorktrees.filter(wt => {
+    if (!wt.workspaceIds) return false;
+    try {
+      const ids = JSON.parse(wt.workspaceIds) as string[];
+      return ids.includes(input.id);
+    } catch {
+      return false;
+    }
+  }).map(wt => ({
+    id: wt.id,
+    repoId: wt.repoId,
+    branch: wt.branch,
+    worktreePath: wt.worktreePath,
+    state: wt.state,
+    derivedStatus: wt.derivedStatus,
+  }));
+
+  return {
+    ...workspace,
+    repos: attachedRepos,
+    worktrees: workspaceWorktrees,
+  };
+}
+
+/**
  * List all workspaces
  */
 export async function listWorkspaces(input?: ListWorkspacesInput) {
@@ -93,73 +163,60 @@ export async function listWorkspaces(input?: ListWorkspacesInput) {
 }
 
 /**
- * Get diff stats for a workspace (additions/deletions vs merge-base)
+ * Update a workspace
  */
-export async function getDiffStats(input: GetDiffStatsInput): Promise<DiffStats> {
+export async function updateWorkspace(input: UpdateWorkspaceInput) {
   const db = getDb();
-  
-  // Get workspace with repo info
-  const workspace = await db.query.workspaces.findFirst({
-    where: eq(workspaces.id, input.workspaceId),
-  });
-  
-  if (!workspace) {
-    throw new Error(`Workspace not found: ${input.workspaceId}`);
+
+  const updates: Partial<{ name: string; description: string }> = {};
+  if (input.name) updates.name = input.name;
+  if (input.description !== undefined) updates.description = input.description;
+
+  if (Object.keys(updates).length === 0) {
+    // Nothing to update, just return current
+    return getWorkspace({ id: input.id });
   }
 
-  // Get repo to find the root path
-  let repoPath: string | null = null;
-  if (workspace.repositoryId) {
-    const repo = await db.query.repos.findFirst({
-      where: eq(repos.id, workspace.repositoryId),
-    });
-    if (repo?.rootPath) {
-      // Workspace path is typically repo/workspaces/directoryName
-      repoPath = `${repo.rootPath}/workspaces/${workspace.directoryName}`;
-    }
-  }
+  await db
+    .update(workspaces)
+    .set({ ...updates, updatedAt: new Date().toISOString() })
+    .where(eq(workspaces.id, input.id));
 
-  if (!repoPath) {
-    return { additions: 0, deletions: 0, filesChanged: 0 };
-  }
-
-  try {
-    // Get merge-base with main/master
-    const { stdout: mergeBase } = await execAsync(
-      'git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD origin/master 2>/dev/null || git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null || echo HEAD~10',
-      { cwd: repoPath }
-    );
-
-    // Get diff stats
-    const { stdout: diffStat } = await execAsync(
-      `git diff --shortstat ${mergeBase.trim()}`,
-      { cwd: repoPath }
-    );
-
-    // Parse: "X files changed, Y insertions(+), Z deletions(-)"
-    const stats = parseDiffStats(diffStat.trim());
-    return stats;
-  } catch (error) {
-    console.error('[getDiffStats] Error:', error);
-    return { additions: 0, deletions: 0, filesChanged: 0 };
-  }
+  return getWorkspace({ id: input.id });
 }
 
 /**
- * Parse git diff --shortstat output
+ * Delete a workspace (and detach all repos/worktrees)
  */
-function parseDiffStats(output: string): DiffStats {
-  if (!output) {
-    return { additions: 0, deletions: 0, filesChanged: 0 };
+export async function deleteWorkspace(input: GetWorkspaceInput) {
+  const db = getDb();
+
+  // Get workspace first
+  const workspace = await getWorkspace(input);
+
+  // Remove all workspace_repos links
+  await db.delete(workspaceRepos).where(eq(workspaceRepos.workspaceId, input.id));
+
+  // Remove this workspace from all worktrees' workspace_ids arrays
+  const allWorktrees = await db.query.worktrees.findMany();
+  for (const wt of allWorktrees) {
+    if (!wt.workspaceIds) continue;
+    try {
+      const ids = JSON.parse(wt.workspaceIds) as string[];
+      const newIds = ids.filter(id => id !== input.id);
+      if (newIds.length !== ids.length) {
+        await db
+          .update(worktrees)
+          .set({ workspaceIds: JSON.stringify(newIds) })
+          .where(eq(worktrees.id, wt.id));
+      }
+    } catch {
+      // Invalid JSON, skip
+    }
   }
 
-  const filesMatch = output.match(/(\d+) files? changed/);
-  const addMatch = output.match(/(\d+) insertions?\(\+\)/);
-  const delMatch = output.match(/(\d+) deletions?\(-\)/);
+  // Delete the workspace
+  await db.delete(workspaces).where(eq(workspaces.id, input.id));
 
-  return {
-    filesChanged: filesMatch ? parseInt(filesMatch[1], 10) : 0,
-    additions: addMatch ? parseInt(addMatch[1], 10) : 0,
-    deletions: delMatch ? parseInt(delMatch[1], 10) : 0,
-  };
+  return workspace;
 }

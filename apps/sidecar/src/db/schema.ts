@@ -8,6 +8,11 @@
  * - Visual snapshots
  * - Git checkpoints per turn
  * - Spec-based workspaces
+ *
+ * REARCHITECTURE (v2):
+ * - Workspaces are pure containers (groupings of repos + worktrees)
+ * - Worktrees are git worktrees, each tied to a repo
+ * - Worktrees can appear in multiple workspaces via workspace_ids[]
  */
 
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
@@ -75,7 +80,30 @@ export const repos = sqliteTable('repos', {
 });
 
 /**
- * Workspaces - Isolated branches/worktrees
+ * Workspaces - Pure containers for organizing repos and worktrees
+ *
+ * A workspace is a grouping concept. It has:
+ * - A name and description
+ * - Repos attached via workspace_repos join table
+ * - Worktrees appear in it via worktrees.workspace_ids[]
+ */
+export const workspaces = sqliteTable('workspaces', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  ownerUserId: text('owner_user_id').references(() => users.id),
+  createdAt: timestamp(),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
+/**
+ * Worktrees - Git worktrees (isolated branches/checkouts)
+ *
+ * Each worktree:
+ * - Belongs to exactly one repo (repoId)
+ * - Lives at a specific path on disk (worktreePath)
+ * - Can appear in multiple workspaces (workspaceIds JSON array)
+ * - Has agent sessions attached to it
  *
  * Types:
  * - standard: Traditional workspace, one-shot interactions
@@ -87,13 +115,13 @@ export const repos = sqliteTable('repos', {
  * - derivedStatus: Auto-computed from session activity
  * - manualStatus: User override for status
  */
-export const workspaces = sqliteTable('workspaces', {
+export const worktrees = sqliteTable('worktrees', {
   id: text('id').primaryKey(),
-  repositoryId: text('repository_id').references(() => repos.id),
-  ownerUserId: text('owner_user_id').references(() => users.id),
-  directoryName: text('directory_name'),
+  repoId: text('repo_id').references(() => repos.id).notNull(),
   branch: text('branch'),
-  workspaceType: text('workspace_type').default('standard'), // 'standard', 'spec-driven', 'ralph', 'openprose'
+  worktreePath: text('worktree_path'), // e.g., /repo/workspaces/feature-foo
+  workspaceIds: text('workspace_ids'), // JSON array: ["ws-1", "ws-2"]
+  worktreeType: text('worktree_type').default('standard'), // 'standard', 'spec-driven', 'ralph', 'openprose'
   state: text('state').default('active'), // 'active', 'archived'
   specContent: text('spec_content'), // The feature spec (for spec-driven/ralph)
   fixPlanContent: text('fix_plan_content'), // Current task list (for ralph)
@@ -102,8 +130,8 @@ export const workspaces = sqliteTable('workspaces', {
   derivedStatus: text('derived_status').default('in-progress'), // 'in-progress', 'done', 'blocked', 'needs-review'
   manualStatus: text('manual_status'), // User override, null means use derived
   pinnedAt: text('pinned_at'), // Timestamp when pinned, null = not pinned
-  notes: text('notes'), // User notes for this workspace
-  linkedWorkspaceIds: text('linked_workspace_ids'), // JSON array of related workspace IDs
+  notes: text('notes'), // User notes for this worktree
+  linkedWorktreeIds: text('linked_worktree_ids'), // JSON array of related worktree IDs
   unread: integer('unread').default(0), // Unread message count
   activeSessionId: text('active_session_id'), // Currently active session
   bigTerminalMode: integer('big_terminal_mode', { mode: 'boolean' }).default(false),
@@ -114,29 +142,21 @@ export const workspaces = sqliteTable('workspaces', {
 
 /**
  * Workspace Repos - Many-to-many join table
- * A workspace can have multiple repos attached (or none)
- * A repo can be attached to multiple workspaces
- * 
- * This decouples workspace identity from repo attachment,
- * enabling:
- * - Cloud workspaces with no local repo
- * - Multi-repo workspaces (monorepo scenarios)
- * - Collaboration without requiring matching local repos
+ * Which repos are attached to which workspaces
+ *
+ * This is purely about visibility: "repo X is available in workspace Y"
+ * The actual worktrees for that repo can then be created/added to the workspace
  */
 export const workspaceRepos = sqliteTable('workspace_repos', {
   id: text('id').primaryKey(),
   workspaceId: text('workspace_id').references(() => workspaces.id).notNull(),
   repoId: text('repo_id').references(() => repos.id).notNull(),
-  /** Path within workspace where this repo's worktree lives */
-  worktreePath: text('worktree_path'),
-  /** Branch checked out for this repo in this workspace */
-  branch: text('branch'),
   createdAt: timestamp(),
 });
 
 /**
  * Workspace Shares - Collaboration
- * Share any workspace with anyone
+ * Share any workspace (container) with anyone
  *
  * Permissions:
  * - view: Read-only access
@@ -172,7 +192,7 @@ export const sessions = sqliteTable(
   'sessions',
   {
     id: text('id').primaryKey(),
-    workspaceId: text('workspace_id').references(() => workspaces.id),
+    worktreeId: text('worktree_id').references(() => worktrees.id),
     agentType: text('agent_type'), // 'claude', 'codex', 'kimi', 'other'
     model: text('model'),
     status: text('status').default('idle'), // 'idle', 'running', 'paused', 'compacting'
@@ -194,7 +214,7 @@ export const sessions = sqliteTable(
     createdAt: timestamp(),
     updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
   },
-  (table) => [index('sessions_workspace_id_idx').on(table.workspaceId)]
+  (table) => [index('sessions_worktree_id_idx').on(table.worktreeId)]
 );
 
 /**
@@ -243,7 +263,7 @@ export const sessionMessages = sqliteTable(
  */
 export const diffComments = sqliteTable('diff_comments', {
   id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').references(() => workspaces.id),
+  worktreeId: text('worktree_id').references(() => worktrees.id),
   userId: text('user_id').references(() => users.id),
   filePath: text('file_path'),
   lineNumber: integer('line_number'),
@@ -291,7 +311,7 @@ export const attachments = sqliteTable(
  */
 export const visualSnapshots = sqliteTable('visual_snapshots', {
   id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').references(() => workspaces.id),
+  worktreeId: text('worktree_id').references(() => worktrees.id),
   sessionId: text('session_id').references(() => sessions.id),
   turnId: text('turn_id'),
   snapshotType: text('snapshot_type'), // 'before', 'after'
@@ -307,7 +327,7 @@ export const visualSnapshots = sqliteTable('visual_snapshots', {
  */
 export const gitCheckpoints = sqliteTable('git_checkpoints', {
   id: text('id').primaryKey(),
-  workspaceId: text('workspace_id').references(() => workspaces.id),
+  worktreeId: text('worktree_id').references(() => worktrees.id),
   turnId: text('turn_id'),
   headOid: text('head_oid'),
   indexTree: text('index_tree'),
@@ -337,6 +357,9 @@ export type NewRepo = typeof repos.$inferInsert;
 
 export type Workspace = typeof workspaces.$inferSelect;
 export type NewWorkspace = typeof workspaces.$inferInsert;
+
+export type Worktree = typeof worktrees.$inferSelect;
+export type NewWorktree = typeof worktrees.$inferInsert;
 
 export type WorkspaceShare = typeof workspaceShares.$inferSelect;
 export type NewWorkspaceShare = typeof workspaceShares.$inferInsert;

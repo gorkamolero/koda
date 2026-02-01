@@ -12,7 +12,7 @@ import {
   restoreCheckpoint as restoreCheckpointService,
   diffCheckpoints as diffCheckpointsService,
   getCheckpoint as getCheckpointService,
-  getCheckpointsByWorkspace as getCheckpointsByWorkspaceService,
+  getCheckpointsByWorktree as getCheckpointsByWorktreeService,
   type SaveCheckpointInput,
   type FileDiff,
   type DiffSummary,
@@ -28,7 +28,7 @@ export {
   restoreCheckpointService as restoreCheckpoint,
   diffCheckpointsService as diffCheckpoints,
   getCheckpointService as getCheckpoint,
-  getCheckpointsByWorkspaceService as getCheckpointsByWorkspace,
+  getCheckpointsByWorktreeService as getCheckpointsByWorktree,
 };
 
 // ============================================================================
@@ -36,7 +36,7 @@ export {
 // ============================================================================
 
 export const SaveCheckpointSchema = z.object({
-  workspaceId: z.string().uuid(),
+  worktreeId: z.string().uuid(),
   turnId: z.string(),
   repoPath: z.string(),
 });
@@ -56,8 +56,8 @@ export const GetCheckpointSchema = z.object({
   checkpointId: z.string().uuid(),
 });
 
-export const GetCheckpointsByWorkspaceSchema = z.object({
-  workspaceId: z.string().uuid(),
+export const GetCheckpointsByWorktreeSchema = z.object({
+  worktreeId: z.string().uuid(),
 });
 
 // ============================================================================
@@ -85,7 +85,7 @@ export async function rpcGetCheckpoint(input: z.infer<typeof GetCheckpointSchema
   return getCheckpointService(db, input.checkpointId) ?? null;
 }
 
-export async function rpcGetCheckpointsByWorkspace(input: z.infer<typeof GetCheckpointsByWorkspaceSchema>) {
+export async function rpcGetCheckpointsByWorktree(input: z.infer<typeof GetCheckpointsByWorktreeSchema>) {
   const db = getDb();
-  return getCheckpointsByWorkspaceService(db, input.workspaceId);
+  return getCheckpointsByWorktreeService(db, input.worktreeId);
 }

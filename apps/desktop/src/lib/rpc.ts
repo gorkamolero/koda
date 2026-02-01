@@ -45,13 +45,15 @@ export const RPC_METHODS = {
   REPO_GET: 'repo.get',
   REPO_LIST: 'repo.list',
   REPO_DELETE: 'repo.delete',
-  // Workspaces
+  // Workspaces (containers)
   WORKSPACE_LIST: 'workspace.list',
   WORKSPACE_CREATE: 'workspace.create',
   WORKSPACE_GET: 'workspace.get',
-  WORKSPACE_GET_DIFF_STATS: 'workspace.getDiffStats',
+  WORKSPACE_GET_WITH_CONTENTS: 'workspace.getWithContents',
+  WORKSPACE_UPDATE: 'workspace.update',
+  WORKSPACE_DELETE: 'workspace.delete',
   WORKSPACE_CREATE_STANDALONE: 'workspace.createStandalone',
-  // Workspace Repos (multi-repo support)
+  // Workspace Repos (which repos are attached to workspace)
   WORKSPACE_REPO_ATTACH: 'workspaceRepo.attach',
   WORKSPACE_REPO_DETACH: 'workspaceRepo.detach',
   WORKSPACE_REPO_LIST: 'workspaceRepo.list',
@@ -60,6 +62,9 @@ export const RPC_METHODS = {
   WORKTREE_DELETE: 'worktree.delete',
   WORKTREE_GET: 'worktree.get',
   WORKTREE_LIST: 'worktree.list',
+  WORKTREE_LIST_BY_WORKSPACE: 'worktree.listByWorkspace',
+  WORKTREE_ADD_TO_WORKSPACE: 'worktree.addToWorkspace',
+  WORKTREE_REMOVE_FROM_WORKSPACE: 'worktree.removeFromWorkspace',
   // Sessions
   SESSION_LIST: 'session.list',
   SESSION_CREATE: 'session.create',
@@ -119,16 +124,82 @@ export interface CreateWorktreeParams {
   repoId: string
   branch: string
   fromBranch?: string
+  workspaceId?: string // Optional workspace to add this worktree to
 }
 
-export interface WorktreeResult {
+/**
+ * Worktree status types (Conductor-style)
+ */
+export type WorktreeStatus = 'in-progress' | 'done' | 'blocked' | 'needs-review'
+export type WorktreeState = 'active' | 'archived'
+export type WorktreeType = 'standard' | 'spec-driven' | 'ralph' | 'openprose'
+
+// Backwards-compat aliases - the old "WorkspaceStatus" was really worktree status
+export type WorkspaceStatus = WorktreeStatus
+export type WorkspaceState = WorktreeState
+export type WorkspaceType = WorktreeType
+
+/**
+ * Worktree - A git worktree tied to a repo
+ * Can appear in multiple workspaces via workspaceIds[]
+ */
+export interface Worktree {
   id: string
-  repositoryId?: string
-  directoryName: string
-  branch?: string
-  workspaceType?: string
-  worktreePath?: string
+  repoId: string
+  branch?: string | null
+  worktreePath?: string | null
+  workspaceIds?: string | null // JSON array: ["ws-1", "ws-2"]
+  worktreeType?: WorktreeType | null
+  state?: WorktreeState | null
+  specContent?: string | null
+  fixPlanContent?: string | null
+  ralphEnabled?: boolean
+  // Conductor-style fields
+  derivedStatus?: WorktreeStatus | null
+  manualStatus?: WorktreeStatus | null
+  pinnedAt?: string | null
+  notes?: string | null
+  linkedWorktreeIds?: string | null
+  unread?: number
+  activeSessionId?: string | null
+  bigTerminalMode?: boolean
+  intendedTargetBranch?: string | null
+  createdAt?: string
+  updatedAt?: string
+  // Extra field from handler
   setupError?: string
+}
+
+// Backwards-compat alias - the old code used "WorktreeResult"
+export type WorktreeResult = Worktree
+
+/**
+ * Legacy workspace type for backwards compatibility with existing UI
+ * This maps to the new Worktree type - use Worktree for new code
+ * @deprecated Use Worktree instead
+ */
+export interface LegacyWorkspace {
+  id: string
+  repositoryId?: string | null
+  ownerUserId?: string | null
+  directoryName?: string | null
+  branch?: string | null
+  workspaceType?: WorktreeType | null
+  state?: WorktreeState | null
+  specContent?: string | null
+  fixPlanContent?: string | null
+  ralphEnabled?: boolean
+  derivedStatus?: WorktreeStatus | null
+  manualStatus?: WorktreeStatus | null
+  pinnedAt?: string | null
+  notes?: string | null
+  linkedWorkspaceIds?: string | null
+  unread?: number
+  activeSessionId?: string | null
+  bigTerminalMode?: boolean
+  intendedTargetBranch?: string | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 /**
@@ -163,46 +234,48 @@ export interface DiffStats {
 }
 
 /**
- * Workspace status types (Conductor-style)
- */
-export type WorkspaceStatus = 'in-progress' | 'done' | 'blocked' | 'needs-review'
-export type WorkspaceState = 'active' | 'archived'
-export type WorkspaceType = 'standard' | 'spec-driven' | 'ralph' | 'openprose'
-
-/**
- * Workspace types - aligned with sidecar schema (with Conductor-style fields)
+ * Workspace - Pure container for organizing repos and worktrees
  */
 export interface Workspace {
   id: string
-  repositoryId?: string
-  ownerUserId?: string
-  directoryName: string
-  branch?: string
-  workspaceType?: WorkspaceType
-  state?: WorkspaceState
-  specContent?: string
-  fixPlanContent?: string
-  ralphEnabled?: boolean
-  // Conductor-style fields
-  derivedStatus?: WorkspaceStatus
-  manualStatus?: WorkspaceStatus | null
-  pinnedAt?: string | null
-  notes?: string | null
-  linkedWorkspaceIds?: string | null // JSON array
-  unread?: number
-  activeSessionId?: string | null
-  bigTerminalMode?: boolean
-  intendedTargetBranch?: string | null
+  name: string
+  description?: string | null
+  ownerUserId?: string | null
   createdAt?: string
   updatedAt?: string
 }
 
+/**
+ * Workspace with its contents (repos and worktrees)
+ */
+export interface WorkspaceWithContents extends Workspace {
+  repos: Array<{
+    id: string
+    name: string | null
+    rootPath: string | null
+    remoteUrl: string | null
+    defaultBranch: string | null
+  }>
+  worktrees: Array<{
+    id: string
+    repoId: string
+    branch: string | null
+    worktreePath: string | null
+    state: string | null
+    derivedStatus: string | null
+  }>
+}
+
 export interface CreateWorkspaceParams {
-  directoryName: string
-  repositoryId?: string
+  name: string
+  description?: string
   ownerUserId?: string
-  branch?: string
-  workspaceType?: 'standard' | 'spec-driven' | 'ralph' | 'openprose'
+}
+
+export interface UpdateWorkspaceParams {
+  id: string
+  name?: string
+  description?: string
 }
 
 export interface GetWorkspaceParams {
@@ -215,7 +288,7 @@ export interface ListWorkspacesParams {
 }
 
 /**
- * Create standalone workspace (no repo attached)
+ * Create standalone workspace (same as CreateWorkspaceParams)
  */
 export interface CreateStandaloneWorkspaceParams {
   name: string
@@ -224,15 +297,13 @@ export interface CreateStandaloneWorkspaceParams {
 
 /**
  * Workspace repo types - for multi-repo workspaces
- * Each repo attached to a workspace gets its own worktree.
+ * This is purely about visibility: "repo X is available in workspace Y"
  * Repos are horizontal - no hierarchy.
  */
 export interface WorkspaceRepo {
   id: string
   workspaceId: string
   repoId: string
-  worktreePath?: string | null
-  branch?: string | null
   createdAt: string
   // Joined repo details
   repoName?: string | null
@@ -244,8 +315,6 @@ export interface WorkspaceRepo {
 export interface AttachRepoParams {
   workspaceId: string
   repoId: string
-  worktreePath?: string
-  branch?: string
 }
 
 export interface DetachRepoParams {
@@ -254,6 +323,24 @@ export interface DetachRepoParams {
 }
 
 export interface ListWorkspaceReposParams {
+  workspaceId: string
+}
+
+/**
+ * Worktree workspace management params
+ */
+export interface ListWorktreesByWorkspaceParams {
+  workspaceId: string
+  includeArchived?: boolean
+}
+
+export interface AddWorktreeToWorkspaceParams {
+  worktreeId: string
+  workspaceId: string
+}
+
+export interface RemoveWorktreeFromWorkspaceParams {
+  worktreeId: string
   workspaceId: string
 }
 
@@ -269,7 +356,7 @@ export type AgentType = 'claude' | 'codex' | 'kimi' | 'other'
  */
 export interface Session {
   id: string
-  workspaceId?: string
+  worktreeId?: string
   agentType?: AgentType
   model?: string
   status?: SessionStatus
@@ -293,7 +380,7 @@ export interface Session {
 }
 
 export interface ClaudeStartParams {
-  workspaceId: string
+  worktreeId: string
   prompt: string
   options?: {
     model?: string
@@ -312,7 +399,7 @@ export interface ClaudeStartResult {
 
 export interface ClaudeSessionInfo {
   id: string
-  workspaceId: string
+  worktreeId: string
   status: SessionStatus
   contextTokenCount: number
   inputTokens: number

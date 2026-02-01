@@ -2,7 +2,7 @@
  * Workspace Repo Handlers
  *
  * Manages the many-to-many relationship between workspaces and repos.
- * Each repo attached to a workspace gets its own worktree.
+ * This is purely about visibility: "repo X is available in workspace Y"
  * Repos are horizontal - no hierarchy, no "primary".
  */
 
@@ -19,8 +19,6 @@ import { workspaceRepos, repos, workspaces } from '../db/schema.js'
 export const AttachRepoSchema = z.object({
   workspaceId: z.string().uuid(),
   repoId: z.string().uuid(),
-  worktreePath: z.string().optional(),
-  branch: z.string().optional(),
 })
 
 export const DetachRepoSchema = z.object({
@@ -49,7 +47,7 @@ export type CreateStandaloneWorkspaceInput = z.input<typeof CreateStandaloneWork
 
 /**
  * Attach a repo to a workspace
- * Creates a worktree for the repo within the workspace
+ * Just creates the link - does NOT create worktrees
  */
 export async function attachRepo(input: AttachRepoInput) {
   const db = getDb()
@@ -70,8 +68,6 @@ export async function attachRepo(input: AttachRepoInput) {
     id: randomUUID(),
     workspaceId: input.workspaceId,
     repoId: input.repoId,
-    worktreePath: input.worktreePath ?? null,
-    branch: input.branch ?? null,
   }
 
   await db.insert(workspaceRepos).values(workspaceRepo)
@@ -119,8 +115,6 @@ export async function listWorkspaceRepos(input: ListWorkspaceReposInput) {
       id: workspaceRepos.id,
       workspaceId: workspaceRepos.workspaceId,
       repoId: workspaceRepos.repoId,
-      worktreePath: workspaceRepos.worktreePath,
-      branch: workspaceRepos.branch,
       createdAt: workspaceRepos.createdAt,
       // Repo details
       repoName: repos.name,
@@ -136,18 +130,15 @@ export async function listWorkspaceRepos(input: ListWorkspaceReposInput) {
 }
 
 /**
- * Create a standalone workspace (no repo attached)
- * Can be used for collaboration or attaching repos later
+ * Create a standalone workspace (pure container, no repo attached)
  */
 export async function createStandaloneWorkspace(input: CreateStandaloneWorkspaceInput) {
   const db = getDb()
 
   const workspace = {
     id: randomUUID(),
-    directoryName: input.name,
-    repositoryId: null,
-    branch: null,
-    workspaceType: 'standard' as const,
+    name: input.name,
+    description: input.description ?? null,
   }
 
   await db.insert(workspaces).values(workspace)
