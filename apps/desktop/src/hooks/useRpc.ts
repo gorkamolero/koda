@@ -300,6 +300,18 @@ export function useAllWorktrees(includeArchived = false) {
 }
 
 /**
+ * List worktrees for a specific workspace
+ */
+export function useWorktreesByWorkspace(workspaceId: string, includeArchived = false) {
+  return useQuery({
+    queryKey: ['worktrees', 'workspace', workspaceId, includeArchived],
+    queryFn: () => rpcRequest<Worktree[]>(RPC_METHODS.WORKTREE_LIST_BY_WORKSPACE, { workspaceId, includeArchived }),
+    enabled: !!workspaceId,
+    retry: false,
+  })
+}
+
+/**
  * Get a single worktree by ID
  */
 export function useWorktree(worktreeId: string) {

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
-import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
+import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
 import type { Worktree } from '@/lib/rpc'
 
-type CreateMode = 'repo' | 'branch'
+type CreateMode = 'choose' | 'repo' | 'branch' | 'standalone'
 
 export function WorkspaceList() {
   const navigate = useNavigate()
@@ -12,11 +12,13 @@ export function WorkspaceList() {
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
+  const createStandaloneWorkspace = useCreateStandaloneWorkspace()
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [createMode, setCreateMode] = useState<CreateMode>('repo')
+  const [createMode, setCreateMode] = useState<CreateMode>('choose')
   const [selectedRepoId, setSelectedRepoId] = useState<string>('')
   const [branchName, setBranchName] = useState('')
+  const [standaloneName, setStandaloneName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
   const handleSelectFolder = async () => {
@@ -49,8 +51,24 @@ export function WorkspaceList() {
       setIsCreateOpen(false)
       setBranchName('')
       setSelectedRepoId('')
-      setCreateMode('repo')
+      setCreateMode('choose')
       void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
+    }
+  }
+
+  const handleCreateStandalone = async () => {
+    if (!standaloneName.trim()) return
+
+    try {
+      const workspace = await createStandaloneWorkspace.mutateAsync({
+        name: standaloneName.trim(),
+      })
+      setIsCreateOpen(false)
+      setStandaloneName('')
+      setCreateMode('choose')
+      void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
     }
@@ -69,7 +87,8 @@ export function WorkspaceList() {
     setIsCreateOpen(false)
     setBranchName('')
     setSelectedRepoId('')
-    setCreateMode('repo')
+    setStandaloneName('')
+    setCreateMode('choose')
     setCreateError(null)
   }
 
@@ -120,6 +139,61 @@ export function WorkspaceList() {
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-surface-card border border-border-subtle rounded-lg p-6 w-full max-w-lg shadow-xl">
+            {/* Step 1: Choose workspace type */}
+            {createMode === 'choose' && (
+              <>
+                <h2 className="text-lg font-semibold text-text-primary mb-4">New Workspace</h2>
+
+                <p className="text-sm text-text-muted mb-4">
+                  Choose how to create your workspace.
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => { setCreateMode('repo') }}
+                    data-testid="create-with-repo"
+                    className="w-full text-left p-4 border border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <div>
+                        <div className="font-medium text-text-primary">With Repository</div>
+                        <div className="text-xs text-text-faint">Connect a git repository and create a worktree branch</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setCreateMode('standalone') }}
+                    data-testid="create-standalone"
+                    className="w-full text-left p-4 border border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <div>
+                        <div className="font-medium text-text-primary">Standalone</div>
+                        <div className="text-xs text-text-faint">Create workspace first, connect repository later</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="flex justify-end mt-6">
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2a: Select repository */}
             {createMode === 'repo' && (
               <>
                 <h2 className="text-lg font-semibold text-text-primary mb-4">New Workspace</h2>
@@ -166,7 +240,13 @@ export function WorkspaceList() {
                   {createRepo.isPending ? 'Registering...' : 'Add Git Repository'}
                 </button>
 
-                <div className="flex justify-end mt-6">
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => { setCreateMode('choose') }}
+                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    Back
+                  </button>
                   <button
                     onClick={closeModal}
                     className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
@@ -177,6 +257,68 @@ export function WorkspaceList() {
               </>
             )}
 
+            {/* Step 2b: Standalone workspace name */}
+            {createMode === 'standalone' && (
+              <>
+                <h2 className="text-lg font-semibold text-text-primary mb-4">Standalone Workspace</h2>
+
+                {createError && (
+                  <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    {createError}
+                  </div>
+                )}
+
+                <p className="text-sm text-text-muted mb-4">
+                  Create a workspace without a repository. You can connect one later.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">Workspace Name</label>
+                    <input
+                      type="text"
+                      value={standaloneName}
+                      onChange={(e) => { setStandaloneName(e.target.value) }}
+                      placeholder="My Workspace"
+                      data-testid="standalone-name-input"
+                      className="w-full px-3 py-2 border border-border-subtle rounded-md bg-surface-control text-text-primary placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-border-accent"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleCreateStandalone()
+                        if (e.key === 'Escape') closeModal()
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => { setCreateMode('choose') }}
+                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                  >
+                    Back
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={closeModal}
+                      className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void handleCreateStandalone()}
+                      disabled={!standaloneName.trim() || createStandaloneWorkspace.isPending}
+                      data-testid="create-standalone-button"
+                      className="px-4 py-2 text-sm font-medium bg-surface-control hover:bg-surface-control-hover text-text-primary rounded-md disabled:opacity-50 transition-colors"
+                    >
+                      {createStandaloneWorkspace.isPending ? 'Creating...' : 'Create Workspace'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Branch name (for repo-based) */}
             {createMode === 'branch' && (
               <>
                 <h2 className="text-lg font-semibold text-text-primary mb-4">Create Branch</h2>
