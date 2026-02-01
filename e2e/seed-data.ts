@@ -363,7 +363,9 @@ async function main() {
           branch: branchName,
         })
         console.log(`Created workspace: ${workspace.id} (${workspace.branch})`)
-        worktreePath = path.join(projectRoot, '.worktrees', branchName)
+        // Worktrees now live under ~/.koda/worktrees/{repoName}/{branchName}
+        const repoName = path.basename(projectRoot)
+        worktreePath = path.join(os.homedir(), '.koda', 'worktrees', repoName, branchName)
       } catch (error) {
         // Worktree creation might fail if git isn't set up properly
         // Fall back to creating a simple workspace entry
@@ -378,10 +380,11 @@ async function main() {
       }
     } else {
       console.log('Workspaces already exist, checking for existing worktree...')
-      // Try to find existing worktree path
+      // Try to find existing worktree path - now under ~/.koda/worktrees/
       const ws = workspaces[0]
       if (ws.branch) {
-        worktreePath = path.join(projectRoot, '.worktrees', ws.branch)
+        const repoName = path.basename(projectRoot)
+        worktreePath = path.join(os.homedir(), '.koda', 'worktrees', repoName, ws.branch)
       }
     }
 

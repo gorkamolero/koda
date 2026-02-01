@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
-import { getDb } from '../db/index.js';
+import { getDb, getWorktreesDir } from '../db/index.js';
 import { worktrees, repos, type Worktree } from '../db/schema.js';
 
 /**
@@ -64,6 +64,10 @@ export const RemoveWorktreeFromWorkspaceSchema = z.object({
   workspaceId: z.string().uuid(),
 });
 
+export const GetWorktreeDiffSchema = z.object({
+  worktreeId: z.string().uuid(),
+});
+
 // Use z.input for handler function signatures (allows optional fields before defaults)
 export type CreateWorktreeInput = z.input<typeof CreateWorktreeSchema>;
 export type DeleteWorktreeInput = z.input<typeof DeleteWorktreeSchema>;
@@ -73,6 +77,7 @@ export type ListAllWorktreesInput = z.input<typeof ListAllWorktreesSchema>;
 export type ListWorktreesByWorkspaceInput = z.input<typeof ListWorktreesByWorkspaceSchema>;
 export type AddWorktreeToWorkspaceInput = z.input<typeof AddWorktreeToWorkspaceSchema>;
 export type RemoveWorktreeFromWorkspaceInput = z.input<typeof RemoveWorktreeFromWorkspaceSchema>;
+export type GetWorktreeDiffInput = z.input<typeof GetWorktreeDiffSchema>;
 
 /**
  * Extended worktree type with setup error info
@@ -210,12 +215,14 @@ export async function createWorktree(
   }
 
   const repoPath = repo.rootPath;
+  const repoName = path.basename(repoPath);
   const directoryName = sanitizeBranchName(input.branch);
-  const worktreesDir = path.join(repoPath, '.worktrees');
-  const worktreePath = path.join(worktreesDir, directoryName);
+  // Worktrees live under ~/.koda/worktrees/{repoName}/{branchName}
+  const repoWorktreesDir = path.join(getWorktreesDir(), repoName);
+  const worktreePath = path.join(repoWorktreesDir, directoryName);
 
-  // Ensure .worktrees directory exists
-  fs.mkdirSync(worktreesDir, { recursive: true });
+  // Ensure worktrees directory exists
+  fs.mkdirSync(repoWorktreesDir, { recursive: true });
 
   // Check if worktree already exists
   if (fs.existsSync(worktreePath)) {
@@ -596,4 +603,186 @@ export async function removeWorktreeFromWorkspace(
     .where(eq(worktrees.id, input.worktreeId));
 
   return { ...worktree, workspaceIds: JSON.stringify(newIds) };
+}
+
+/**
+ * File change information in a diff
+ */
+export interface FileDiff {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  diff?: string;
+  additions?: number;
+  deletions?: number;
+}
+
+/**
+ * Summary statistics for a diff
+ */
+export interface DiffSummary {
+  filesChanged: number;
+  additions: number;
+  deletions: number;
+}
+
+/**
+ * Result of comparing worktree to merge base
+ */
+export interface WorktreeDiff {
+  files: FileDiff[];
+  summary: DiffSummary;
+  mergeBase?: string;
+  targetBranch?: string;
+}
+
+/**
+ * Execute a git command in the specified directory
+ */
+function gitCommand(repoPath: string, args: string): string | null {
+  try {
+    return execSync(`git ${args}`, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).toString().trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse git diff output into structured data
+ */
+function parseDiffOutput(statOutput: string, patchOutput: string): WorktreeDiff {
+  const files: FileDiff[] = [];
+  let totalAdditions = 0;
+  let totalDeletions = 0;
+
+  // Parse --numstat output (format: additions\tdeletions\tfilename)
+  const statLines = statOutput.split('\n').filter((line) => line.includes('\t'));
+
+  for (const line of statLines) {
+    const match = line.match(/^(\d+|-)\t(\d+|-)\t(.+)$/);
+    if (match) {
+      const additions = match[1] === '-' ? 0 : parseInt(match[1], 10);
+      const deletions = match[2] === '-' ? 0 : parseInt(match[2], 10);
+      const filePath = match[3];
+
+      // Determine status based on additions/deletions and patch content
+      let status: FileDiff['status'] = 'modified';
+      if (patchOutput.includes(`new file mode`) && patchOutput.includes(filePath)) {
+        status = 'added';
+      } else if (patchOutput.includes(`deleted file mode`) && patchOutput.includes(filePath)) {
+        status = 'deleted';
+      } else if (patchOutput.includes(`rename from`) && patchOutput.includes(filePath)) {
+        status = 'renamed';
+      }
+
+      // Extract the diff for this specific file
+      const fileDiff = extractFileDiff(patchOutput, filePath);
+
+      files.push({
+        path: filePath,
+        status,
+        diff: fileDiff,
+        additions,
+        deletions,
+      });
+
+      totalAdditions += additions;
+      totalDeletions += deletions;
+    }
+  }
+
+  return {
+    files,
+    summary: {
+      filesChanged: files.length,
+      additions: totalAdditions,
+      deletions: totalDeletions,
+    },
+  };
+}
+
+/**
+ * Extract the diff section for a specific file
+ */
+function extractFileDiff(patchOutput: string, filePath: string): string | undefined {
+  const escapedPath = filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const diffPattern = new RegExp(
+    `diff --git a/${escapedPath} b/${escapedPath}[\\s\\S]*?(?=diff --git|$)`,
+    'g'
+  );
+
+  const match = patchOutput.match(diffPattern);
+  return match?.[0];
+}
+
+/**
+ * Get git diff for a worktree against its merge base
+ *
+ * This shows all changes (committed and uncommitted) on the branch
+ * compared to where it branched from.
+ */
+export async function getWorktreeDiff(
+  input: GetWorktreeDiffInput,
+  db?: ReturnType<typeof getDb>
+): Promise<WorktreeDiff> {
+  const database = db ?? getDb();
+
+  // Get the worktree
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
+  });
+
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
+  }
+
+  const repoPath = worktree.worktreePath;
+  if (!repoPath || !fs.existsSync(repoPath)) {
+    return {
+      files: [],
+      summary: { filesChanged: 0, additions: 0, deletions: 0 },
+    };
+  }
+
+  // Get the repo for default branch info
+  const repo = await database.query.repos.findFirst({
+    where: eq(repos.id, worktree.repoId),
+  });
+
+  // Target branch is either the intended target or the repo's default branch
+  const targetBranch = worktree.intendedTargetBranch ?? repo?.defaultBranch ?? 'main';
+
+  // Get the merge base between current HEAD and target branch
+  // This is the commit where the branches diverged
+  const mergeBase = gitCommand(repoPath, `merge-base HEAD origin/${targetBranch}`);
+
+  if (!mergeBase) {
+    // If we can't find a merge base, try comparing to the target branch directly
+    // or just show uncommitted changes
+    const diffOutput = gitCommand(repoPath, 'diff HEAD --numstat') ?? '';
+    const patchOutput = gitCommand(repoPath, 'diff HEAD') ?? '';
+
+    if (!diffOutput && !patchOutput) {
+      return {
+        files: [],
+        summary: { filesChanged: 0, additions: 0, deletions: 0 },
+      };
+    }
+
+    return parseDiffOutput(diffOutput, patchOutput);
+  }
+
+  // Get the diff between merge base and current working tree
+  // This includes both committed changes on the branch AND uncommitted changes
+  const diffOutput = gitCommand(repoPath, `diff ${mergeBase} --numstat`) ?? '';
+  const patchOutput = gitCommand(repoPath, `diff ${mergeBase}`) ?? '';
+
+  const result = parseDiffOutput(diffOutput, patchOutput);
+  result.mergeBase = mergeBase;
+  result.targetBranch = targetBranch;
+
+  return result;
 }

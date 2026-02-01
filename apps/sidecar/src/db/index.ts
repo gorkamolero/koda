@@ -7,6 +7,39 @@ import * as os from 'node:os';
 import { runMigrationsOnConnection } from './migrate.js';
 
 /**
+ * Get the Koda data directory based on platform
+ * All Koda-managed data (db, worktrees, etc.) lives under this directory
+ *
+ * Paths:
+ * - macOS: ~/.koda
+ * - Linux: ~/.koda
+ * - Windows: %USERPROFILE%\.koda
+ */
+export function getKodaDataDir(): string {
+  // Check for override (used by tests)
+  const dataOverride = process.env.KODA_DATA_DIR;
+  if (dataOverride) {
+    fs.mkdirSync(dataOverride, { recursive: true });
+    return dataOverride;
+  }
+
+  // Simple, consistent path across platforms: ~/.koda
+  const kodaDir = path.join(os.homedir(), '.koda');
+  fs.mkdirSync(kodaDir, { recursive: true });
+  return kodaDir;
+}
+
+/**
+ * Get the worktrees directory
+ * All git worktrees are stored here: ~/.koda/worktrees/{repoName}/{branchName}
+ */
+export function getWorktreesDir(): string {
+  const worktreesDir = path.join(getKodaDataDir(), 'worktrees');
+  fs.mkdirSync(worktreesDir, { recursive: true });
+  return worktreesDir;
+}
+
+/**
  * Get the database path based on platform
  * Supports environment variable overrides for testing:
  * - KODA_DB_PATH: Direct database path override (e.g., ':memory:' for tests)
@@ -25,33 +58,8 @@ export function getDbPath(): string {
     return dbPathOverride;
   }
 
-  const platform = os.platform();
-
-  if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/com.koda.app/koda.db
-    const appSupport = path.join(
-      os.homedir(),
-      'Library',
-      'Application Support',
-      'com.koda.app'
-    );
-    fs.mkdirSync(appSupport, { recursive: true });
-    return path.join(appSupport, 'koda.db');
-  } else if (platform === 'linux') {
-    // Linux: ~/.local/share/koda/koda.db
-    const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
-    const appDir = path.join(dataHome, 'koda');
-    fs.mkdirSync(appDir, { recursive: true });
-    return path.join(appDir, 'koda.db');
-  } else if (platform === 'win32') {
-    // Windows: %APPDATA%\koda\koda.db
-    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-    const appDir = path.join(appData, 'koda');
-    fs.mkdirSync(appDir, { recursive: true });
-    return path.join(appDir, 'koda.db');
-  }
-
-  throw new Error(`Unsupported platform: ${platform}`);
+  // Use centralized Koda data directory
+  return path.join(getKodaDataDir(), 'koda.db');
 }
 
 /**
