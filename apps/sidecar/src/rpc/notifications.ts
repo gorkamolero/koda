@@ -29,6 +29,8 @@ export const SIDECAR_NOTIFICATIONS = {
   TOOL_RESULT: 'toolResult',
   CONTEXT_USAGE: 'contextUsage',
   SESSION_STATUS: 'sessionStatus',
+  PTY_DATA: 'pty.data',
+  PTY_EXIT: 'pty.exit',
 } as const
 
 // ============================================================================
@@ -100,6 +102,22 @@ export interface SessionStatusNotification {
   sessionId: string
   status: 'idle' | 'running' | 'paused' | 'compacting' | 'completed' | 'error' | 'cancelled'
   message?: string
+}
+
+/**
+ * PTY data notification payload
+ */
+export interface PtyDataNotification {
+  sessionId: string
+  data: string
+}
+
+/**
+ * PTY exit notification payload
+ */
+export interface PtyExitNotification {
+  sessionId: string
+  exitCode: number
 }
 
 // ============================================================================
@@ -266,6 +284,26 @@ export class NotificationEmitter {
       sessionId,
       status,
       message,
+    })
+  }
+
+  /**
+   * Emit PTY data notification (terminal output)
+   */
+  emitPtyData(sessionId: string, data: string): void {
+    this.emit<PtyDataNotification>(SIDECAR_NOTIFICATIONS.PTY_DATA, {
+      sessionId,
+      data,
+    })
+  }
+
+  /**
+   * Emit PTY exit notification
+   */
+  emitPtyExit(sessionId: string, exitCode: number): void {
+    this.emit<PtyExitNotification>(SIDECAR_NOTIFICATIONS.PTY_EXIT, {
+      sessionId,
+      exitCode,
     })
   }
 }

@@ -80,6 +80,8 @@ export const SIDECAR_NOTIFICATION_METHODS = {
   TOOL_RESULT: 'toolResult',
   CONTEXT_USAGE: 'contextUsage',
   SESSION_STATUS: 'sessionStatus',
+  PTY_DATA: 'pty.data',
+  PTY_EXIT: 'pty.exit',
 } as const
 
 // ============================================================================
@@ -410,4 +412,38 @@ export interface ContextUsagePayload {
  */
 export function onContextUsage(handler: NotificationHandler<ContextUsagePayload>): () => void {
   return registerNotificationHandler(SIDECAR_NOTIFICATION_METHODS.CONTEXT_USAGE, handler)
+}
+
+// ============================================================================
+// PTY Notification Helpers
+// ============================================================================
+
+/**
+ * PTY data notification payload
+ */
+export interface PtyDataPayload {
+  sessionId: string
+  data: string
+}
+
+/**
+ * Subscribe to PTY data notifications
+ */
+export function onPtyData(handler: NotificationHandler<PtyDataPayload>): () => void {
+  return registerNotificationHandler(SIDECAR_NOTIFICATION_METHODS.PTY_DATA, handler)
+}
+
+/**
+ * PTY exit notification payload
+ */
+export interface PtyExitPayload {
+  sessionId: string
+  exitCode: number
+}
+
+/**
+ * Subscribe to PTY exit notifications
+ */
+export function onPtyExit(handler: NotificationHandler<PtyExitPayload>): () => void {
+  return registerNotificationHandler(SIDECAR_NOTIFICATION_METHODS.PTY_EXIT, handler)
 }
