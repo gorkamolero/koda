@@ -81,6 +81,11 @@ export const RPC_METHODS = {
   CHECKPOINT_DIFF: 'checkpoint.diff',
   CHECKPOINT_GET: 'checkpoint.get',
   CHECKPOINT_LIST: 'checkpoint.list',
+  // Pulse
+  PULSE_START: 'pulse.start',
+  PULSE_STOP: 'pulse.stop',
+  PULSE_STATUS: 'pulse.status',
+  PULSE_LIST_ACTIVE: 'pulse.listActive',
 } as const
 
 /**
@@ -455,4 +460,46 @@ export type RpcErrorEvent = {
     method: string
     error: JsonRpcError
   }
+}
+
+/**
+ * Pulse types
+ */
+export type PulseStatus = 'idle' | 'starting' | 'running' | 'syncing' | 'error' | 'stopping'
+
+export interface PulseInfo {
+  worktreeId: string
+  status: PulseStatus
+  repoRootPath: string
+  syncCount: number
+  lastSyncAt: string | null
+  errorMessage: string | null
+}
+
+export interface StartPulseParams {
+  worktreeId: string
+  repoRootPath: string
+}
+
+export interface StopPulseParams {
+  worktreeId: string
+}
+
+export interface GetPulseStatusParams {
+  worktreeId: string
+}
+
+export interface PulseStatusNotification {
+  worktreeId: string
+  status: PulseStatus
+  syncCount: number
+  lastSyncAt: string | null
+  errorMessage: string | null
+}
+
+export interface PulseLogNotification {
+  worktreeId: string
+  line: string
+  stream: 'stdout' | 'stderr'
+  timestamp: number
 }

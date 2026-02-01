@@ -86,31 +86,38 @@ pub async fn spawn_sidecar(
         .map_err(|e| format!("Failed to create app data dir: {}", e))?;
 
     // In production, sidecar will be bundled. For dev, we expect it in workspace
-    let sidecar_path = if cfg!(debug_assertions) {
+    let (sidecar_path, resources_path) = if cfg!(debug_assertions) {
         // Dev mode: workspace relative path (from src-tauri directory)
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
-        PathBuf::from(&manifest_dir)
+        let manifest_path = PathBuf::from(&manifest_dir);
+        let sidecar = manifest_path
             .join("..")
             .join("..")
             .join("sidecar")
             .join("dist")
-            .join("index.js")
+            .join("index.js");
+        // Resources are in src-tauri/resources during dev
+        let resources = manifest_path.join("resources");
+        (sidecar, resources)
     } else {
         // Production: bundled in resources
-        app.path()
+        let resource_dir = app
+            .path()
             .resource_dir()
-            .map_err(|e| format!("Failed to get resource dir: {}", e))?
-            .join("sidecar")
-            .join("index.js")
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+        let sidecar = resource_dir.join("sidecar").join("index.js");
+        (sidecar, resource_dir)
     };
 
     tracing::info!("Spawning sidecar from: {:?}", sidecar_path);
+    tracing::info!("Resources path: {:?}", resources_path);
 
     // Spawn sidecar using shell plugin
     let (_, child) = app
         .shell()
         .command("node")
         .env("KODA_SOCKET", &state.socket_path)
+        .env("KODA_RESOURCES_PATH", resources_path.to_str().unwrap_or(""))
         .args([
             sidecar_path.to_str().unwrap(),
             "--app-dir",

@@ -1,5 +1,5 @@
 import { useParams, Link } from '@tanstack/react-router'
-import { useWorktree } from '@/hooks/useRpc'
+import { useWorktree, useRepo } from '@/hooks/useRpc'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import type { Worktree } from '@/lib/rpc'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useState, useRef } from 'react'
+import { PulseButton } from '@/components/Pulse/PulseButton'
 
 // Static menu items - hoisted outside component to avoid recreation
 const MORE_ACTIONS_MENU_ITEMS = [
@@ -153,6 +154,8 @@ export function MainHeader({ title, actions }: MainHeaderProps): React.ReactElem
   const params = useParams({ strict: false })
   const workspaceId = (params as { id?: string }).id
   const { data: worktree, isLoading } = useWorktree(workspaceId ?? '')
+  const { data: repo } = useRepo(worktree?.repoId ?? '')
+  const repoRootPath = repo?.rootPath ?? ''
 
   // If we're not in a workspace and no title, don't render
   if (!workspaceId && !title) {
@@ -187,6 +190,12 @@ export function MainHeader({ title, actions }: MainHeaderProps): React.ReactElem
 
       {/* Right side: Actions */}
       <div className="flex items-center gap-2">
+        {worktree && repoRootPath && (
+          <PulseButton
+            worktreeId={worktree.id}
+            repoRootPath={repoRootPath}
+          />
+        )}
         {actions}
         {workspaceId && <MoreActionsMenu />}
       </div>
