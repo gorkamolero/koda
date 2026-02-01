@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const _KODA_COMPACT = {
   K: ['╻ ╻', '╠╸ ', '╹ ╹'],
   O: ['╭─╮', '│ │', '╰─╯'],
-  D: ['╭─╮', '│ │', '╰─╯'].map((line, i) => i === 0 ? '┌─╮' : i === 2 ? '└─╯' : '│ │'),
+  D: ['╭─╮', '│ │', '╰─╯'].map((_line, i) => i === 0 ? '┌─╮' : i === 2 ? '└─╯' : '│ │'),
   A: ['╭─╮', '├─┤', '╵ ╵'],
 }
 
@@ -436,5 +436,5 @@ export const KodaSpinner = memo(function KodaSpinner({
 // Convenience exports
 // ============================================================================
 
-export { KODA_LARGE, KODA_MINIMAL }
+export { KODA_LARGE, KODA_MINIMAL, _KODA_COMPACT, _KODA_BRAILLE }
 export type { AnimationStyle }
