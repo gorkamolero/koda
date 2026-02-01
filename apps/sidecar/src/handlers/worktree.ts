@@ -668,18 +668,18 @@ function parseDiffOutput(statOutput: string, patchOutput: string): WorktreeDiff 
       const deletions = match[2] === '-' ? 0 : parseInt(match[2], 10);
       const filePath = match[3];
 
-      // Determine status based on additions/deletions and patch content
+      // Extract the diff for this specific file first
+      const fileDiff = extractFileDiff(patchOutput, filePath);
+
+      // Determine status based on the FILE-SPECIFIC diff, not the entire patch
       let status: FileDiff['status'] = 'modified';
-      if (patchOutput.includes(`new file mode`) && patchOutput.includes(filePath)) {
+      if (fileDiff?.includes('new file mode')) {
         status = 'added';
-      } else if (patchOutput.includes(`deleted file mode`) && patchOutput.includes(filePath)) {
+      } else if (fileDiff?.includes('deleted file mode')) {
         status = 'deleted';
-      } else if (patchOutput.includes(`rename from`) && patchOutput.includes(filePath)) {
+      } else if (fileDiff?.includes('rename from')) {
         status = 'renamed';
       }
-
-      // Extract the diff for this specific file
-      const fileDiff = extractFileDiff(patchOutput, filePath);
 
       files.push({
         path: filePath,

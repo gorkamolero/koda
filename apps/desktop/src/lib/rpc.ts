@@ -90,6 +90,9 @@ export const RPC_METHODS = {
   // GitHub
   GITHUB_CREATE_PR: 'github.createPr',
   GITHUB_GET_CHECKS: 'github.getChecks',
+  // Filesystem
+  FS_READ_DIRECTORY: 'fs.readDirectory',
+  FS_READ_FILE: 'fs.readFile',
 } as const
 
 /**
@@ -553,4 +556,21 @@ export interface ChecksResult {
   checks: GhCheck[]
   prUrl?: string
   commitSha?: string
+}
+
+/**
+ * Filesystem types
+ */
+export interface FileEntry {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+}
+
+export interface ReadDirectoryParams {
+  path: string
+}
+
+export interface ReadFileParams {
+  path: string
 }

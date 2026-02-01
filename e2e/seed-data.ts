@@ -271,6 +271,29 @@ These files demonstrate the diff view functionality.
     console.log('Could not stage files:', e)
   }
 
+  // Delete a file that exists in the base branch to show "deleted" status in diff
+  // The .editorconfig file exists in most projects and is safe to delete for testing
+  const filesToTryDelete = ['.editorconfig', '.prettierrc', '.eslintignore', 'turbo.json']
+  let deletedAFile = false
+
+  for (const fileName of filesToTryDelete) {
+    const filePath = path.join(worktreePath, fileName)
+    if (fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath)
+        console.log(`Deleted ${fileName} to create deleted file scenario`)
+        deletedAFile = true
+        break
+      } catch (e) {
+        console.log(`Could not delete ${fileName}:`, e)
+      }
+    }
+  }
+
+  if (!deletedAFile) {
+    console.log('No suitable files found to delete for deleted file test')
+  }
+
   console.log('Created test files for diff testing')
 }
 

@@ -168,6 +168,14 @@ import {
   GetChecksSchema,
 } from './handlers/github.js';
 
+// Import filesystem handlers
+import {
+  readDirectory,
+  readFile,
+  ReadDirectoryInputSchema,
+  ReadFileInputSchema,
+} from './handlers/fs.js';
+
 /**
  * Get the Unix socket path based on platform
  */
@@ -289,6 +297,10 @@ function registerMethods() {
   // GitHub operations
   router.register('github.createPr', createPr, CreatePrSchema);
   router.register('github.getChecks', getChecks, GetChecksSchema);
+
+  // Filesystem operations
+  router.register('fs.readDirectory', readDirectory, ReadDirectoryInputSchema);
+  router.register('fs.readFile', readFile, ReadFileInputSchema);
 
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);

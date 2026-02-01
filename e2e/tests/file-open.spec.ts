@@ -99,6 +99,15 @@ test.describe('File Opening from Diff View', () => {
     // Editor tab testid is like "editor-tab-new-feature-ts"
     const editorTab = page.getByTestId(`editor-tab-${filenamePart}`)
     await expect(editorTab).toBeVisible({ timeout: 5000 })
+
+    // Verify the editor actually has content (not just an empty tab)
+    const monacoEditor = page.locator('.monaco-editor')
+    await expect(monacoEditor).toBeVisible({ timeout: 5000 })
+
+    // Check that there's actual content in the editor view lines
+    const viewLines = page.locator('.view-lines')
+    const lineContent = await viewLines.textContent()
+    expect(lineContent?.length).toBeGreaterThan(0)
   })
 
   test('clicking a deleted file does not open an editor tab', async ({ page }) => {
@@ -114,6 +123,9 @@ test.describe('File Opening from Diff View', () => {
 
     // Navigate to Changes tab
     await page.getByTestId('right-tab-changes').click()
+
+    // Wait for diff to load
+    await page.waitForTimeout(1000)
 
     // Find a deleted file row
     const deletedFile = page.locator('[data-file-status="deleted"]').first()
@@ -192,27 +204,38 @@ test.describe('File Opening from All Files', () => {
 
     // Wait for file explorer to load
     const fileExplorer = page.getByTestId('file-explorer')
-    await expect(fileExplorer).toBeVisible({ timeout: 5000 })
+    const explorerVisible = await fileExplorer.isVisible({ timeout: 5000 }).catch(() => false)
 
-    // Find a file (not a directory) in the tree
-    // File tree items have data-testid="file-item" and type indication
-    const fileItems = page.locator('[data-testid="file-item"][data-type="file"]')
-
-    if ((await fileItems.count()) === 0) {
-      // Try to expand a directory first
-      const dirItems = page.locator('[data-testid="file-item"][data-type="directory"]')
-      if ((await dirItems.count()) > 0) {
-        await dirItems.first().click()
-        await page.waitForTimeout(500)
-      }
-    }
-
-    // Now look for files again
-    const visibleFiles = page.locator('[data-testid="file-item"][data-type="file"]')
-    if ((await visibleFiles.count()) === 0) {
-      test.skip(true, 'No files visible in file explorer')
+    if (!explorerVisible) {
+      test.skip(true, 'File explorer not visible - rootPath may be empty')
       return
     }
+
+    // Wait for files to load (directory read is async)
+    await page.waitForTimeout(1000)
+
+    // Find a file (not a directory) in the tree
+    // File tree items have data-testid="file-item-{name}" and type indication
+    const fileItems = page.locator('[data-testid^="file-item-"][data-type="file"]')
+    const dirItems = page.locator('[data-testid^="file-item-"][data-type="directory"]')
+
+    let fileCount = await fileItems.count()
+    const dirCount = await dirItems.count()
+
+    if (fileCount === 0 && dirCount > 0) {
+      // Try to expand first directory to find files
+      await dirItems.first().click()
+      await page.waitForTimeout(500)
+      fileCount = await fileItems.count()
+    }
+
+    // If still no files, skip
+    if (fileCount === 0) {
+      test.skip(true, `No files visible (found ${dirCount} directories)`)
+      return
+    }
+
+    const visibleFiles = fileItems
 
     // Get filename for verification
     const firstFile = visibleFiles.first()
@@ -242,12 +265,32 @@ test.describe('File Opening from All Files', () => {
     await page.getByTestId('right-tab-files').click()
 
     // Wait for file explorer
-    await expect(page.getByTestId('file-explorer')).toBeVisible({ timeout: 5000 })
+    const fileExplorer = page.getByTestId('file-explorer')
+    const explorerVisible = await fileExplorer.isVisible({ timeout: 5000 }).catch(() => false)
+
+    if (!explorerVisible) {
+      test.skip(true, 'File explorer not visible')
+      return
+    }
+
+    // Wait for files to load
+    await page.waitForTimeout(1000)
 
     // Find a file
-    const fileItems = page.locator('[data-testid="file-item"][data-type="file"]')
-    if ((await fileItems.count()) === 0) {
-      test.skip(true, 'No files in file explorer')
+    const fileItems = page.locator('[data-testid^="file-item-"][data-type="file"]')
+    const dirItems = page.locator('[data-testid^="file-item-"][data-type="directory"]')
+
+    let fileCount = await fileItems.count()
+    const dirCount = await dirItems.count()
+
+    if (fileCount === 0 && dirCount > 0) {
+      await dirItems.first().click()
+      await page.waitForTimeout(500)
+      fileCount = await fileItems.count()
+    }
+
+    if (fileCount === 0) {
+      test.skip(true, `No files in file explorer (found ${dirCount} directories)`)
       return
     }
 

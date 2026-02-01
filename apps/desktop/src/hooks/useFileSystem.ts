@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
-import { readDir, readTextFile, writeTextFile, type DirEntry } from '@tauri-apps/plugin-fs'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
+import { rpcRequest } from '@/lib/tauri'
+import { RPC_METHODS, type FileEntry as RpcFileEntry } from '@/lib/rpc'
 import type { FileEntry } from '@/store/fileExplorer'
 
 interface UseFileSystemReturn {
@@ -11,7 +13,10 @@ interface UseFileSystemReturn {
 }
 
 /**
- * Hook for file system operations with Tauri fs plugin
+ * Hook for file system operations
+ *
+ * Uses RPC calls to sidecar for read operations (works in both Tauri and E2E contexts)
+ * Uses Tauri plugin for write operations (Tauri-only)
  */
 export function useFileSystem(): UseFileSystemReturn {
   const [isLoading, setIsLoading] = useState(false)
@@ -21,24 +26,12 @@ export function useFileSystem(): UseFileSystemReturn {
   const cache = useRef<Map<string, FileEntry[]>>(new Map())
 
   /**
-   * Convert Tauri DirEntry to our FileEntry format
-   */
-  const convertDirEntry = useCallback(
-    (entry: DirEntry, parentPath: string): FileEntry => ({
-      name: entry.name,
-      path: `${parentPath}/${entry.name}`,
-      type: entry.isDirectory ? 'directory' : 'file',
-    }),
-    []
-  )
-
-  /**
-   * Read directory contents
+   * Read directory contents via RPC
    */
   const readDirectory = useCallback(
-    async (path: string): Promise<FileEntry[]> => {
+    async (dirPath: string): Promise<FileEntry[]> => {
       // Check cache
-      const cached = cache.current.get(path)
+      const cached = cache.current.get(dirPath)
       if (cached) {
         return cached
       }
@@ -47,19 +40,20 @@ export function useFileSystem(): UseFileSystemReturn {
       setError(null)
 
       try {
-        const entries = await readDir(path)
+        const entries = await rpcRequest<RpcFileEntry[]>(
+          RPC_METHODS.FS_READ_DIRECTORY,
+          { path: dirPath }
+        )
 
-        // Sort: directories first, then alphabetically
-        const sorted = entries.sort((a, b) => {
-          if (a.isDirectory && !b.isDirectory) return -1
-          if (!a.isDirectory && b.isDirectory) return 1
-          return a.name.localeCompare(b.name)
-        })
-
-        const fileEntries = sorted.map((entry) => convertDirEntry(entry, path))
+        // Convert to FileEntry format (already sorted by sidecar)
+        const fileEntries: FileEntry[] = entries.map((entry) => ({
+          name: entry.name,
+          path: entry.path,
+          type: entry.type,
+        }))
 
         // Cache result
-        cache.current.set(path, fileEntries)
+        cache.current.set(dirPath, fileEntries)
 
         return fileEntries
       } catch (err) {
@@ -70,17 +64,20 @@ export function useFileSystem(): UseFileSystemReturn {
         setIsLoading(false)
       }
     },
-    [convertDirEntry]
+    []
   )
 
   /**
-   * Read file contents
+   * Read file contents via RPC
    */
-  const readFile = useCallback(async (path: string): Promise<string> => {
+  const readFile = useCallback(async (filePath: string): Promise<string> => {
     setError(null)
 
     try {
-      const content = await readTextFile(path)
+      const content = await rpcRequest<string>(
+        RPC_METHODS.FS_READ_FILE,
+        { path: filePath }
+      )
       return content
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -90,13 +87,13 @@ export function useFileSystem(): UseFileSystemReturn {
   }, [])
 
   /**
-   * Write file contents
+   * Write file contents (still uses Tauri plugin)
    */
-  const writeFile = useCallback(async (path: string, content: string): Promise<void> => {
+  const writeFile = useCallback(async (filePath: string, content: string): Promise<void> => {
     setError(null)
 
     try {
-      await writeTextFile(path, content)
+      await writeTextFile(filePath, content)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(`Failed to write file: ${message}`)
