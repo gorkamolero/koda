@@ -7,6 +7,7 @@ const createMessage = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
   role: 'assistant',
   content: '',
   timestamp: Date.now(),
+  status: 'complete',
   ...overrides,
 })
 
@@ -75,7 +76,8 @@ describe('extractMessageContent', () => {
       contentBlocks: [
         {
           type: 'tool_result',
-          id: 'tool-1',
+          toolUseId: 'tool-1',
+          toolName: 'read_file',
           output: 'File content here',
         },
       ],
@@ -89,7 +91,8 @@ describe('extractMessageContent', () => {
       contentBlocks: [
         {
           type: 'tool_result',
-          id: 'tool-1',
+          toolUseId: 'tool-1',
+          toolName: 'read_file',
           error: 'File not found',
         },
       ],
