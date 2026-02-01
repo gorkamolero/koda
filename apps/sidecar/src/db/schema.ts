@@ -113,6 +113,28 @@ export const workspaces = sqliteTable('workspaces', {
 });
 
 /**
+ * Workspace Repos - Many-to-many join table
+ * A workspace can have multiple repos attached (or none)
+ * A repo can be attached to multiple workspaces
+ * 
+ * This decouples workspace identity from repo attachment,
+ * enabling:
+ * - Cloud workspaces with no local repo
+ * - Multi-repo workspaces (monorepo scenarios)
+ * - Collaboration without requiring matching local repos
+ */
+export const workspaceRepos = sqliteTable('workspace_repos', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').references(() => workspaces.id).notNull(),
+  repoId: text('repo_id').references(() => repos.id).notNull(),
+  /** Path within workspace where this repo's worktree lives */
+  worktreePath: text('worktree_path'),
+  /** Branch checked out for this repo in this workspace */
+  branch: text('branch'),
+  createdAt: timestamp(),
+});
+
+/**
  * Workspace Shares - Collaboration
  * Share any workspace with anyone
  *
@@ -318,6 +340,9 @@ export type NewWorkspace = typeof workspaces.$inferInsert;
 
 export type WorkspaceShare = typeof workspaceShares.$inferSelect;
 export type NewWorkspaceShare = typeof workspaceShares.$inferInsert;
+
+export type WorkspaceRepo = typeof workspaceRepos.$inferSelect;
+export type NewWorkspaceRepo = typeof workspaceRepos.$inferInsert;
 
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;

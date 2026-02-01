@@ -83,6 +83,18 @@ import {
   ListWorktreesSchema,
 } from './handlers/worktree.js';
 
+// Import workspace repo handlers
+import {
+  attachRepo,
+  detachRepo,
+  listWorkspaceRepos,
+  createStandaloneWorkspace,
+  AttachRepoSchema,
+  DetachRepoSchema,
+  ListWorkspaceReposSchema,
+  CreateStandaloneWorkspaceSchema,
+} from './handlers/workspaceRepo.js';
+
 // Import checkpoint handlers
 import {
   rpcSaveCheckpoint,
@@ -175,6 +187,12 @@ function registerMethods() {
   router.register('worktree.delete', deleteWorktree, DeleteWorktreeSchema);
   router.register('worktree.get', getWorktree, GetWorktreeSchema);
   router.register('worktree.list', listWorktrees, ListWorktreesSchema);
+
+  // Workspace repo management (multi-repo support)
+  router.register('workspaceRepo.attach', attachRepo, AttachRepoSchema);
+  router.register('workspaceRepo.detach', detachRepo, DetachRepoSchema);
+  router.register('workspaceRepo.list', listWorkspaceRepos, ListWorkspaceReposSchema);
+  router.register('workspace.createStandalone', createStandaloneWorkspace, CreateStandaloneWorkspaceSchema);
 
   // Checkpoint management
   router.register('checkpoint.save', rpcSaveCheckpoint, SaveCheckpointSchema);

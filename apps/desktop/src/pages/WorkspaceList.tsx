@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
-import { useWorkspaces, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
+import { useWorkspaces, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
 import type { Workspace } from '@/lib/rpc'
 
-type CreateMode = 'repo' | 'branch'
+type CreateMode = 'repo' | 'branch' | 'join' | 'standalone'
 
 export function WorkspaceList() {
   const navigate = useNavigate()
@@ -12,11 +12,14 @@ export function WorkspaceList() {
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
+  const createStandaloneWorkspace = useCreateStandaloneWorkspace()
   
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createMode, setCreateMode] = useState<CreateMode>('repo')
   const [selectedRepoId, setSelectedRepoId] = useState<string>('')
   const [branchName, setBranchName] = useState('')
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [joinWorkspaceId, setJoinWorkspaceId] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
   const handleSelectFolder = async () => {
@@ -69,8 +72,31 @@ export function WorkspaceList() {
     setIsCreateOpen(false)
     setBranchName('')
     setSelectedRepoId('')
+    setWorkspaceName('')
+    setJoinWorkspaceId('')
     setCreateMode('repo')
     setCreateError(null)
+  }
+
+  const handleCreateStandalone = async () => {
+    if (!workspaceName.trim()) return
+
+    try {
+      const workspace = await createStandaloneWorkspace.mutateAsync({
+        name: workspaceName.trim(),
+      })
+      closeModal()
+      void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
+    }
+  }
+
+  const handleJoinWorkspace = () => {
+    if (!joinWorkspaceId.trim()) return
+    // Navigate directly to the workspace - Liveblocks will handle the room join
+    closeModal()
+    void navigate({ to: '/workspace/$id', params: { id: joinWorkspaceId.trim() } })
   }
 
   const isLoading = loadingWorkspaces || loadingRepos
@@ -120,15 +146,37 @@ export function WorkspaceList() {
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-background border border-border rounded-lg p-6 w-full max-w-lg shadow-xl">
-            {createMode === 'repo' ? (
+            {createMode === 'repo' && (
               <>
-                <h2 className="text-lg font-semibold mb-4">Select Repository</h2>
-                
+                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
+
                 {createError && (
                   <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                     {createError}
                   </div>
                 )}
+
+                {/* Mode selection tabs */}
+                <div className="flex gap-2 mb-4 border-b border-border pb-3">
+                  <button
+                    onClick={() => setCreateMode('repo')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                  >
+                    From Repository
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('standalone')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Standalone
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('join')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Join Existing
+                  </button>
+                </div>
 
                 {/* Existing repos */}
                 {hasRepos && (
@@ -171,10 +219,12 @@ export function WorkspaceList() {
                   </button>
                 </div>
               </>
-            ) : (
+            )}
+
+            {createMode === 'branch' && (
               <>
                 <h2 className="text-lg font-semibold mb-4">Create Branch</h2>
-                
+
                 {createError && (
                   <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                     {createError}
@@ -206,7 +256,7 @@ export function WorkspaceList() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between mt-6">
                   <button
                     onClick={() => { setCreateMode('repo'); }}
@@ -230,6 +280,150 @@ export function WorkspaceList() {
                       {createWorktree.isPending ? 'Creating...' : 'Create Workspace'}
                     </button>
                   </div>
+                </div>
+              </>
+            )}
+
+            {createMode === 'standalone' && (
+              <>
+                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
+
+                {createError && (
+                  <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    {createError}
+                  </div>
+                )}
+
+                {/* Mode selection tabs */}
+                <div className="flex gap-2 mb-4 border-b border-border pb-3">
+                  <button
+                    onClick={() => setCreateMode('repo')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    From Repository
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('standalone')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                  >
+                    Standalone
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('join')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Join Existing
+                  </button>
+                </div>
+
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create a workspace without attaching a repository. You can attach repos later or use this for collaboration.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Workspace Name</label>
+                    <input
+                      type="text"
+                      value={workspaceName}
+                      onChange={(e) => { setWorkspaceName(e.target.value); }}
+                      placeholder="my-project"
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleCreateStandalone()
+                        if (e.key === 'Escape') closeModal()
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => void handleCreateStandalone()}
+                    disabled={!workspaceName.trim() || createStandaloneWorkspace.isPending}
+                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {createStandaloneWorkspace.isPending ? 'Creating...' : 'Create Workspace'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {createMode === 'join' && (
+              <>
+                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
+
+                {createError && (
+                  <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                    {createError}
+                  </div>
+                )}
+
+                {/* Mode selection tabs */}
+                <div className="flex gap-2 mb-4 border-b border-border pb-3">
+                  <button
+                    onClick={() => setCreateMode('repo')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    From Repository
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('standalone')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Standalone
+                  </button>
+                  <button
+                    onClick={() => setCreateMode('join')}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
+                  >
+                    Join Existing
+                  </button>
+                </div>
+
+                <p className="text-sm text-muted-foreground mb-4">
+                  Join a workspace shared by a collaborator. Ask them for the workspace ID.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Workspace ID</label>
+                    <input
+                      type="text"
+                      value={joinWorkspaceId}
+                      onChange={(e) => { setJoinWorkspaceId(e.target.value); }}
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleJoinWorkspace()
+                        if (e.key === 'Escape') closeModal()
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-6">
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleJoinWorkspace}
+                    disabled={!joinWorkspaceId.trim()}
+                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    Join Workspace
+                  </button>
                 </div>
               </>
             )}

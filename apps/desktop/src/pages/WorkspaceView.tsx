@@ -2,48 +2,34 @@ import { useParams, useSearch } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { useAtomValue } from 'jotai'
 import { AgentChat } from '@/components/AgentChat'
+import { FileExplorer } from '@/components/FileExplorer'
+import { Editor } from '@/components/Editor'
+import { DiffView } from '@/components/DiffView'
 import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
 import { TerminalPanel } from '@/components/Terminal'
 import { GitStatusBar } from '@/components/GitStatusBar'
 import { Scratchpad } from '@/components/Scratchpad'
-import { RightSidebar } from '@/components/RightSidebar'
+import { ChecksView } from '@/components/ChecksView'
+import { ReviewView } from '@/components/ReviewView'
+import { CollaborativeWorkspaceProvider } from '@/components/CollaborativeWorkspaceProvider'
 import {
   InterviewMode,
   SpecDrivenView,
   RalphView,
 } from '@/components/Interview'
 import { workspaceTypeAtom } from '@/store/interview'
+import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorkspace, useSessions } from '@/hooks/useRpc'
-import { useResizable } from '@/hooks/useResizable'
-import { cn } from '@/lib/utils'
 
-type Tab = 'chat' | 'spec' | 'scratchpad'
+type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec' | 'scratchpad' | 'checks' | 'review'
 
-/**
- * WorkspaceView - Conductor-style layout
- *
- * The key insight: TopBar is INSIDE main-content, not above it.
- *
- * ┌─────────────────────────────────────────┬────────────────────────────┐
- * │ main-content                            │ right-panel                │
- * │ ┌─────────────────────────────────────┐ │ ┌────────────────────────┐ │
- * │ │ TopBar Row 1: Workspace | branch    │ │ │ PR Actions row         │ │
- * │ │ TopBar Row 2: Scratchpad | Chat     │ │ │ Files|Changes|Checks   │ │
- * │ ├─────────────────────────────────────┤ │ ├────────────────────────┤ │
- * │ │                                     │ │ │ git-panel content      │ │
- * │ │ Messages (virtuoso)                 │ │ │                        │ │
- * │ │                                     │ │ ├────────────────────────┤ │
- * │ ├─────────────────────────────────────┤ │ │ terminal-panel         │ │
- * │ │ Composer (input) - bottom           │ │ │                        │ │
- * │ └─────────────────────────────────────┘ │ └────────────────────────┘ │
- * └─────────────────────────────────────────┴────────────────────────────┘
- */
 export function WorkspaceView() {
   const { id } = useParams({ from: '/workspace/$id' })
   const search = useSearch({ from: '/workspace/$id' })
   const workspaceType = useAtomValue(workspaceTypeAtom)
+  const sidebarVisible = useAtomValue(sidebarVisibleAtom)
 
   // Fetch workspace data to get the real path
   const { data: workspace } = useWorkspace(id)
@@ -57,6 +43,7 @@ export function WorkspaceView() {
   // Set initial active session when sessions load
   useEffect(() => {
     if (sessions && sessions.length > 0 && !activeSessionId) {
+      // Select the most recent session or the first running one
       const runningSession = sessions.find((s) => s.status === 'running')
       const mostRecentSession = sessions[0]
       setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
@@ -74,32 +61,6 @@ export function WorkspaceView() {
 
   const [activeTab, setActiveTab] = useState<Tab>(getInitialTab)
 
-  // Right panel resizing (main-content vs right-panel, horizontal)
-  const rightPanelResize = useResizable({
-    cssVar: '--right-panel-width',
-    initialSize: 400,
-    minSize: 280,
-    maxSize: 600,
-    direction: 'horizontal',
-    storageKey: 'koda-right-panel-width',
-    edge: 'start',
-  })
-
-  // Terminal panel resizing (within right-panel, vertical split)
-  const terminalResize = useResizable({
-    cssVar: '--terminal-height',
-    initialSize: 250,
-    minSize: 100,
-    maxSize: 500,
-    direction: 'vertical',
-    storageKey: 'koda-terminal-height',
-    edge: 'start',
-  })
-
-  // State for showing/hiding panels
-  const [showRightPanel, setShowRightPanel] = useState(true)
-  const [showTerminal, setShowTerminal] = useState(true)
-
   // Update tab when mode changes
   useEffect(() => {
     if (startMode === 'interview') {
@@ -116,9 +77,15 @@ export function WorkspaceView() {
   const getTabs = (): { id: Tab; label: string }[] => {
     const baseTabs: { id: Tab; label: string }[] = [
       { id: 'chat', label: 'Chat' },
+      { id: 'files', label: 'Files' },
+      { id: 'diff', label: 'Diff' },
+      { id: 'checks', label: 'Checks' },
+      { id: 'review', label: 'Review' },
+      { id: 'terminal', label: 'Terminal' },
       { id: 'scratchpad', label: 'Scratchpad' },
     ]
 
+    // Add spec tab for spec-driven and ralph modes
     if (workspaceType === 'spec-driven' || workspaceType === 'ralph') {
       baseTabs.splice(1, 0, { id: 'spec', label: 'Spec' })
     }
@@ -143,29 +110,22 @@ export function WorkspaceView() {
   useKeyboardShortcuts({
     onSwitchTab: handleSwitchTab,
     tabCount: tabs.length,
-    onToggleTerminal: () => setShowTerminal((prev) => !prev),
-    onToggleSidebar: () => setShowRightPanel((prev) => !prev),
   })
 
   return (
-    <div className="h-full flex">
-      {/* Command Palette (global) */}
-      <CommandPalette />
+    <CollaborativeWorkspaceProvider workspaceId={id}>
+      <div className="h-full flex flex-col">
+        {/* Command Palette (global) */}
+        <CommandPalette />
 
-      {/* Main content panel (chat/scratchpad) - includes its own TopBar */}
-      <div
-        data-testid="main-content"
-        className="flex-1 min-w-0 flex flex-col overflow-hidden"
-      >
-        {/* TopBar is INSIDE main-content */}
+        {/* Conductor-style top bar */}
         <TopBar
           workspace={workspace}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
 
-        {/* Content area - fills remaining space */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 overflow-hidden">
           {activeTab === 'chat' && (
             <AgentChat workspaceId={id} sessionId={activeSessionId} />
           )}
@@ -178,78 +138,56 @@ export function WorkspaceView() {
             <RalphView workspaceId={id} />
           )}
 
+          {/* Show interview mode directly when in interview mode param */}
           {activeTab === 'spec' &&
             startMode === 'interview' &&
             workspaceType === 'standard' && (
               <InterviewMode workspaceId={id} />
             )}
 
-          {activeTab === 'scratchpad' && <Scratchpad workspaceId={id} />}
+          {activeTab === 'files' && rootPath && (
+            <div className="h-full flex">
+              {/* File explorer sidebar */}
+              {sidebarVisible && (
+                <div
+                  data-testid="file-explorer-sidebar"
+                  className="w-64 border-r border-border h-full overflow-hidden"
+                >
+                  <FileExplorer rootPath={rootPath} />
+                </div>
+              )}
+
+              {/* Editor area */}
+              <div className="flex-1 h-full overflow-hidden">
+                <Editor />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'diff' && (
+            <DiffView workspaceId={id} />
+          )}
+
+          {activeTab === 'terminal' && (
+            <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
+          )}
+
+          {activeTab === 'scratchpad' && (
+            <Scratchpad workspaceId={id} />
+          )}
+
+          {activeTab === 'checks' && (
+            <ChecksView workspaceId={id} />
+          )}
+
+          {activeTab === 'review' && (
+            <ReviewView workspaceId={id} />
+          )}
         </div>
 
-        {/* Git status bar at bottom of main content */}
+        {/* Git status bar at bottom */}
         <GitStatusBar workspace={workspace} />
       </div>
-
-      {/* Right panel (Files/Changes + Terminal) */}
-      {showRightPanel && (
-        <>
-          {/* Resize handle */}
-          <div
-            {...rightPanelResize.handleProps}
-            className={cn(
-              'w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize flex-shrink-0',
-              rightPanelResize.isDragging && 'bg-primary/50'
-            )}
-          />
-
-          {/* Right panel content */}
-          <div
-            data-testid="right-panel"
-            style={{ width: `${rightPanelResize.size}px` }}
-            className="flex-shrink-0 flex flex-col overflow-hidden border-l border-border"
-          >
-            {/* Git panel (Files/Changes/Checks/Review) - includes its own header bars */}
-            <div
-              data-testid="git-panel"
-              className={cn(
-                'overflow-hidden',
-                showTerminal ? 'flex-1' : 'h-full'
-              )}
-            >
-              <RightSidebar
-                workspaceId={id}
-                rootPath={rootPath}
-                onToggleTerminal={() => setShowTerminal((prev) => !prev)}
-                onToggleSidebar={() => setShowRightPanel(false)}
-                showTerminal={showTerminal}
-              />
-            </div>
-
-            {/* Terminal panel (below git-panel in right sidebar) */}
-            {showTerminal && (
-              <>
-                {/* Resize handle (horizontal) */}
-                <div
-                  {...terminalResize.handleProps}
-                  className={cn(
-                    'h-1 bg-border hover:bg-primary/50 transition-colors cursor-row-resize flex-shrink-0',
-                    terminalResize.isDragging && 'bg-primary/50'
-                  )}
-                />
-                {/* Terminal */}
-                <div
-                  data-testid="terminal-panel"
-                  style={{ height: `${terminalResize.size}px` }}
-                  className="flex-shrink-0 border-t border-border"
-                >
-                  <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+    </CollaborativeWorkspaceProvider>
   )
 }
