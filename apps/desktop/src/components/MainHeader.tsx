@@ -1,5 +1,7 @@
 import { useParams, Link } from '@tanstack/react-router'
-import { useWorkspace } from '@/hooks/useRpc'
+import { useWorktree } from '@/hooks/useRpc'
+import { useClickOutside } from '@/hooks/useClickOutside'
+import type { Worktree } from '@/lib/rpc'
 import { cn } from '@/lib/utils'
 import {
   ChevronRight,
@@ -10,7 +12,14 @@ import {
   Settings,
   Loader2,
 } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
+
+// Static menu items - hoisted outside component to avoid recreation
+const MORE_ACTIONS_MENU_ITEMS = [
+  { icon: ExternalLink, label: 'Open in VS Code', action: () => { console.log('Open in VS Code') } },
+  { icon: RefreshCw, label: 'Sync with remote', action: () => { console.log('Sync') } },
+  { icon: Settings, label: 'Workspace settings', action: () => { console.log('Settings') } },
+]
 
 interface MainHeaderProps {
   /** Override the title (for non-workspace pages) */
@@ -22,28 +31,15 @@ interface MainHeaderProps {
 /**
  * Branch selector dropdown.
  */
-function BranchSelector({ branch }: { branch?: string }) {
+function BranchSelector({ branch }: { branch: string }): React.ReactElement {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
-
-  if (!branch) return null
+  useClickOutside(dropdownRef, {
+    onClickOutside: () => { setIsOpen(false) },
+    onEscape: () => { setIsOpen(false) },
+    enabled: isOpen,
+  })
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -78,32 +74,15 @@ function BranchSelector({ branch }: { branch?: string }) {
 /**
  * More actions dropdown menu.
  */
-function MoreActionsMenu({ workspaceId: _workspaceId }: { workspaceId: string }) {
+function MoreActionsMenu(): React.ReactElement {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
-
-  const menuItems = [
-    { icon: ExternalLink, label: 'Open in VS Code', action: () => { console.log('Open in VS Code') } },
-    { icon: RefreshCw, label: 'Sync with remote', action: () => { console.log('Sync') } },
-    { icon: Settings, label: 'Workspace settings', action: () => { console.log('Settings') } },
-  ]
+  useClickOutside(dropdownRef, {
+    onClickOutside: () => { setIsOpen(false) },
+    onEscape: () => { setIsOpen(false) },
+    enabled: isOpen,
+  })
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -117,7 +96,7 @@ function MoreActionsMenu({ workspaceId: _workspaceId }: { workspaceId: string })
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-1 w-48 glass-popover rounded-lg border border-border-strong shadow-xl py-1 z-50 animate-fade-in">
-          {menuItems.map((item) => (
+          {MORE_ACTIONS_MENU_ITEMS.map((item) => (
             <button
               key={item.label}
               onClick={() => {
@@ -143,7 +122,8 @@ function MoreActionsMenu({ workspaceId: _workspaceId }: { workspaceId: string })
 /**
  * Breadcrumb navigation showing current location.
  */
-function Breadcrumb({ workspace, title }: { workspace?: { directoryName: string }; title?: string }) {
+function Breadcrumb({ worktree, title }: { worktree?: Worktree; title?: string }): React.ReactElement {
+  const displayName = worktree?.worktreePath?.split('/').pop() ?? worktree?.branch
   return (
     <nav className="flex items-center gap-1 text-sm">
       <Link
@@ -153,11 +133,11 @@ function Breadcrumb({ workspace, title }: { workspace?: { directoryName: string 
         Home
       </Link>
 
-      {(workspace || title) && (
+      {(worktree || title) && (
         <>
           <ChevronRight className="w-4 h-4 text-text-dim" />
           <span className="text-text-primary font-medium truncate max-w-[200px]">
-            {workspace?.directoryName || title}
+            {displayName || title}
           </span>
         </>
       )}
@@ -169,10 +149,10 @@ function Breadcrumb({ workspace, title }: { workspace?: { directoryName: string 
  * Main header component for the content area.
  * Shows workspace info, branch selector, and actions.
  */
-export function MainHeader({ title, actions }: MainHeaderProps) {
+export function MainHeader({ title, actions }: MainHeaderProps): React.ReactElement {
   const params = useParams({ strict: false })
   const workspaceId = (params as { id?: string }).id
-  const { data: workspace, isLoading } = useWorkspace(workspaceId ?? '')
+  const { data: worktree, isLoading } = useWorktree(workspaceId ?? '')
 
   // If we're not in a workspace and no title, don't render
   if (!workspaceId && !title) {
@@ -195,20 +175,20 @@ export function MainHeader({ title, actions }: MainHeaderProps) {
     <header className="flex items-center justify-between px-4 h-full border-b border-border-subtle">
       {/* Left side: Breadcrumb + Branch */}
       <div className="flex items-center gap-4">
-        <Breadcrumb workspace={workspace} title={title} />
+        <Breadcrumb worktree={worktree} title={title} />
 
-        {workspace?.branch && (
+        {worktree?.branch ? (
           <>
             <div className="h-4 w-px bg-border-subtle" />
-            <BranchSelector branch={workspace.branch} />
+            <BranchSelector branch={worktree.branch} />
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Right side: Actions */}
       <div className="flex items-center gap-2">
         {actions}
-        {workspaceId && <MoreActionsMenu workspaceId={workspaceId} />}
+        {workspaceId && <MoreActionsMenu />}
       </div>
     </header>
   )

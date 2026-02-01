@@ -1,52 +1,28 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useAtom } from 'jotai'
 import { cn } from '@/lib/utils'
 import { selectedModelAtom, AGENT_MODELS, type AgentModel } from '@/store/chat'
+import { useClickOutside } from '@/hooks/useClickOutside'
 import { ChevronDown, Check, Sparkles } from 'lucide-react'
 
 /**
- * Dropdown selector for choosing the AI model
+ * Dropdown selector for choosing the AI model.
  */
-export function ModelSelector() {
+export function ModelSelector(): React.ReactElement {
   const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom)
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const currentModel = AGENT_MODELS.find((m) => m.id === selectedModel)
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false)
-      }
-    }
+  useClickOutside(containerRef, {
+    onClickOutside: () => { setIsOpen(false) },
+    onEscape: () => { setIsOpen(false) },
+    enabled: isOpen,
+  })
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [])
-
-  // Close dropdown on escape key
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [])
-
-  const handleSelect = (model: AgentModel) => {
-    setSelectedModel(model)
+  function handleSelect(modelId: AgentModel): void {
+    setSelectedModel(modelId)
     setIsOpen(false)
   }
 

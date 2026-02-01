@@ -79,6 +79,7 @@ import {
   deleteWorktree,
   getWorktree,
   listWorktrees,
+  listAllWorktrees,
   listWorktreesByWorkspace,
   addWorktreeToWorkspace,
   removeWorktreeFromWorkspace,
@@ -86,6 +87,7 @@ import {
   DeleteWorktreeSchema,
   GetWorktreeSchema,
   ListWorktreesSchema,
+  ListAllWorktreesSchema,
   ListWorktreesByWorkspaceSchema,
   AddWorktreeToWorkspaceSchema,
   RemoveWorktreeFromWorkspaceSchema,
@@ -197,6 +199,7 @@ function registerMethods() {
   router.register('worktree.delete', deleteWorktree, DeleteWorktreeSchema);
   router.register('worktree.get', getWorktree, GetWorktreeSchema);
   router.register('worktree.list', listWorktrees, ListWorktreesSchema);
+  router.register('worktree.listAll', listAllWorktrees, ListAllWorktreesSchema);
   router.register('worktree.listByWorkspace', listWorktreesByWorkspace, ListWorktreesByWorkspaceSchema);
   router.register('worktree.addToWorkspace', addWorktreeToWorkspace, AddWorktreeToWorkspaceSchema);
   router.register('worktree.removeFromWorkspace', removeWorktreeFromWorkspace, RemoveWorktreeFromWorkspaceSchema);

@@ -1,5 +1,5 @@
 import { useParams, useSearch } from '@tanstack/react-router'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAtomValue } from 'jotai'
 import { AgentChat } from '@/components/AgentChat'
 import { FileExplorer } from '@/components/FileExplorer'
@@ -13,53 +13,36 @@ import { Scratchpad } from '@/components/Scratchpad'
 import { ChecksView } from '@/components/ChecksView'
 import { ReviewView } from '@/components/ReviewView'
 import { CollaborativeWorkspaceProvider } from '@/components/CollaborativeWorkspaceProvider'
-import {
-  InterviewMode,
-  SpecDrivenView,
-  RalphView,
-} from '@/components/Interview'
+import { InterviewMode, SpecDrivenView, RalphView } from '@/components/Interview'
 import { workspaceTypeAtom } from '@/store/interview'
 import { sidebarVisibleAtom } from '@/store/ui'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useWorkspace, useSessions } from '@/hooks/useRpc'
+import { useWorktree, useSessions } from '@/hooks/useRpc'
 
 type Tab = 'terminal' | 'diff' | 'chat' | 'files' | 'spec' | 'scratchpad' | 'checks' | 'review'
 
-export function WorkspaceView() {
+export function WorkspaceView(): React.ReactElement {
   const { id } = useParams({ from: '/workspace/$id' })
   const search = useSearch({ from: '/workspace/$id' })
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const sidebarVisible = useAtomValue(sidebarVisibleAtom)
 
-  // Fetch workspace data to get the real path
-  const { data: workspace } = useWorkspace(id)
-
-  // Fetch sessions for this workspace
+  const { data: workspace } = useWorktree(id)
   const { data: sessions } = useSessions(id)
 
-  // Active session tracking
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
 
   // Set initial active session when sessions load
   useEffect(() => {
     if (sessions && sessions.length > 0 && !activeSessionId) {
-      // Select the most recent session or the first running one
       const runningSession = sessions.find((s) => s.status === 'running')
-      const mostRecentSession = sessions[0]
-      setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
+      setActiveSessionId(runningSession?.id ?? sessions[0]?.id)
     }
   }, [sessions, activeSessionId])
 
-  // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
-
-  // Determine initial tab based on mode param
-  const getInitialTab = (): Tab => {
-    if (startMode === 'interview') return 'spec'
-    return 'chat'
-  }
-
-  const [activeTab, setActiveTab] = useState<Tab>(getInitialTab)
+  const initialTab: Tab = startMode === 'interview' ? 'spec' : 'chat'
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
   // Update tab when mode changes
   useEffect(() => {
@@ -69,12 +52,10 @@ export function WorkspaceView() {
   }, [startMode])
 
   // Get real workspace path from worktree
-  const rootPath = workspace?.directoryName
-    ? `/Users/gorkolas/.koda/worktrees/${workspace.directoryName}`
-    : ''
+  const rootPath = workspace?.worktreePath ?? ''
 
   // Build tabs based on workspace type
-  const getTabs = (): { id: Tab; label: string }[] => {
+  const tabs = useMemo((): { id: Tab; label: string }[] => {
     const baseTabs: { id: Tab; label: string }[] = [
       { id: 'chat', label: 'Chat' },
       { id: 'files', label: 'Files' },
@@ -91,9 +72,7 @@ export function WorkspaceView() {
     }
 
     return baseTabs
-  }
-
-  const tabs = getTabs()
+  }, [workspaceType])
 
   // Handle tab switching via keyboard shortcuts
   const handleSwitchTab = useCallback(

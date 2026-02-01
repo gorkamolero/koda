@@ -5,6 +5,7 @@
  * Displays a stack of colored circles with initials.
  */
 
+import { useMemo } from 'react'
 import { usePresence } from '@/hooks/useCollaboration'
 import { useIsCollaborationAvailable } from '@/components/CollaborativeWorkspaceProvider'
 import { cn } from '@/lib/utils'
@@ -22,10 +23,9 @@ export function PresenceAvatars({
   maxVisible = 3,
   size = 'sm',
   className,
-}: PresenceAvatarsProps) {
+}: PresenceAvatarsProps): React.ReactElement | null {
   const isAvailable = useIsCollaborationAvailable()
 
-  // Only render if collaboration is available
   if (!isAvailable) {
     return null
   }
@@ -33,31 +33,36 @@ export function PresenceAvatars({
   return <PresenceAvatarsInner maxVisible={maxVisible} size={size} className={className} />
 }
 
+const SIZE_CLASSES = {
+  sm: 'w-6 h-6 text-[10px]',
+  md: 'w-8 h-8 text-xs',
+} as const
+
 function PresenceAvatarsInner({
   maxVisible,
   size,
   className,
-}: Required<Pick<PresenceAvatarsProps, 'maxVisible' | 'size'>> & { className?: string }) {
+}: Required<Pick<PresenceAvatarsProps, 'maxVisible' | 'size'>> & { className?: string }): React.ReactElement | null {
   const { peers, self } = usePresence()
 
-  // Include self in the display
-  const allUsers = [
-    ...(self ? [{ name: self.name, color: self.color, isLocal: true }] : []),
-    ...peers.map((p) => ({ name: p.name, color: p.color, isLocal: p.isLocal })),
-  ]
+  const { visibleUsers, overflowCount } = useMemo(() => {
+    const allUsers = [
+      ...(self ? [{ name: self.name, color: self.color }] : []),
+      ...peers.map((p) => ({ name: p.name, color: p.color })),
+    ]
 
-  // Don't render if alone
-  if (allUsers.length <= 1) {
+    return {
+      allUsers,
+      visibleUsers: allUsers.slice(0, maxVisible),
+      overflowCount: Math.max(0, allUsers.length - maxVisible),
+    }
+  }, [self, peers, maxVisible])
+
+  if (visibleUsers.length <= 1) {
     return null
   }
 
-  const visibleUsers = allUsers.slice(0, maxVisible)
-  const overflowCount = allUsers.length - maxVisible
-
-  const sizeClasses = {
-    sm: 'w-6 h-6 text-[10px]',
-    md: 'w-8 h-8 text-xs',
-  }
+  const sizeClass = SIZE_CLASSES[size]
 
   return (
     <div className={cn('flex -space-x-2', className)}>
@@ -66,7 +71,7 @@ function PresenceAvatarsInner({
           key={i}
           className={cn(
             'rounded-full flex items-center justify-center font-medium text-white border-2 border-background',
-            sizeClasses[size]
+            sizeClass
           )}
           style={{ backgroundColor: user.color }}
           title={user.name}
@@ -79,9 +84,9 @@ function PresenceAvatarsInner({
         <div
           className={cn(
             'rounded-full flex items-center justify-center font-medium bg-muted text-muted-foreground border-2 border-background',
-            sizeClasses[size]
+            sizeClass
           )}
-          title={`${overflowCount} more`}
+          title={`${String(overflowCount)} more`}
         >
           +{overflowCount}
         </div>

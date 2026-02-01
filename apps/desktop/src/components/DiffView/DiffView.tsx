@@ -10,7 +10,7 @@ import {
   isLoadingAtom,
   type DiffFile,
 } from '@/store/diff'
-import { useCheckpoints, useCheckpointDiff, useWorkspace } from '@/hooks/useRpc'
+import { useCheckpoints, useCheckpointDiff, useWorktree } from '@/hooks/useRpc'
 import { parseUnifiedDiff, getExtension, extensionToLanguage } from '@/lib/diffParser'
 import { FileTree } from './FileTree'
 import { DiffEditor } from './DiffEditor'
@@ -39,10 +39,10 @@ export function DiffView({ workspaceId }: DiffViewProps) {
   const setIsLoading = useSetAtom(isLoadingAtom)
   const isLoading = useAtomValue(isLoadingAtom)
 
-  // Fetch workspace data
-  const { data: workspace } = useWorkspace(workspaceId)
+  // Fetch worktree data (workspaceId is actually a worktree ID in the new model)
+  const { data: worktree } = useWorktree(workspaceId)
 
-  // Fetch checkpoints for this workspace
+  // Fetch checkpoints for this worktree
   const { data: checkpoints, isLoading: loadingCheckpoints } = useCheckpoints(workspaceId)
 
   // Get the two most recent checkpoints for diffing
@@ -56,10 +56,8 @@ export function DiffView({ workspaceId }: DiffViewProps) {
     return [sorted[1]?.id ?? null, sorted[0]?.id ?? null]
   }, [checkpoints])
 
-  // Get the worktree path from workspace
-  const repoPath = workspace?.directoryName
-    ? `/Users/gorkolas/.koda/worktrees/${workspace.directoryName}`
-    : ''
+  // Get the worktree path
+  const repoPath = worktree?.worktreePath ?? ''
 
   // Fetch the diff between checkpoints
   const {

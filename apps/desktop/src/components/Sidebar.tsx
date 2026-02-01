@@ -1,8 +1,9 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useWorkspaces, useRepos, useSidecar, useWorkspaceDiffStats } from '@/hooks/useRpc'
+import { useAllWorktrees, useRepos, useSidecar } from '@/hooks/useRpc'
+import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
-import type { Workspace, Repo, WorkspaceStatus } from '@/lib/rpc'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import type { Worktree, Repo, WorktreeStatus } from '@/lib/rpc'
+import { useState, useMemo, useRef } from 'react'
 import {
   Plus,
   Settings,
@@ -26,18 +27,30 @@ import {
 } from 'lucide-react'
 
 // ============================================================================
-// Usage Bar (kept and restyled)
+// Shared Components
 // ============================================================================
 
-function UsageBar({
-  label,
-  value,
-  max,
-}: {
+interface ExpandChevronProps {
+  isExpanded: boolean
+  className?: string
+}
+
+function ExpandChevron({ isExpanded, className = 'w-4 h-4 text-text-dim' }: ExpandChevronProps): React.ReactElement {
+  const Icon = isExpanded ? ChevronDown : ChevronRight
+  return <Icon className={className} />
+}
+
+// ============================================================================
+// Usage Bar
+// ============================================================================
+
+interface UsageBarProps {
   label: string
   value: number
   max: number
-}) {
+}
+
+function UsageBar({ label, value, max }: UsageBarProps): React.ReactElement {
   const percent = Math.min(100, Math.round((value / max) * 100))
   const isHigh = percent > 80
 
@@ -46,7 +59,7 @@ function UsageBar({
       <div className="flex justify-between text-xs">
         <span className="text-text-faint">{label}</span>
         <span className={cn('text-text-muted', isHigh && 'text-orange-400')}>
-          {String(percent)}%
+          {percent}%
         </span>
       </div>
       <div className="h-1 rounded-full bg-surface-inset overflow-hidden">
@@ -68,52 +81,22 @@ function UsageBar({
 // Status Indicators
 // ============================================================================
 
-function getStatusConfig(status?: WorkspaceStatus | null): {
+interface StatusConfig {
   icon: React.ReactNode
   colorClass: string
-} {
-  switch (status) {
-    case 'done':
-      return {
-        icon: <Check className="w-3.5 h-3.5" />,
-        colorClass: 'text-green-500',
-      }
-    case 'blocked':
-    case 'needs-review':
-      return {
-        icon: <AlertCircle className="w-3.5 h-3.5" />,
-        colorClass: 'text-orange-500',
-      }
-    case 'in-progress':
-    default:
-      return {
-        icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
-        colorClass: 'text-text-dim',
-      }
-  }
 }
 
-// ============================================================================
-// Diff Stats Badge
-// ============================================================================
-
-function DiffStatsBadge({ workspaceId }: { workspaceId: string }) {
-  const { data: stats } = useWorkspaceDiffStats(workspaceId)
-
-  if (!stats || (stats.additions === 0 && stats.deletions === 0)) {
-    return null
+function getStatusConfig(status?: WorktreeStatus | null): StatusConfig {
+  if (status === 'done') {
+    return { icon: <Check className="w-3.5 h-3.5" />, colorClass: 'text-green-500' }
   }
-
-  return (
-    <div className="flex items-center gap-0.5 text-xs font-mono px-1.5 py-0.5 rounded bg-surface-inset">
-      {stats.additions > 0 && (
-        <span className="text-green-500">+{String(stats.additions)}</span>
-      )}
-      {stats.deletions > 0 && (
-        <span className="text-red-400 ml-0.5">-{String(stats.deletions)}</span>
-      )}
-    </div>
-  )
+  if (status === 'blocked' || status === 'needs-review') {
+    return { icon: <AlertCircle className="w-3.5 h-3.5" />, colorClass: 'text-orange-500' }
+  }
+  return {
+    icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
+    colorClass: 'text-text-dim',
+  }
 }
 
 // ============================================================================
@@ -123,9 +106,7 @@ function DiffStatsBadge({ workspaceId }: { workspaceId: string }) {
 function formatTimeAgo(date: string | null | undefined): string {
   if (!date) return ''
 
-  const now = Date.now()
-  const then = new Date(date).getTime()
-  const diffMs = now - then
+  const diffMs = Date.now() - new Date(date).getTime()
   const diffMins = Math.floor(diffMs / 60000)
 
   if (diffMins < 1) return 'just now'
@@ -149,31 +130,14 @@ interface DropdownMenuProps {
   align?: 'left' | 'right'
 }
 
-function DropdownMenu({ isOpen, onClose, children, align = 'right' }: DropdownMenuProps) {
+function DropdownMenu({ isOpen, onClose, children, align = 'right' }: DropdownMenuProps): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen, onClose])
+  useClickOutside(menuRef, {
+    onClickOutside: onClose,
+    onEscape: onClose,
+    enabled: isOpen,
+  })
 
   if (!isOpen) return null
 
@@ -198,7 +162,7 @@ interface MenuItemProps {
   destructive?: boolean
 }
 
-function MenuItem({ icon, children, onClick, destructive }: MenuItemProps) {
+function MenuItem({ icon, children, onClick, destructive }: MenuItemProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
@@ -214,7 +178,7 @@ function MenuItem({ icon, children, onClick, destructive }: MenuItemProps) {
   )
 }
 
-function MenuSeparator() {
+function MenuSeparator(): React.ReactElement {
   return <div className="my-1 border-t border-border-subtle" />
 }
 
@@ -228,7 +192,7 @@ function RepoActionsDropdown({
 }: {
   repo: Repo
   onClose: () => void
-}) {
+}): React.ReactElement {
   const navigate = useNavigate()
 
   return (
@@ -297,34 +261,18 @@ function WorkspaceContextMenu({
   position,
   onClose,
 }: {
-  workspace: Workspace
+  workspace: Worktree
   position: { x: number; y: number }
   onClose: () => void
-}) {
+}): React.ReactElement {
   const menuRef = useRef<HTMLDivElement>(null)
-  const isPinned = !!workspace.pinnedAt
+  const isPinned = Boolean(workspace.pinnedAt)
   const isArchived = workspace.state === 'archived'
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [onClose])
+  useClickOutside(menuRef, {
+    onClickOutside: onClose,
+    onEscape: onClose,
+  })
 
   return (
     <div
@@ -346,7 +294,7 @@ function WorkspaceContextMenu({
         icon={<Copy className="w-4 h-4" />}
         onClick={() => {
           onClose()
-          void navigator.clipboard.writeText(workspace.branch ?? workspace.directoryName)
+          void navigator.clipboard.writeText(workspace.branch ?? '')
         }}
       >
         Copy branch name
@@ -356,7 +304,7 @@ function WorkspaceContextMenu({
         onClick={() => {
           onClose()
           // TODO: Open in Finder
-          console.log('Open in Finder:', workspace.directoryName)
+          console.log('Open in Finder:', workspace.worktreePath)
         }}
       >
         Open in Finder
@@ -366,7 +314,7 @@ function WorkspaceContextMenu({
         onClick={() => {
           onClose()
           // TODO: Open in editor
-          console.log('Open in editor:', workspace.directoryName)
+          console.log('Open in editor:', workspace.worktreePath)
         }}
       >
         Open in Editor
@@ -409,10 +357,10 @@ function WorkspaceRow({
   isActive,
   showPinIndicator = false,
 }: {
-  workspace: Workspace
+  workspace: Worktree
   isActive: boolean
   showPinIndicator?: boolean
-}) {
+}): React.ReactElement {
   const status = workspace.manualStatus ?? workspace.derivedStatus
   const { icon, colorClass } = getStatusConfig(status)
   const timeAgo = formatTimeAgo(workspace.updatedAt)
@@ -451,7 +399,7 @@ function WorkspaceRow({
                 <Pin className="w-3 h-3 text-blue-400 flex-shrink-0" />
               )}
               <span className="text-text-primary text-sm font-medium truncate">
-                {workspace.branch ?? workspace.directoryName}
+                {workspace.branch ?? 'unnamed'}
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -461,11 +409,10 @@ function WorkspaceRow({
                   <span>{String(unreadCount)}</span>
                 </div>
               )}
-              <DiffStatsBadge workspaceId={workspace.id} />
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-text-faint">
-            <span className="truncate">{workspace.directoryName}</span>
+            <span className="truncate">{workspace.worktreePath?.split('/').pop() ?? workspace.branch}</span>
             {timeAgo && (
               <>
                 <span>·</span>
@@ -526,9 +473,9 @@ function RepoGroup({
   activeWorkspaceId,
 }: {
   repo: Repo
-  workspaces: Workspace[]
+  workspaces: Worktree[]
   activeWorkspaceId?: string
-}) {
+}): React.ReactElement {
   const navigate = useNavigate()
   const [isExpanded, setIsExpanded] = useState(true)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -553,12 +500,7 @@ function RepoGroup({
             {repoName}
           </span>
 
-          {/* Chevron */}
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-text-dim flex-shrink-0" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-text-dim flex-shrink-0" />
-          )}
+          <ExpandChevron isExpanded={isExpanded} className="w-4 h-4 text-text-dim flex-shrink-0" />
         </button>
 
         {/* Actions (visible on hover) */}
@@ -616,7 +558,7 @@ function RepoGroup({
 // Sidebar Header
 // ============================================================================
 
-function SidebarHeader() {
+function SidebarHeader(): React.ReactElement {
   const navigate = useNavigate()
 
   return (
@@ -660,7 +602,7 @@ function SidebarHeader() {
 // Sidebar Footer
 // ============================================================================
 
-function SidebarFooter() {
+function SidebarFooter(): React.ReactElement {
   const { status } = useSidecar()
   const navigate = useNavigate()
 
@@ -724,9 +666,9 @@ function PinnedWorkspacesSection({
   workspaces,
   activeWorkspaceId,
 }: {
-  workspaces: Workspace[]
+  workspaces: Worktree[]
   activeWorkspaceId?: string
-}) {
+}): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(true)
 
   if (workspaces.length === 0) return null
@@ -739,12 +681,8 @@ function PinnedWorkspacesSection({
       >
         <Pin className="w-4 h-4 text-blue-400" />
         <span className="text-text-primary text-sm font-medium flex-1 text-left">Pinned</span>
-        <span className="text-xs text-text-faint">{String(workspaces.length)}</span>
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-text-dim" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-text-dim" />
-        )}
+        <span className="text-xs text-text-faint">{workspaces.length}</span>
+        <ExpandChevron isExpanded={isExpanded} />
       </button>
       {isExpanded && (
         <div className="ml-2 mt-1">
@@ -770,10 +708,10 @@ function ArchivedWorkspacesSection({
   workspaces,
   activeWorkspaceId,
 }: {
-  workspaces: Workspace[]
+  workspaces: Worktree[]
   activeWorkspaceId?: string
-}) {
-  const [isExpanded, setIsExpanded] = useState(false) // Collapsed by default
+}): React.ReactElement | null {
+  const [isExpanded, setIsExpanded] = useState(false)
 
   if (workspaces.length === 0) return null
 
@@ -785,12 +723,8 @@ function ArchivedWorkspacesSection({
       >
         <Archive className="w-4 h-4 text-text-dim" />
         <span className="text-text-muted text-sm font-medium flex-1 text-left">Archived</span>
-        <span className="text-xs text-text-faint">{String(workspaces.length)}</span>
-        {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-text-dim" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-text-dim" />
-        )}
+        <span className="text-xs text-text-faint">{workspaces.length}</span>
+        <ExpandChevron isExpanded={isExpanded} />
       </button>
       {isExpanded && (
         <div className="ml-2 mt-1">
@@ -811,8 +745,8 @@ function ArchivedWorkspacesSection({
 // Workspace List (grouped by repo)
 // ============================================================================
 
-function WorkspaceList() {
-  const { data: workspaces, isLoading: loadingWorkspaces } = useWorkspaces()
+function WorkspaceList(): React.ReactElement {
+  const { data: workspaces, isLoading: loadingWorkspaces } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const params = useParams({ strict: false })
   const activeId = (params as { id?: string }).id
@@ -821,15 +755,15 @@ function WorkspaceList() {
   const { pinnedWorkspaces, archivedWorkspaces, groupedWorkspaces } = useMemo(() => {
     if (!workspaces || !repos) {
       return {
-        pinnedWorkspaces: [] as Workspace[],
-        archivedWorkspaces: [] as Workspace[],
-        groupedWorkspaces: new Map<string, { repo: Repo; workspaces: Workspace[] }>(),
+        pinnedWorkspaces: [] as Worktree[],
+        archivedWorkspaces: [] as Worktree[],
+        groupedWorkspaces: new Map<string, { repo: Repo; workspaces: Worktree[] }>(),
       }
     }
 
-    const pinned: Workspace[] = []
-    const archived: Workspace[] = []
-    const groups = new Map<string, { repo: Repo; workspaces: Workspace[] }>()
+    const pinned: Worktree[] = []
+    const archived: Worktree[] = []
+    const groups = new Map<string, { repo: Repo; workspaces: Worktree[] }>()
 
     // Initialize groups for all repos
     for (const repo of repos) {
@@ -842,8 +776,8 @@ function WorkspaceList() {
         archived.push(ws)
       } else if (ws.pinnedAt) {
         pinned.push(ws)
-      } else if (ws.repositoryId && groups.has(ws.repositoryId)) {
-        groups.get(ws.repositoryId)?.workspaces.push(ws)
+      } else if (ws.repoId && groups.has(ws.repoId)) {
+        groups.get(ws.repoId)?.workspaces.push(ws)
       }
     }
 
@@ -918,7 +852,7 @@ function WorkspaceList() {
 // Main Sidebar
 // ============================================================================
 
-export function Sidebar() {
+export function Sidebar(): React.ReactElement {
   return (
     <div className="flex flex-col h-full bg-surface-base">
       <SidebarHeader />

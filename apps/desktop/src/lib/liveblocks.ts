@@ -52,7 +52,7 @@ type LiveblocksPresence = {
  */
 type SessionData = {
   id: string
-  workspaceId: string | null
+  worktreeId: string | null
   agentType: string | null
   model: string | null
   status: string | null
