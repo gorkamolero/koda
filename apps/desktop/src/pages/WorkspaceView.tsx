@@ -9,6 +9,7 @@ import { TerminalPanel } from '@/components/Terminal'
 import { GitStatusBar } from '@/components/GitStatusBar'
 import { Scratchpad } from '@/components/Scratchpad'
 import { RightSidebar } from '@/components/RightSidebar'
+import { Editor } from '@/components/Editor'
 import { CollaborativeWorkspaceProvider } from '@/components/CollaborativeWorkspaceProvider'
 import {
   InterviewMode,
@@ -16,6 +17,7 @@ import {
   RalphView,
 } from '@/components/Interview'
 import { workspaceTypeAtom } from '@/store/interview'
+import { openFilesAtom } from '@/store/fileExplorer'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
 import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
@@ -50,6 +52,7 @@ export function WorkspaceView() {
   const search = useSearch({ from: '/workspace/$id' })
   const navigate = useNavigate()
   const workspaceType = useAtomValue(workspaceTypeAtom)
+  const openFiles = useAtomValue(openFilesAtom)
 
   // Try fetching as worktree first (git-backed workspace)
   const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(id)
@@ -453,8 +456,13 @@ export function WorkspaceView() {
             </div>
           )}
 
-          {/* Normal content when worktree exists */}
-          {!isLoading && worktree && activeTab === 'chat' && (
+          {/* Editor - shown when files are open */}
+          {openFiles.length > 0 && (
+            <Editor />
+          )}
+
+          {/* Normal content when worktree exists and no files open */}
+          {!isLoading && worktree && activeTab === 'chat' && openFiles.length === 0 && (
             <AgentChat worktreeId={id} sessionId={activeSessionId} />
           )}
 

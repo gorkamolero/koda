@@ -87,6 +87,7 @@ export const FileTreeItem = memo(function FileTreeItem({
   return (
     <div
       data-testid={testId}
+      data-type={entry.type}
       data-selected={isSelected}
       tabIndex={0}
       role="treeitem"

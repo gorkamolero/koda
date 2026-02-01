@@ -59,11 +59,14 @@ function FileRow({
 }) {
   const { directory, filename } = splitPath(file.path)
   const { icon: StatusIcon, color: statusColor } = getStatusStyle(file.status)
+  // Create testid from filename: "new-feature.ts" -> "diff-file-new-feature-ts"
+  const testId = `diff-file-${filename.replace(/\./g, '-').toLowerCase()}`
 
   return (
     <div
       className="group flex items-center py-1 px-3 mx-2 gap-1.5 hover:bg-accent has-[button:hover]:bg-transparent rounded-md cursor-pointer text-sm relative"
-      data-state="closed"
+      data-testid={testId}
+      data-file-status={file.status}
       onClick={onClick}
     >
       {/* File path */}
@@ -160,20 +163,31 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
   // Handle file click - open in editor tab
   const handleFileClick = useCallback(
     async (file: FileDiff) => {
-      if (!rootPath || file.status === 'deleted') return
+      console.log('[DiffView] handleFileClick called', { rootPath, file: file.path, status: file.status })
+
+      if (!rootPath) {
+        console.warn('[DiffView] No rootPath, cannot open file')
+        return
+      }
+      if (file.status === 'deleted') {
+        console.log('[DiffView] Skipping deleted file')
+        return
+      }
 
       const fullPath = `${rootPath}/${file.path}`
       const filename = file.path.split('/').pop() ?? file.path
+      console.log('[DiffView] Opening file:', { fullPath, filename })
 
       try {
         const content = await readFile(fullPath)
+        console.log('[DiffView] File read success, length:', content.length)
         openFile({
           path: fullPath,
           name: filename,
           content,
         })
       } catch (err) {
-        console.error('Failed to open file:', err)
+        console.error('[DiffView] Failed to open file:', err)
       }
     },
     [rootPath, readFile, openFile]
