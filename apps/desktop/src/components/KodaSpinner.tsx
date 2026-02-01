@@ -5,17 +5,14 @@ import { cn } from '@/lib/utils'
 // KODA ASCII Art Definitions
 // ============================================================================
 
-/**
- * Compact KODA letters using box-drawing characters
- * Each letter is 3 lines tall for inline use
- * @internal Reserved for future use in compact ASCII displays
- */
-const _KODA_COMPACT = {
-  K: ['╻ ╻', '╠╸ ', '╹ ╹'],
-  O: ['╭─╮', '│ │', '╰─╯'],
-  D: ['╭─╮', '│ │', '╰─╯'].map((line, i) => i === 0 ? '┌─╮' : i === 2 ? '└─╯' : '│ │'),
-  A: ['╭─╮', '├─┤', '╵ ╵'],
-}
+// Compact KODA letters using box-drawing characters
+// Reserved for future use in compact ASCII displays
+// const KODA_COMPACT = {
+//   K: ['╻ ╻', '╠╸ ', '╹ ╹'],
+//   O: ['╭─╮', '│ │', '╰─╯'],
+//   D: ['┌─╮', '│ │', '└─╯'],
+//   A: ['╭─╮', '├─┤', '╵ ╵'],
+// }
 
 /**
  * Large ASCII art KODA logo
@@ -35,28 +32,26 @@ const KODA_LARGE = `
  */
 const KODA_MINIMAL = 'K·O·D·A'
 
-/**
- * KODA using braille patterns for a unique look
- * @internal Reserved for future braille animation mode
- */
-const _KODA_BRAILLE = {
-  frames: [
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // Full
-    '⣷⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // K animating
-    '⣯⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⣟⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⡿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣷⣿⣷⡇⣿⡇⡇⣿⣿⡇',  // O animating
-    '⣿⡇⡇⣯⣿⣯⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣟⣿⣟⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣷⡇⡇⣿⣿⡇',  // D animating
-    '⣿⡇⡇⣿⣿⣿⡇⣯⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣟⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣷⣿⣷',  // A animating
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣯⣿⣯',
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣟⣿⣟',
-  ]
-}
+// KODA using braille patterns for a unique look
+// Reserved for future braille animation mode
+// const KODA_BRAILLE = {
+//   frames: [
+//     '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // Full
+//     '⣷⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // K animating
+//     '⣯⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
+//     '⣟⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
+//     '⡿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
+//     '⣿⡇⡇⣷⣿⣷⡇⣿⡇⡇⣿⣿⡇',  // O animating
+//     '⣿⡇⡇⣯⣿⣯⡇⣿⡇⡇⣿⣿⡇',
+//     '⣿⡇⡇⣟⣿⣟⡇⣿⡇⡇⣿⣿⡇',
+//     '⣿⡇⡇⣿⣿⣿⡇⣷⡇⡇⣿⣿⡇',  // D animating
+//     '⣿⡇⡇⣿⣿⣿⡇⣯⡇⡇⣿⣿⡇',
+//     '⣿⡇⡇⣿⣿⣿⡇⣟⡇⡇⣿⣿⡇',
+//     '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣷⣿⣷',  // A animating
+//     '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣯⣿⣯',
+//     '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣟⣿⣟',
+//   ]
+// }
 
 // ============================================================================
 // Animation Types

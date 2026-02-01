@@ -20,6 +20,7 @@ describe('MessageActionBar', () => {
     role: 'assistant',
     content: 'Test message content',
     timestamp: Date.now(),
+    status: 'complete',
     ...overrides,
   })
 
