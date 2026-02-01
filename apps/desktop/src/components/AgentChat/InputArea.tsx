@@ -17,7 +17,7 @@ import { filterCommands, type SlashCommand } from '@/lib/slashCommands'
 import { detectMentionContext, completeMention, parseMentions } from '@/hooks/useMentionParser'
 
 interface InputAreaProps {
-  onSendMessage?: (message: string, images?: File[]) => void
+  onSendMessage?: (message: string, mentions?: MessageMention[]) => void
   onSwitchTab?: (tab: string) => void
 }
 
@@ -30,7 +30,7 @@ interface InputAreaProps {
 export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React.ReactElement {
   const [inputValue, setInputValue] = useAtom(inputValueAtom)
   const isStreaming = useAtomValue(isStreamingAtom)
-  const addMessage = useSetAtom(addMessageAtom)
+  const addMessage = useSetAtom(addMessageAtom) // For slash commands (system messages)
   const clearMessages = useSetAtom(clearMessagesAtom)
   const selectedModel = useAtomValue(selectedModelAtom)
   const [thinkingEnabled, setThinkingEnabled] = useAtom(thinkingEnabledDefaultAtom)
@@ -131,25 +131,20 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
     const trimmedValue = inputValue.trim()
     if (!trimmedValue || isStreaming) return
 
+    // Parse mentions for the parent to handle
     const parsedMentions = parseMentions(trimmedValue)
     const mentions: MessageMention[] = parsedMentions.map(m => ({
       path: m.path,
       displayName: m.displayName,
     }))
 
-    addMessage({
-      role: 'user',
-      content: trimmedValue,
-      status: 'complete',
-      mentions: mentions.length > 0 ? mentions : undefined,
-    })
-
     setInputValue('')
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-    onSendMessage?.(trimmedValue)
-  }, [inputValue, isStreaming, addMessage, setInputValue, onSendMessage])
+    // Let parent (AgentChat) handle adding the message to the store
+    onSendMessage?.(trimmedValue, mentions.length > 0 ? mentions : undefined)
+  }, [inputValue, isStreaming, setInputValue, onSendMessage])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
