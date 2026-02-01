@@ -7,11 +7,11 @@ import type { Worktree, WorktreeStatus } from '@/lib/rpc'
 import {
   Search,
   Filter,
-  Loader2,
   Archive,
   ChevronLeft,
   FolderPlus,
 } from 'lucide-react'
+import { KodaSpinner } from '@/components/KodaSpinner'
 
 // ============================================================================
 // Status Filter Options
@@ -205,7 +205,7 @@ export function AllWorkspacesPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {loadingWorkspaces ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-text-muted animate-spin" />
+            <KodaSpinner style="wave" />
           </div>
         ) : filteredWorkspaces.length === 0 ? (
           <div className="text-center py-12">
