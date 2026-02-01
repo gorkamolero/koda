@@ -33,6 +33,7 @@ interface TerminalPanelProps {
 export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: TerminalPanelProps) {
   void _workspaceId
   const containerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
@@ -126,6 +127,70 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
       unsubscribeExit()
     })
   }, [])
+
+  // Navigation helpers
+  const navigateToNextTab = useCallback(() => {
+    if (tabs.length <= 1) return
+    const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+    const nextIndex = (currentIndex + 1) % tabs.length
+    const nextTab = tabs[nextIndex]
+    if (nextTab) setActiveTabId(nextTab.id)
+  }, [tabs, activeTabId])
+
+  const navigateToPrevTab = useCallback(() => {
+    if (tabs.length <= 1) return
+    const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+    const prevIndex = currentIndex <= 0 ? tabs.length - 1 : currentIndex - 1
+    const prevTab = tabs[prevIndex]
+    if (prevTab) setActiveTabId(prevTab.id)
+  }, [tabs, activeTabId])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if terminal panel is focused or contains focus
+      if (!panelRef.current?.contains(document.activeElement) && document.activeElement !== panelRef.current) {
+        return
+      }
+
+      // Cmd+T: New terminal tab
+      if (e.metaKey && e.key === 't') {
+        e.preventDefault()
+        e.stopPropagation()
+        void createNewTerminal()
+        return
+      }
+
+      // Cmd+W: Close current terminal tab
+      if (e.metaKey && e.key === 'w') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (activeTabId) {
+          void closeTerminal(activeTabId)
+        }
+        return
+      }
+
+      // Opt+Cmd+Right: Next terminal
+      if (e.metaKey && e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault()
+        e.stopPropagation()
+        navigateToNextTab()
+        return
+      }
+
+      // Opt+Cmd+Left: Previous terminal
+      if (e.metaKey && e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        e.stopPropagation()
+        navigateToPrevTab()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [activeTabId, navigateToNextTab, navigateToPrevTab])
 
   const createNewTerminal = async () => {
     const id = `term-${Date.now()}`
@@ -263,10 +328,15 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
   const activeTab = tabs.find(t => t.id === activeTabId)
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1b1e]" data-testid="terminal-container">
+    <div 
+      ref={panelRef}
+      className="h-full flex flex-col bg-[#1a1b1e]" 
+      data-testid="terminal-container"
+      tabIndex={-1}
+    >
       {/* Tab bar */}
       <div className="flex items-center border-b border-border/50 bg-[#141517]" data-testid="terminal-tab-bar">
-        <div className="flex-1 flex items-center overflow-x-auto">
+        <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
             <div
               key={tab.id}
@@ -274,7 +344,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
               data-pid={tab.pid}
               data-connecting={tab.connecting}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border/30 cursor-pointer group',
+                'flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border/30 cursor-pointer group whitespace-nowrap flex-shrink-0',
                 activeTabId === tab.id
                   ? 'bg-[#1a1b1e] text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-[#1a1b1e]/50'
