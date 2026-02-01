@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
-import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
+import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
 import type { Worktree } from '@/lib/rpc'
 
-type CreateMode = 'repo' | 'branch' | 'join' | 'standalone'
+type CreateMode = 'repo' | 'branch'
 
 export function WorkspaceList() {
   const navigate = useNavigate()
@@ -12,14 +12,11 @@ export function WorkspaceList() {
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
-  const createStandaloneWorkspace = useCreateStandaloneWorkspace()
-  
+
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createMode, setCreateMode] = useState<CreateMode>('repo')
   const [selectedRepoId, setSelectedRepoId] = useState<string>('')
   const [branchName, setBranchName] = useState('')
-  const [workspaceName, setWorkspaceName] = useState('')
-  const [joinWorkspaceId, setJoinWorkspaceId] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
   const handleSelectFolder = async () => {
@@ -29,7 +26,7 @@ export function WorkspaceList() {
         multiple: false,
         title: 'Select Git Repository',
       })
-      
+
       if (selected && typeof selected === 'string') {
         const repo = await createRepo.mutateAsync({ rootPath: selected })
         setSelectedRepoId(repo.id)
@@ -43,9 +40,9 @@ export function WorkspaceList() {
 
   const handleCreateWorktree = async () => {
     if (!selectedRepoId || !branchName.trim()) return
-    
+
     try {
-      const workspace = await createWorktree.mutateAsync({
+      const worktree = await createWorktree.mutateAsync({
         repoId: selectedRepoId,
         branch: branchName.trim(),
       })
@@ -53,7 +50,7 @@ export function WorkspaceList() {
       setBranchName('')
       setSelectedRepoId('')
       setCreateMode('repo')
-      void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
+      void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
     }
@@ -72,31 +69,8 @@ export function WorkspaceList() {
     setIsCreateOpen(false)
     setBranchName('')
     setSelectedRepoId('')
-    setWorkspaceName('')
-    setJoinWorkspaceId('')
     setCreateMode('repo')
     setCreateError(null)
-  }
-
-  const handleCreateStandalone = async () => {
-    if (!workspaceName.trim()) return
-
-    try {
-      const workspace = await createStandaloneWorkspace.mutateAsync({
-        name: workspaceName.trim(),
-      })
-      closeModal()
-      void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
-    }
-  }
-
-  const handleJoinWorkspace = () => {
-    if (!joinWorkspaceId.trim()) return
-    // Navigate directly to the workspace - Liveblocks will handle the room join
-    closeModal()
-    void navigate({ to: '/workspace/$id', params: { id: joinWorkspaceId.trim() } })
   }
 
   const isLoading = loadingWorkspaces || loadingRepos
@@ -105,7 +79,7 @@ export function WorkspaceList() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="text-text-muted">Loading...</div>
       </div>
     )
   }
@@ -128,15 +102,15 @@ export function WorkspaceList() {
     <div className="h-full flex flex-col p-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-2">Workspaces</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-text-primary mb-2">Workspaces</h1>
+          <p className="text-text-muted">
             Manage your agent workspaces and review their work
           </p>
         </div>
         <button
           onClick={() => { setIsCreateOpen(true); }}
           data-testid="new-workspace-button"
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-surface-control hover:bg-surface-control-hover text-text-primary h-10 px-4 py-2 transition-colors"
         >
           New Workspace
         </button>
@@ -145,10 +119,10 @@ export function WorkspaceList() {
       {/* Create Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background border border-border rounded-lg p-6 w-full max-w-lg shadow-xl">
+          <div className="bg-surface-card border border-border-subtle rounded-lg p-6 w-full max-w-lg shadow-xl">
             {createMode === 'repo' && (
               <>
-                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
+                <h2 className="text-lg font-semibold text-text-primary mb-4">New Workspace</h2>
 
                 {createError && (
                   <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
@@ -156,42 +130,24 @@ export function WorkspaceList() {
                   </div>
                 )}
 
-                {/* Mode selection tabs */}
-                <div className="flex gap-2 mb-4 border-b border-border pb-3">
-                  <button
-                    onClick={() => setCreateMode('repo')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
-                  >
-                    From Repository
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('standalone')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Standalone
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('join')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Join Existing
-                  </button>
-                </div>
+                <p className="text-sm text-text-muted mb-4">
+                  Select a git repository to create a new workspace branch.
+                </p>
 
                 {/* Existing repos */}
                 {hasRepos && (
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-2">Recent Repositories</label>
+                    <label className="block text-sm font-medium text-text-primary mb-2">Recent Repositories</label>
                     <div className="space-y-2 max-h-48 overflow-y-auto" data-testid="repo-list">
                       {repos.map((repo) => (
                         <button
                           key={repo.id}
                           onClick={() => { handleRepoSelect(repo.id); }}
                           data-testid={`repo-button-${repo.id}`}
-                          className="w-full text-left p-3 border border-border rounded-md hover:border-primary hover:bg-accent/50 transition-colors"
+                          className="w-full text-left p-3 border border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors"
                         >
-                          <div className="font-medium">{repo.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{repo.rootPath}</div>
+                          <div className="font-medium text-text-primary">{repo.name}</div>
+                          <div className="text-xs text-text-faint truncate">{repo.rootPath}</div>
                         </button>
                       ))}
                     </div>
@@ -202,7 +158,7 @@ export function WorkspaceList() {
                 <button
                   onClick={() => void handleSelectFolder()}
                   disabled={createRepo.isPending}
-                  className="w-full p-4 border-2 border-dashed border-border rounded-md hover:border-primary hover:bg-accent/30 transition-colors flex items-center justify-center gap-2"
+                  className="w-full p-4 border-2 border-dashed border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors flex items-center justify-center gap-2 text-text-muted hover:text-text-primary"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -213,7 +169,7 @@ export function WorkspaceList() {
                 <div className="flex justify-end mt-6">
                   <button
                     onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
+                    className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
                   >
                     Cancel
                   </button>
@@ -223,7 +179,7 @@ export function WorkspaceList() {
 
             {createMode === 'branch' && (
               <>
-                <h2 className="text-lg font-semibold mb-4">Create Branch</h2>
+                <h2 className="text-lg font-semibold text-text-primary mb-4">Create Branch</h2>
 
                 {createError && (
                   <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
@@ -231,27 +187,27 @@ export function WorkspaceList() {
                   </div>
                 )}
 
-                <div className="mb-4 p-3 rounded-md bg-accent/50">
-                  <div className="text-sm font-medium">{selectedRepo?.name}</div>
-                  <div className="text-xs text-muted-foreground">{selectedRepo?.rootPath}</div>
+                <div className="mb-4 p-3 rounded-md bg-surface-item">
+                  <div className="text-sm font-medium text-text-primary">{selectedRepo?.name}</div>
+                  <div className="text-xs text-text-faint">{selectedRepo?.rootPath}</div>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Branch Name</label>
+                    <label className="block text-sm font-medium text-text-primary mb-1">Branch Name</label>
                     <input
                       type="text"
                       value={branchName}
                       onChange={(e) => { setBranchName(e.target.value); }}
                       placeholder="feature/my-feature"
-                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 border border-border-subtle rounded-md bg-surface-control text-text-primary placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-border-accent"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') void handleCreateWorktree()
                         if (e.key === 'Escape') closeModal()
                       }}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-text-faint mt-1">
                       A git worktree will be created for isolated work
                     </p>
                   </div>
@@ -261,169 +217,25 @@ export function WorkspaceList() {
                   <button
                     onClick={() => { setCreateMode('repo'); }}
                     data-testid="modal-back-button"
-                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
                   >
                     Back
                   </button>
                   <div className="flex gap-2">
                     <button
                       onClick={closeModal}
-                      className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
+                      className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => void handleCreateWorktree()}
                       disabled={!branchName.trim() || createWorktree.isPending}
-                      className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 text-sm font-medium bg-surface-control hover:bg-surface-control-hover text-text-primary rounded-md disabled:opacity-50 transition-colors"
                     >
                       {createWorktree.isPending ? 'Creating...' : 'Create Workspace'}
                     </button>
                   </div>
-                </div>
-              </>
-            )}
-
-            {createMode === 'standalone' && (
-              <>
-                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
-
-                {createError && (
-                  <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                    {createError}
-                  </div>
-                )}
-
-                {/* Mode selection tabs */}
-                <div className="flex gap-2 mb-4 border-b border-border pb-3">
-                  <button
-                    onClick={() => setCreateMode('repo')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    From Repository
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('standalone')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
-                  >
-                    Standalone
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('join')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Join Existing
-                  </button>
-                </div>
-
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create a workspace without attaching a repository. You can attach repos later or use this for collaboration.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Workspace Name</label>
-                    <input
-                      type="text"
-                      value={workspaceName}
-                      onChange={(e) => { setWorkspaceName(e.target.value); }}
-                      placeholder="my-project"
-                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void handleCreateStandalone()
-                        if (e.key === 'Escape') closeModal()
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-6">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => void handleCreateStandalone()}
-                    disabled={!workspaceName.trim() || createStandaloneWorkspace.isPending}
-                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                  >
-                    {createStandaloneWorkspace.isPending ? 'Creating...' : 'Create Workspace'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {createMode === 'join' && (
-              <>
-                <h2 className="text-lg font-semibold mb-4">New Workspace</h2>
-
-                {createError && (
-                  <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                    {createError}
-                  </div>
-                )}
-
-                {/* Mode selection tabs */}
-                <div className="flex gap-2 mb-4 border-b border-border pb-3">
-                  <button
-                    onClick={() => setCreateMode('repo')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    From Repository
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('standalone')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Standalone
-                  </button>
-                  <button
-                    onClick={() => setCreateMode('join')}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary/10 text-primary"
-                  >
-                    Join Existing
-                  </button>
-                </div>
-
-                <p className="text-sm text-muted-foreground mb-4">
-                  Join a workspace shared by a collaborator. Ask them for the workspace ID.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Workspace ID</label>
-                    <input
-                      type="text"
-                      value={joinWorkspaceId}
-                      onChange={(e) => { setJoinWorkspaceId(e.target.value); }}
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleJoinWorkspace()
-                        if (e.key === 'Escape') closeModal()
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 mt-6">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium border border-border rounded-md hover:bg-accent transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleJoinWorkspace}
-                    disabled={!joinWorkspaceId.trim()}
-                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                  >
-                    Join Workspace
-                  </button>
                 </div>
               </>
             )}
@@ -438,14 +250,14 @@ export function WorkspaceList() {
             <button
               key={workspace.id}
               onClick={() => { handleWorkspaceClick(workspace); }}
-              className="text-left p-4 border border-border rounded-lg hover:border-primary hover:bg-accent/50 transition-colors"
+              className="text-left p-4 border border-border-subtle rounded-lg hover:border-border-accent hover:bg-surface-hover transition-colors"
             >
-              <h3 className="font-medium text-primary">{workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h3 className="font-medium text-text-primary">{workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'}</h3>
+              <p className="text-sm text-text-muted mt-1">
                 {workspace.branch || 'no branch'}
               </p>
               {workspace.createdAt && (
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-text-faint mt-2">
                   Created {new Date(workspace.createdAt).toLocaleDateString()}
                 </p>
               )}

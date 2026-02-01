@@ -1,4 +1,4 @@
-import { useParams, useSearch } from '@tanstack/react-router'
+import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { useAtomValue } from 'jotai'
 import { AgentChat } from '@/components/AgentChat'
@@ -19,7 +19,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorktree, useSessions } from '@/hooks/useRpc'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
-import { FolderPlus, Loader2 } from 'lucide-react'
+import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 
@@ -45,10 +45,11 @@ type Tab = 'chat' | 'spec' | 'scratchpad'
 export function WorkspaceView() {
   const { id } = useParams({ from: '/workspace/$id' })
   const search = useSearch({ from: '/workspace/$id' })
+  const navigate = useNavigate()
   const workspaceType = useAtomValue(workspaceTypeAtom)
 
   // Fetch worktree data to get the real path
-  const { data: worktree, isLoading: isLoadingWorktree } = useWorktree(id)
+  const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(id)
 
   // Fetch sessions for this workspace
   const { data: sessions } = useSessions(id)
@@ -111,7 +112,6 @@ export function WorkspaceView() {
 
   // Get real workspace path from worktree
   const rootPath = worktree?.worktreePath ?? ''
-  const hasRepo = Boolean(worktree?.repoId)
 
   // Build tabs based on workspace type
   const getTabs = (): { id: Tab; label: string }[] => {
@@ -187,38 +187,35 @@ export function WorkspaceView() {
           {/* Loading state */}
           {isLoadingWorktree && (
             <div className="h-full flex items-center justify-center">
-              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+              <Loader2 className="w-6 h-6 text-text-muted animate-spin" />
             </div>
           )}
 
-          {/* No repo connected - show indicator */}
-          {!isLoadingWorktree && !hasRepo && activeTab === 'chat' && (
+          {/* Error state - worktree not found */}
+          {!isLoadingWorktree && (worktreeError || !worktree) && activeTab === 'chat' && (
             <div className="h-full flex flex-col items-center justify-center px-8">
               <div className="max-w-md text-center">
-                <FolderPlus className="w-12 h-12 text-text-dim mx-auto mb-4" />
+                <AlertCircle className="w-12 h-12 text-text-dim mx-auto mb-4" />
                 <h3 className="text-sm font-medium text-text-muted mb-1">
-                  No repository connected
+                  Workspace not found
                 </h3>
                 <p className="text-xs text-text-faint mb-4">
-                  Connect a git repository to enable file editing, code review, and version control.
+                  This workspace doesn&apos;t exist or has been deleted.
                 </p>
                 <button
                   type="button"
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-surface-control hover:bg-surface-control-hover text-text-primary transition-colors"
-                  onClick={() => {
-                    // TODO: Open repo connect dialog
-                    console.log('Connect repo clicked')
-                  }}
+                  onClick={() => { void navigate({ to: '/' }) }}
                 >
-                  <FolderPlus className="w-4 h-4" />
-                  Connect Repository
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Workspaces
                 </button>
               </div>
             </div>
           )}
 
-          {/* Normal content when repo is connected */}
-          {!isLoadingWorktree && hasRepo && activeTab === 'chat' && (
+          {/* Normal content when worktree exists */}
+          {!isLoadingWorktree && worktree && activeTab === 'chat' && (
             <AgentChat worktreeId={id} sessionId={activeSessionId} />
           )}
 
