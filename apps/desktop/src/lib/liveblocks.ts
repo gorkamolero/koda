@@ -20,15 +20,23 @@ import type { Presence } from '@/types/collaboration'
 // =============================================================================
 
 /**
- * Create the Liveblocks client
- * Uses public API key for frontend (safe to expose)
+ * Check if Liveblocks is configured
+ * In E2E tests and local dev without key, this will be false
  */
-const client = createClient({
-  publicApiKey: import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY ?? '',
+const LIVEBLOCKS_PUBLIC_KEY = import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY as string | undefined
 
-  // Throttle presence updates (avoid spamming)
-  throttle: 100,
-})
+/**
+ * Create the Liveblocks client lazily
+ * Only creates client if a valid public key is configured
+ * This prevents errors in E2E tests and local dev without Liveblocks
+ */
+const client = LIVEBLOCKS_PUBLIC_KEY
+  ? createClient({
+      publicApiKey: LIVEBLOCKS_PUBLIC_KEY,
+      // Throttle presence updates (avoid spamming)
+      throttle: 100,
+    })
+  : null
 
 // =============================================================================
 // Type Definitions for Liveblocks
@@ -159,32 +167,42 @@ type ThreadMetadata = {
 /**
  * Create typed room context
  * This provides React hooks for the specific room types
+ * Only created if Liveblocks client is available
  */
-export const {
-  RoomProvider,
-  useRoom,
-  useMyPresence,
-  useUpdateMyPresence,
-  useOthers,
-  useOthersMapped,
-  useOthersConnectionIds,
-  useOther,
-  useSelf,
-  useStorage,
-  useMutation,
-  useStatus,
-  useLostConnectionListener,
-  useErrorListener,
-  useEventListener,
-  useBroadcastEvent,
-  useHistory,
-  useUndo,
-  useRedo,
-  useCanUndo,
-  useCanRedo,
-} = createRoomContext<LiveblocksPresence, LiveblocksStorage, UserMeta, RoomEvent, ThreadMetadata>(
-  client
-)
+const roomContext = client
+  ? createRoomContext<LiveblocksPresence, LiveblocksStorage, UserMeta, RoomEvent, ThreadMetadata>(
+      client
+    )
+  : null
+
+// Export room context hooks (will throw helpful errors if used without Liveblocks)
+function createNoopHook(name: string) {
+  return () => {
+    throw new Error(`${name} requires Liveblocks to be configured (VITE_LIVEBLOCKS_PUBLIC_KEY)`)
+  }
+}
+
+export const RoomProvider = roomContext?.RoomProvider ?? ((() => null) as never)
+export const useRoom = roomContext?.useRoom ?? createNoopHook('useRoom')
+export const useMyPresence = roomContext?.useMyPresence ?? createNoopHook('useMyPresence')
+export const useUpdateMyPresence = roomContext?.useUpdateMyPresence ?? createNoopHook('useUpdateMyPresence')
+export const useOthers = roomContext?.useOthers ?? createNoopHook('useOthers')
+export const useOthersMapped = roomContext?.useOthersMapped ?? createNoopHook('useOthersMapped')
+export const useOthersConnectionIds = roomContext?.useOthersConnectionIds ?? createNoopHook('useOthersConnectionIds')
+export const useOther = roomContext?.useOther ?? createNoopHook('useOther')
+export const useSelf = roomContext?.useSelf ?? createNoopHook('useSelf')
+export const useStorage = roomContext?.useStorage ?? createNoopHook('useStorage')
+export const useMutation = roomContext?.useMutation ?? createNoopHook('useMutation')
+export const useStatus = roomContext?.useStatus ?? createNoopHook('useStatus')
+export const useLostConnectionListener = roomContext?.useLostConnectionListener ?? createNoopHook('useLostConnectionListener')
+export const useErrorListener = roomContext?.useErrorListener ?? createNoopHook('useErrorListener')
+export const useEventListener = roomContext?.useEventListener ?? createNoopHook('useEventListener')
+export const useBroadcastEvent = roomContext?.useBroadcastEvent ?? createNoopHook('useBroadcastEvent')
+export const useHistory = roomContext?.useHistory ?? createNoopHook('useHistory')
+export const useUndo = roomContext?.useUndo ?? createNoopHook('useUndo')
+export const useRedo = roomContext?.useRedo ?? createNoopHook('useRedo')
+export const useCanUndo = roomContext?.useCanUndo ?? createNoopHook('useCanUndo')
+export const useCanRedo = roomContext?.useCanRedo ?? createNoopHook('useCanRedo')
 
 // =============================================================================
 // Global Liveblocks Context
@@ -192,8 +210,12 @@ export const {
 
 /**
  * Global Liveblocks context for non-room-specific operations
+ * Only created if Liveblocks client is available
  */
-export const { LiveblocksProvider, useClient } = createLiveblocksContext(client)
+const liveblocksContext = client ? createLiveblocksContext(client) : null
+
+export const LiveblocksProvider = liveblocksContext?.LiveblocksProvider ?? ((() => null) as never)
+export const useClient = liveblocksContext?.useClient ?? createNoopHook('useClient')
 
 // =============================================================================
 // Room ID Helpers

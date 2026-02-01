@@ -15,7 +15,7 @@ export const KodaConfigSchema = z.object({
   teardown: z.array(z.string()).optional(),
   customPrompt: z.string().optional(),
   runScript: z.string().optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
 });
 
 export type KodaConfig = z.infer<typeof KodaConfigSchema>;

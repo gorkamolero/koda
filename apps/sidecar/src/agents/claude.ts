@@ -1,21 +1,29 @@
 /**
  * Claude Code Handler
  *
- * Manages Claude Code CLI sessions using bidirectional stream-json mode.
- * This is the same approach used by Conductor - no PTY needed.
+ * Manages Claude Code sessions using the Claude Agent SDK.
+ * Integrates the Koda MCP server for interactive tools.
  *
- * Key: --input-format stream-json allows writing JSON to stdin
- *      --output-format stream-json provides JSON responses on stdout
+ * Architecture:
+ * - Uses @anthropic-ai/claude-agent-sdk for session management
+ * - Multi-turn async generator pattern for continuous conversation
+ * - canUseTool callback for ExitPlanMode approval and path validation
+ * - Hooks for checkpointing and notifications
+ * - Generator reuse with dynamic settings updates
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
-import { EventEmitter } from 'node:events';
-import * as fs from 'node:fs/promises';
-import * as fsSync from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
-import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
+import { EventEmitter } from 'node:events'
+import * as fs from 'node:fs/promises'
+import * as path from 'node:path'
+import * as os from 'node:os'
+import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
+import { query, type Query, type SDKMessage, type Options } from '@anthropic-ai/claude-agent-sdk'
+import { createKodaMCPServer } from '../mcp/kodaMCPServer.js'
+import { getFrontendRpcClient, type FrontendRpcClient } from '../rpc/frontendRpc.js'
+import { getNotificationEmitter } from '../rpc/notifications.js'
+import { getDb } from '../db/index.js'
+import { saveCheckpoint } from '../checkpoint/service.js'
 
 // ============================================================================
 // Zod Schemas
@@ -84,24 +92,62 @@ export type ClaudeGetSessionParams = z.infer<typeof ClaudeGetSessionParamsSchema
 export type ClaudeGetMessagesParams = z.infer<typeof ClaudeGetMessagesParamsSchema>;
 
 /**
+ * Permission mode for the SDK
+ */
+export type PermissionMode = 'default' | 'plan' | 'bypassPermissions'
+
+/**
  * Session status
  */
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled';
 
 /**
- * Internal session state
+ * Current settings for a session (can be dynamically updated)
+ */
+export interface SessionSettings {
+  model: string
+  permissionMode: PermissionMode
+  maxThinkingTokens?: number
+}
+
+/**
+ * Internal session state - enhanced for Conductor pattern
  */
 export interface ClaudeSession {
-  id: string;
-  workspaceId: string;
-  status: SessionStatus;
-  process: ChildProcess | null;
-  options?: ClaudeSessionOptions;
-  contextTokenCount: number;
-  inputTokens: number;
-  outputTokens: number;
-  createdAt: Date;
-  updatedAt: Date;
+  id: string
+  workspaceId: string
+  status: SessionStatus
+  
+  // SDK Query instance (reused across turns)
+  query: Query | null
+  
+  // Generator pattern for multi-turn conversations
+  sendMessage: ((prompt: string) => Promise<void>) | null
+  sendTerminate: (() => void) | null
+  
+  // Dynamic settings (can be updated mid-session)
+  currentSettings: SessionSettings
+  
+  // Turn tracking for checkpointing
+  turnId: number
+  
+  // Working directory for path validation
+  cwd: string
+  
+  // Abort controller for cancellation
+  abortController: AbortController | null
+  
+  // Original options
+  options?: ClaudeSessionOptions
+  
+  // Token tracking
+  contextTokenCount: number
+  inputTokens: number
+  outputTokens: number
+  
+  // Timestamps
+  createdAt: Date
+  updatedAt: Date
 }
 
 /**
@@ -193,6 +239,233 @@ export interface ClaudeSettings {
 }
 
 // ============================================================================
+// Multi-Turn Input Generator Pattern (from Conductor)
+// ============================================================================
+
+/**
+ * Input generator state
+ */
+interface InputGeneratorState {
+  messageQueue: Array<{ prompt: string; resolve: () => void }>
+  waitingForMessage: ((value: string) => void) | null
+  terminated: boolean
+}
+
+/**
+ * SDK user message type for the input generator
+ */
+interface SDKUserMessageInput {
+  type: 'user'
+  message: { role: 'user'; content: string }
+  parent_tool_use_id: string | null
+  session_id: string
+}
+
+/**
+ * Creates an async generator for multi-turn input
+ *
+ * This pattern allows the same Query to handle multiple turns without
+ * spawning new CLI processes. Messages are queued and yielded as the
+ * SDK requests them.
+ */
+function createInputGenerator(sessionId: string): {
+  inputGenerator: () => AsyncGenerator<SDKUserMessageInput>
+  sendMessage: (prompt: string) => Promise<void>
+  sendTerminate: () => void
+} {
+  const state: InputGeneratorState = {
+    messageQueue: [],
+    waitingForMessage: null,
+    terminated: false,
+  }
+
+  const sendMessage = (prompt: string): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      if (state.waitingForMessage) {
+        // SDK is waiting, deliver immediately
+        state.waitingForMessage(prompt)
+        state.waitingForMessage = null
+        resolve()
+      } else {
+        // Queue for later delivery
+        state.messageQueue.push({ prompt, resolve })
+      }
+    })
+  }
+
+  const sendTerminate = (): void => {
+    state.terminated = true
+    if (state.waitingForMessage) {
+      // Unblock with empty to allow graceful shutdown
+      state.waitingForMessage('')
+    }
+  }
+
+  async function* inputGenerator(): AsyncGenerator<SDKUserMessageInput> {
+    while (!state.terminated) {
+      const msg = await new Promise<string>((resolve) => {
+        if (state.messageQueue.length > 0) {
+          const item = state.messageQueue.shift()!
+          item.resolve()
+          resolve(item.prompt)
+        } else {
+          state.waitingForMessage = resolve
+        }
+      })
+
+      if (msg && !state.terminated) {
+        yield {
+          type: 'user',
+          message: { role: 'user', content: msg },
+          parent_tool_use_id: null,
+          session_id: sessionId,
+        }
+      }
+    }
+  }
+
+  return { inputGenerator, sendMessage, sendTerminate }
+}
+
+// ============================================================================
+// canUseTool Callback (from Conductor)
+// ============================================================================
+
+/**
+ * Permission result type matching SDK expectations
+ */
+type PermissionResult =
+  | { behavior: 'allow' }
+  | { behavior: 'deny'; message: string }
+
+/**
+ * Creates a canUseTool callback for permission validation
+ *
+ * Handles:
+ * - ExitPlanMode: Requires frontend approval before allowing
+ * - Edit tools: Validates paths are within workspace directory
+ */
+function createCanUseTool(
+  session: ClaudeSession,
+  frontendRpc: FrontendRpcClient
+): (toolName: string, toolInput: unknown) => Promise<PermissionResult> {
+  return async (toolName: string, toolInput: unknown): Promise<PermissionResult> => {
+    // ExitPlanMode requires explicit frontend approval
+    if (toolName === 'ExitPlanMode') {
+      try {
+        const response = await frontendRpc.exitPlanMode({ turnId: session.turnId })
+        if (!response.approved) {
+          console.log(`[Claude] ExitPlanMode denied by frontend for session ${session.id}`)
+          return { behavior: 'deny', message: 'Plan approval denied by user' }
+        }
+      } catch (error) {
+        console.error(`[Claude] Error requesting ExitPlanMode approval:`, error)
+        return { behavior: 'deny', message: 'Failed to get plan approval' }
+      }
+    }
+
+    // Edit tools must target files within the workspace
+    const editTools = ['Edit', 'Write', 'NotebookEdit', 'mcp__filesystem-with-morph__edit_file']
+    if (editTools.includes(toolName)) {
+      const input = toolInput as { file_path?: string; path?: string }
+      const filePath = input.file_path || input.path
+
+      if (filePath && !filePath.startsWith(session.cwd)) {
+        console.log(`[Claude] Edit denied - path outside workspace: ${filePath}`)
+        return { behavior: 'deny', message: `Path outside workspace: ${filePath}` }
+      }
+    }
+
+    return { behavior: 'allow' }
+  }
+}
+
+// ============================================================================
+// Hooks System (from Conductor)
+// ============================================================================
+
+/**
+ * Hook JSON output type (minimal - all fields optional)
+ */
+type HookJSONOutput = Record<string, unknown>
+
+/**
+ * Creates hooks for session lifecycle events
+ *
+ * Hooks:
+ * - UserPromptSubmit: Save checkpoint before processing
+ * - Stop: Save checkpoint on session end
+ * - PostToolUse.EnterPlanMode: Notify frontend
+ */
+function createHooks(session: ClaudeSession): Options['hooks'] {
+  const notificationEmitter = getNotificationEmitter()
+
+  return {
+    // Save checkpoint when user submits a prompt
+    UserPromptSubmit: [
+      {
+        hooks: [
+          async (_input: unknown, _toolUseID: string | undefined, _options: { signal: AbortSignal }): Promise<HookJSONOutput> => {
+            console.log(`[Claude] UserPromptSubmit hook - turn ${session.turnId} for session ${session.id}`)
+            try {
+              const db = getDb()
+              saveCheckpoint(db, {
+                worktreeId: session.workspaceId,
+                turnId: `turn-${session.turnId}-start`,
+                repoPath: session.cwd,
+              })
+              console.log(`[Claude] Checkpoint saved for turn ${session.turnId} start`)
+            } catch (error) {
+              // Checkpoint failures should not break the session
+              console.error(`[Claude] Failed to save checkpoint:`, error)
+            }
+            return {}
+          },
+        ],
+      },
+    ],
+
+    // Save checkpoint when session stops
+    Stop: [
+      {
+        hooks: [
+          async (_input: unknown, _toolUseID: string | undefined, _options: { signal: AbortSignal }): Promise<HookJSONOutput> => {
+            console.log(`[Claude] Stop hook - turn ${session.turnId} for session ${session.id}`)
+            try {
+              const db = getDb()
+              saveCheckpoint(db, {
+                worktreeId: session.workspaceId,
+                turnId: `turn-${session.turnId}-stop`,
+                repoPath: session.cwd,
+              })
+              console.log(`[Claude] Checkpoint saved for turn ${session.turnId} stop`)
+            } catch (error) {
+              // Checkpoint failures should not break the session
+              console.error(`[Claude] Failed to save checkpoint:`, error)
+            }
+            return {}
+          },
+        ],
+      },
+    ],
+
+    // Notify frontend when entering plan mode
+    PostToolUse: [
+      {
+        matcher: 'EnterPlanMode',
+        hooks: [
+          async (_input: unknown, _toolUseID: string | undefined, _options: { signal: AbortSignal }): Promise<HookJSONOutput> => {
+            console.log(`[Claude] EnterPlanMode detected for session ${session.id}`)
+            notificationEmitter.emitEnterPlanMode(session.id)
+            return {}
+          },
+        ],
+      },
+    ],
+  }
+}
+
+// ============================================================================
 // Event types for TypeScript
 // ============================================================================
 
@@ -219,220 +492,372 @@ export interface StoredMessage {
 }
 
 /**
- * Handler for Claude Code CLI sessions
+ * Handler for Claude Code sessions using the Agent SDK
  */
 export class ClaudeHandler extends EventEmitter {
-  private sessions: Map<string, ClaudeSession> = new Map();
-  private streamBuffers: Map<string, string> = new Map();
-  private messageBuffers: Map<string, StoredMessage[]> = new Map();
+  private sessions: Map<string, ClaudeSession> = new Map()
+  private messageBuffers: Map<string, StoredMessage[]> = new Map()
 
   constructor() {
-    super();
+    super()
   }
 
   /**
-   * Build environment for Claude CLI - removes ANTHROPIC_API_KEY so Claude uses subscription auth
+   * Build environment for Claude - removes ANTHROPIC_API_KEY so Claude uses subscription auth
    */
-  private buildEnv(): NodeJS.ProcessEnv {
-    const env = { ...globalThis.process.env };
-    delete env.ANTHROPIC_API_KEY;
-    return env;
+  private buildEnv(): Record<string, string | undefined> {
+    const env = { ...globalThis.process.env }
+    // Strip API keys to force subscription auth (following Conductor's pattern)
+    delete env.ANTHROPIC_API_KEY
+    delete env.OPENAI_API_KEY
+    delete env.CLAUDE_CODE_USE_BEDROCK
+    delete env.CLAUDE_CODE_USE_VERTEX
+    return env
   }
 
   /**
-   * Find claude binary path
-   */
-  private findClaudeBinary(): string {
-    const home = os.homedir();
-    const candidates = [
-      path.join(home, '.local', 'bin', 'claude'),
-      '/usr/local/bin/claude',
-      '/opt/homebrew/bin/claude',
-    ];
-
-    for (const candidate of candidates) {
-      if (fsSync.existsSync(candidate)) {
-        console.log(`[Claude] Found binary at: ${candidate}`);
-        return candidate;
-      }
-    }
-
-    console.log(`[Claude] Binary not found in common locations, falling back to PATH`);
-    return 'claude';
-  }
-
-  /**
-   * Start a new Claude session using bidirectional stream-json mode
-   * This is the same approach used by Conductor - no PTY needed
+   * Start a new Claude session using the Agent SDK with full Conductor integration
    */
   async start(params: ClaudeStartParams): Promise<ClaudeStartResult> {
-    const sessionId = randomUUID();
-    const claudeBin = this.findClaudeBinary();
+    const sessionId = randomUUID()
+    const abortController = new AbortController()
+    const frontendRpc = getFrontendRpcClient()
+    const cwd = params.options?.workingDirectory || globalThis.process.cwd()
 
-    // Build args with bidirectional stream-json (like Conductor does)
-    const args = [
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--input-format', 'stream-json',
-    ];
+    console.log(`[Claude] Starting session ${sessionId} with Conductor integration`)
 
-    // Add optional args
-    if (params.options?.workingDirectory) {
-      args.push('--cwd', params.options.workingDirectory);
-    }
-    if (params.options?.model) {
-      args.push('--model', params.options.model);
-    }
-    if (params.options?.maxTokens) {
-      args.push('--max-turns', String(params.options.maxTokens));
-    }
-    if (params.options?.allowedTools?.length) {
-      args.push('--allowedTools', params.options.allowedTools.join(','));
-    }
-    if (params.options?.systemPrompt) {
-      args.push('--system-prompt', params.options.systemPrompt);
-    }
-    if (params.options?.dangerouslySkipPermissions) {
-      args.push('--dangerously-skip-permissions');
-    }
+    // Create input generator for multi-turn conversations
+    const { inputGenerator, sendMessage, sendTerminate } = createInputGenerator(sessionId)
 
-    console.log(`[Claude] Starting session ${sessionId} with bidirectional stream-json`);
-    console.log(`[Claude] Binary: ${claudeBin}`);
-    console.log(`[Claude] Args: ${args.join(' ')}`);
-
-    // Spawn with regular pipes - no PTY needed with stream-json input mode
-    const childProcess = spawn(claudeBin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: this.buildEnv(),
-      cwd: params.options?.workingDirectory || globalThis.process.cwd(),
-    });
-
+    // Create session first (needed for callbacks)
     const session: ClaudeSession = {
       id: sessionId,
       workspaceId: params.workspaceId,
       status: 'running',
-      process: childProcess,
+      query: null,
+      sendMessage,
+      sendTerminate,
+      currentSettings: {
+        model: params.options?.model || 'claude-sonnet-4-20250514',
+        permissionMode: params.options?.dangerouslySkipPermissions ? 'bypassPermissions' : 'default',
+        maxThinkingTokens: undefined,
+      },
+      turnId: 0,
+      cwd,
+      abortController,
       options: params.options,
       contextTokenCount: 0,
       inputTokens: 0,
       outputTokens: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
+    }
 
-    this.sessions.set(sessionId, session);
-    this.streamBuffers.set(sessionId, '');
-    this.messageBuffers.set(sessionId, []);
+    this.sessions.set(sessionId, session)
+    this.messageBuffers.set(sessionId, [])
 
-    this.setupProcessHandlers(sessionId, childProcess);
+    // Create MCP server for Koda tools
+    const kodaMcp = createKodaMCPServer(sessionId, params.workspaceId, frontendRpc)
 
-    // Send the initial prompt via stdin as JSON (stream-json input format)
-    const userMessage = {
-      type: 'user',
-      message: {
-        role: 'user',
-        content: params.prompt,
+    // Build SDK options
+    const sdkOptions: Options = {
+      cwd,
+      env: this.buildEnv(),
+      abortController,
+      model: session.currentSettings.model,
+      mcpServers: {
+        koda: kodaMcp,
       },
-    };
-    
-    console.log(`[Claude] Sending initial prompt via stdin`);
-    childProcess.stdin?.write(JSON.stringify(userMessage) + '\n');
+      // Conductor patterns
+      canUseTool: createCanUseTool(session, frontendRpc),
+      hooks: createHooks(session),
+    }
+
+    // Add optional settings
+    if (params.options?.allowedTools?.length) {
+      sdkOptions.allowedTools = params.options.allowedTools
+    }
+    if (params.options?.dangerouslySkipPermissions) {
+      sdkOptions.permissionMode = 'bypassPermissions'
+      sdkOptions.allowDangerouslySkipPermissions = true
+    }
+
+    console.log(`[Claude] SDK options:`, JSON.stringify({
+      cwd: sdkOptions.cwd,
+      model: sdkOptions.model,
+      permissionMode: sdkOptions.permissionMode,
+    }, null, 2))
+
+    // Create the query with input generator (Conductor pattern)
+    const sdkQuery = query({
+      prompt: inputGenerator(),
+      options: sdkOptions,
+    })
+
+    session.query = sdkQuery
+
+    // Start processing the stream in the background
+    this.processQueryStream(sessionId, sdkQuery)
+
+    // Send the initial prompt
+    session.turnId++
+    sendMessage(params.prompt)
 
     return {
       sessionId,
       status: 'running',
-    };
+    }
   }
 
   /**
-   * Resume an existing session
+   * Continue an existing session with a new prompt (multi-turn)
    */
-  async resume(params: ClaudeResumeParams): Promise<ClaudeStartResult> {
-    const session = this.sessions.get(params.sessionId);
+  async continue(params: { sessionId: string; prompt: string }): Promise<ClaudeStartResult> {
+    const session = this.sessions.get(params.sessionId)
     if (!session) {
-      throw new Error('Session not found');
+      throw new Error(`Session not found: ${params.sessionId}`)
+    }
+    if (!session.sendMessage) {
+      throw new Error(`Session ${params.sessionId} is not active`)
     }
 
-    const claudeBin = this.findClaudeBinary();
-    const args = [
-      '--output-format', 'stream-json',
-      '--verbose', 
-      '--input-format', 'stream-json',
-      '--resume', params.sessionId,
-    ];
+    console.log(`[Claude] Continuing session ${params.sessionId}, turn ${session.turnId + 1}`)
 
-    if (session.options?.workingDirectory) {
-      args.push('--cwd', session.options.workingDirectory);
-    }
-    if (session.options?.model) {
-      args.push('--model', session.options.model);
-    }
-
-    const childProcess = spawn(claudeBin, args, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: this.buildEnv(),
-      cwd: session.options?.workingDirectory || globalThis.process.cwd(),
-    });
-
-    session.process = childProcess;
-    session.status = 'running';
-    session.updatedAt = new Date();
-
-    this.streamBuffers.set(params.sessionId, '');
-    this.setupProcessHandlers(params.sessionId, childProcess);
-
-    // Send follow-up prompt if provided
-    if (params.prompt) {
-      const userMessage = {
-        type: 'user',
-        message: {
-          role: 'user',
-          content: params.prompt,
-        },
-      };
-      childProcess.stdin?.write(JSON.stringify(userMessage) + '\n');
-    }
+    session.turnId++
+    session.status = 'running'
+    session.updatedAt = new Date()
+    
+    await session.sendMessage(params.prompt)
 
     return {
       sessionId: params.sessionId,
       status: 'running',
-    };
+    }
+  }
+
+  /**
+   * Update session settings dynamically (model, permissionMode, maxThinkingTokens)
+   */
+  async updateSettings(
+    sessionId: string,
+    settings: Partial<SessionSettings>
+  ): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`)
+    }
+    if (!session.query) {
+      throw new Error(`Session ${sessionId} has no active query`)
+    }
+
+    console.log(`[Claude] Updating settings for session ${sessionId}:`, settings)
+
+    if (settings.model !== undefined) {
+      await session.query.setModel(settings.model)
+      session.currentSettings.model = settings.model
+    }
+
+    if (settings.permissionMode !== undefined) {
+      await session.query.setPermissionMode(settings.permissionMode)
+      session.currentSettings.permissionMode = settings.permissionMode
+    }
+
+    if (settings.maxThinkingTokens !== undefined) {
+      await session.query.setMaxThinkingTokens(settings.maxThinkingTokens)
+      session.currentSettings.maxThinkingTokens = settings.maxThinkingTokens
+    }
+
+    session.updatedAt = new Date()
+  }
+
+  /**
+   * Process the SDK query stream and emit events
+   */
+  private async processQueryStream(sessionId: string, sdkQuery: Query): Promise<void> {
+    const session = this.sessions.get(sessionId)
+    if (!session) return
+
+    try {
+      for await (const message of sdkQuery) {
+        // Convert SDK message to our event format
+        const event = this.convertSDKMessage(message)
+        if (event) {
+          this.storeMessage(sessionId, event)
+          this.emitEvent(sessionId, event)
+        }
+
+        // Update token counts if available
+        if (message.type === 'result' && 'usage' in message) {
+          const usage = message.usage as TokenUsage | undefined
+          if (usage) {
+            session.inputTokens = usage.input_tokens
+            session.outputTokens = usage.output_tokens
+            session.contextTokenCount = usage.input_tokens + usage.output_tokens
+            session.updatedAt = new Date()
+
+            this.emit('context_used', {
+              sessionId,
+              inputTokens: usage.input_tokens,
+              outputTokens: usage.output_tokens,
+              totalTokens: usage.input_tokens + usage.output_tokens,
+              cacheCreationTokens: usage.cache_creation_input_tokens,
+              cacheReadTokens: usage.cache_read_input_tokens,
+            } satisfies ContextUsedEvent)
+          }
+        }
+      }
+
+      // Stream completed successfully
+      if (session.status !== 'cancelled') {
+        session.status = 'completed'
+        session.updatedAt = new Date()
+        this.emit('session_ended', {
+          sessionId,
+          reason: 'completed',
+        } satisfies SessionEndedEvent)
+      }
+    } catch (error) {
+      console.error(`[Claude] Stream error for session ${sessionId}:`, error)
+      if (session.status !== 'cancelled') {
+        session.status = 'error'
+        session.updatedAt = new Date()
+        this.emit('error', error instanceof Error ? error.message : String(error))
+        this.emit('session_ended', {
+          sessionId,
+          reason: 'error',
+        } satisfies SessionEndedEvent)
+      }
+    }
+  }
+
+  /**
+   * Convert SDK message to our internal event format
+   */
+  private convertSDKMessage(message: SDKMessage): ClaudeStreamEvent | null {
+    // The SDK message types map fairly directly to our event types
+    switch (message.type) {
+      case 'user':
+        return { type: 'user', message: message.message }
+      case 'assistant':
+        return { type: 'assistant', message: message.message }
+      case 'result':
+        return {
+          type: 'result',
+          result: 'result' in message ? String(message.result) : '',
+          session_id: 'session_id' in message ? String(message.session_id) : undefined,
+          usage: 'usage' in message ? message.usage as TokenUsage : undefined,
+        }
+      case 'system':
+        return { type: 'system', message: 'message' in message ? String(message.message) : '' }
+      default:
+        // Pass through other message types
+        return message as ClaudeStreamEvent
+    }
+  }
+
+  /**
+   * Emit event based on type
+   */
+  private emitEvent(_sessionId: string, event: ClaudeStreamEvent): void {
+    switch (event.type) {
+      case 'tool_use':
+        this.emit('tool_use', event)
+        break
+      case 'tool_result':
+        this.emit('tool_result', event)
+        break
+      default:
+        this.emit('message', event)
+    }
+  }
+
+  /**
+   * Resume an existing session using the SDK's resume option
+   */
+  async resume(params: ClaudeResumeParams): Promise<ClaudeStartResult> {
+    const session = this.sessions.get(params.sessionId)
+    if (!session) {
+      throw new Error('Session not found')
+    }
+
+    const abortController = new AbortController()
+
+    // Create MCP server for Koda tools
+    const kodaMcp = createKodaMCPServer(params.sessionId, session.workspaceId, getFrontendRpcClient())
+
+    // Build SDK options with resume
+    const sdkOptions: Options = {
+      cwd: session.options?.workingDirectory || globalThis.process.cwd(),
+      env: this.buildEnv(),
+      abortController,
+      resume: params.sessionId, // Use SDK's native resume
+      mcpServers: {
+        koda: kodaMcp,
+      },
+    }
+
+    if (session.options?.model) {
+      sdkOptions.model = session.options.model
+    }
+
+    console.log(`[Claude] Resuming session ${params.sessionId} with Agent SDK`)
+
+    // Create the query - use the new prompt if provided, otherwise send empty to continue
+    const sdkQuery = query({
+      prompt: params.prompt || '',
+      options: sdkOptions,
+    })
+
+    // Update session state
+    session.query = sdkQuery
+    session.abortController = abortController
+    session.status = 'running'
+    session.updatedAt = new Date()
+
+    // Start processing the stream in the background
+    this.processQueryStream(params.sessionId, sdkQuery)
+
+    return {
+      sessionId: params.sessionId,
+      status: 'running',
+    }
   }
 
   /**
    * Cancel a running session
    */
   async cancel(params: ClaudeCancelParams): Promise<ClaudeCancelResult> {
-    const session = this.sessions.get(params.sessionId);
+    const session = this.sessions.get(params.sessionId)
     if (!session) {
-      throw new Error('Session not found');
+      throw new Error('Session not found')
     }
 
-    session.status = 'cancelled';
-    session.updatedAt = new Date();
+    session.status = 'cancelled'
+    session.updatedAt = new Date()
 
-    if (session.process && !session.process.killed) {
-      session.process.kill('SIGTERM');
+    // Abort the SDK query
+    if (session.abortController) {
+      session.abortController.abort()
     }
 
     this.emit('session_ended', {
       sessionId: params.sessionId,
       reason: 'cancelled',
-    } satisfies SessionEndedEvent);
+    } satisfies SessionEndedEvent)
 
     return {
       success: true,
       sessionId: params.sessionId,
-    };
+    }
   }
 
   /**
    * Get session info
    */
   getSession(sessionId: string): ClaudeSessionInfo | null {
-    const session = this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId)
     if (!session) {
-      return null;
+      return null
     }
 
     return {
@@ -444,7 +869,7 @@ export class ClaudeHandler extends EventEmitter {
       outputTokens: session.outputTokens,
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
-    };
+    }
   }
 
   /**
@@ -452,12 +877,12 @@ export class ClaudeHandler extends EventEmitter {
    */
   async getClaudeSettings(): Promise<ClaudeSettings | null> {
     try {
-      const claudeHome = globalThis.process.env.CLAUDE_HOME || path.join(os.homedir(), '.claude');
-      const settingsPath = path.join(claudeHome, 'settings.json');
-      const content = await fs.readFile(settingsPath, 'utf-8');
-      return JSON.parse(content) as ClaudeSettings;
+      const claudeHome = globalThis.process.env.CLAUDE_HOME || path.join(os.homedir(), '.claude')
+      const settingsPath = path.join(claudeHome, 'settings.json')
+      const content = await fs.readFile(settingsPath, 'utf-8')
+      return JSON.parse(content) as ClaudeSettings
     } catch {
-      return null;
+      return null
     }
   }
 
@@ -466,118 +891,29 @@ export class ClaudeHandler extends EventEmitter {
    */
   async dispose(): Promise<void> {
     const killPromises = Array.from(this.sessions.keys()).map((sessionId) => {
-      const session = this.sessions.get(sessionId);
-      if (session?.process && !session.process.killed) {
-        session.process.kill('SIGTERM');
+      const session = this.sessions.get(sessionId)
+      if (session?.abortController && !session.abortController.signal.aborted) {
+        session.abortController.abort()
       }
-      return Promise.resolve();
-    });
+      return Promise.resolve()
+    })
 
-    await Promise.all(killPromises);
-    this.sessions.clear();
-    this.streamBuffers.clear();
-  }
-
-  /**
-   * Setup event handlers for the process
-   */
-  private setupProcessHandlers(sessionId: string, childProcess: ChildProcess): void {
-    console.log(`[Claude] Setting up handlers for session ${sessionId}, PID: ${childProcess.pid}`);
-
-    if (!childProcess.stdout) {
-      console.error(`[Claude] ERROR: stdout is null for session ${sessionId}`);
-      return;
-    }
-
-    childProcess.stdout.on('data', (data: Buffer) => {
-      const text = data.toString();
-      console.log(`[Claude] stdout (${sessionId}): ${text.substring(0, 300)}${text.length > 300 ? '...' : ''}`);
-      this.handleStdout(sessionId, text);
-    });
-
-    childProcess.stderr?.on('data', (data: Buffer) => {
-      const errorText = data.toString().trim();
-      if (errorText) {
-        console.log(`[Claude] stderr (${sessionId}): ${errorText}`);
-        // Don't emit as error - stderr often contains debug info
-      }
-    });
-
-    childProcess.on('close', (code: number | null) => {
-      console.log(`[Claude] Process close (${sessionId}): code=${code}`);
-      this.handleProcessClose(sessionId, code);
-    });
-
-    childProcess.on('error', (err: Error) => {
-      console.error(`[Claude] Process error (${sessionId}):`, err.message);
-      this.emit('error', err.message);
-      const session = this.sessions.get(sessionId);
-      if (session) {
-        session.status = 'error';
-        session.updatedAt = new Date();
-      }
-    });
-  }
-
-  /**
-   * Handle stdout data from Claude process
-   */
-  private handleStdout(sessionId: string, data: string): void {
-    let buffer = this.streamBuffers.get(sessionId) || '';
-    buffer += data;
-
-    // Process complete lines (newline-delimited JSON)
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || ''; // Keep incomplete line in buffer
-    this.streamBuffers.set(sessionId, buffer);
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      try {
-        const event = JSON.parse(trimmed) as ClaudeStreamEvent;
-        this.processStreamEvent(sessionId, event);
-      } catch {
-        // Ignore JSON parse errors for non-JSON output
-      }
-    }
-  }
-
-  /**
-   * Process a parsed stream event
-   */
-  private processStreamEvent(sessionId: string, event: ClaudeStreamEvent): void {
-    // Store event in buffer for polling
-    this.storeMessage(sessionId, event);
-
-    // Emit the event based on type
-    switch (event.type) {
-      case 'tool_use':
-        this.emit('tool_use', event);
-        break;
-      case 'tool_result':
-        this.emit('tool_result', event);
-        break;
-      case 'result':
-        this.handleResultEvent(sessionId, event);
-        break;
-      default:
-        this.emit('message', event);
-    }
+    await Promise.all(killPromises)
+    this.sessions.clear()
+    this.messageBuffers.clear()
   }
 
   /**
    * Store a message in the buffer for polling
    */
   private storeMessage(sessionId: string, event: ClaudeStreamEvent): void {
-    const buffer = this.messageBuffers.get(sessionId);
+    const buffer = this.messageBuffers.get(sessionId)
     if (buffer) {
       buffer.push({
         index: buffer.length,
         timestamp: Date.now(),
         event,
-      });
+      })
     }
   }
 
@@ -585,72 +921,21 @@ export class ClaudeHandler extends EventEmitter {
    * Get messages for a session since a given index (for polling)
    */
   getMessages(sessionId: string, fromIndex = 0): StoredMessage[] {
-    const buffer = this.messageBuffers.get(sessionId);
-    if (!buffer) return [];
-    return buffer.slice(fromIndex);
-  }
-
-  /**
-   * Handle a result event (contains token usage)
-   */
-  private handleResultEvent(sessionId: string, event: ClaudeStreamEvent): void {
-    if (event.type !== 'result') return;
-
-    const session = this.sessions.get(sessionId);
-    if (!session) return;
-
-    // Extract token usage
-    const usage = event.usage as TokenUsage | undefined;
-    if (usage) {
-      session.inputTokens = usage.input_tokens;
-      session.outputTokens = usage.output_tokens;
-      session.contextTokenCount = usage.input_tokens + usage.output_tokens;
-      session.updatedAt = new Date();
-
-      this.emit('context_used', {
-        sessionId,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        totalTokens: usage.input_tokens + usage.output_tokens,
-        cacheCreationTokens: usage.cache_creation_input_tokens,
-        cacheReadTokens: usage.cache_read_input_tokens,
-      } satisfies ContextUsedEvent);
-    }
-
-    this.emit('message', event);
-  }
-
-  /**
-   * Handle process close event
-   */
-  private handleProcessClose(sessionId: string, code: number | null): void {
-    const session = this.sessions.get(sessionId);
-    if (!session) return;
-
-    // Don't update if already cancelled
-    if (session.status === 'cancelled') return;
-
-    const newStatus: SessionStatus = code === 0 ? 'completed' : 'error';
-    session.status = newStatus;
-    session.updatedAt = new Date();
-
-    this.emit('session_ended', {
-      sessionId,
-      reason: code === 0 ? 'completed' : 'error',
-      exitCode: code ?? undefined,
-    } satisfies SessionEndedEvent);
+    const buffer = this.messageBuffers.get(sessionId)
+    if (!buffer) return []
+    return buffer.slice(fromIndex)
   }
 
   // Type-safe event emitter overrides
   override on<K extends keyof ClaudeHandlerEvents>(event: K, listener: ClaudeHandlerEvents[K]): this {
-    return super.on(event, listener);
+    return super.on(event, listener)
   }
 
   override emit<K extends keyof ClaudeHandlerEvents>(
     event: K,
     ...args: Parameters<ClaudeHandlerEvents[K]>
   ): boolean {
-    return super.emit(event, ...args);
+    return super.emit(event, ...args)
   }
 }
 
@@ -658,16 +943,16 @@ export class ClaudeHandler extends EventEmitter {
 // Singleton instance for RPC handlers
 // ============================================================================
 
-let handlerInstance: ClaudeHandler | null = null;
+let handlerInstance: ClaudeHandler | null = null
 
 /**
  * Get the singleton Claude handler instance
  */
 export function getClaudeHandler(): ClaudeHandler {
   if (!handlerInstance) {
-    handlerInstance = new ClaudeHandler();
+    handlerInstance = new ClaudeHandler()
   }
-  return handlerInstance;
+  return handlerInstance
 }
 
 // ============================================================================
@@ -678,46 +963,68 @@ export function getClaudeHandler(): ClaudeHandler {
  * Start a new Claude session
  */
 export async function claudeStart(params: ClaudeStartParams): Promise<ClaudeStartResult> {
-  const handler = getClaudeHandler();
-  return handler.start(params);
+  const handler = getClaudeHandler()
+  return handler.start(params)
 }
 
 /**
  * Resume an existing Claude session
  */
 export async function claudeResume(params: ClaudeResumeParams): Promise<ClaudeStartResult> {
-  const handler = getClaudeHandler();
-  return handler.resume(params);
+  const handler = getClaudeHandler()
+  return handler.resume(params)
 }
 
 /**
  * Cancel a Claude session
  */
 export async function claudeCancel(params: ClaudeCancelParams): Promise<ClaudeCancelResult> {
-  const handler = getClaudeHandler();
-  return handler.cancel(params);
+  const handler = getClaudeHandler()
+  return handler.cancel(params)
 }
 
 /**
  * Get Claude session info
  */
 export async function claudeGetSession(params: ClaudeGetSessionParams): Promise<ClaudeSessionInfo | null> {
-  const handler = getClaudeHandler();
-  return handler.getSession(params.sessionId);
+  const handler = getClaudeHandler()
+  return handler.getSession(params.sessionId)
 }
 
 /**
  * Get Claude settings
  */
 export async function claudeGetSettings(): Promise<ClaudeSettings | null> {
-  const handler = getClaudeHandler();
-  return handler.getClaudeSettings();
+  const handler = getClaudeHandler()
+  return handler.getClaudeSettings()
 }
 
 /**
  * Get messages for a session (polling endpoint)
  */
 export async function claudeGetMessages(params: ClaudeGetMessagesParams): Promise<StoredMessage[]> {
-  const handler = getClaudeHandler();
-  return handler.getMessages(params.sessionId, params.fromIndex ?? 0);
+  const handler = getClaudeHandler()
+  return handler.getMessages(params.sessionId, params.fromIndex ?? 0)
+}
+
+/**
+ * Continue an existing Claude session
+ */
+export async function claudeContinue(params: { sessionId: string; prompt: string }): Promise<ClaudeStartResult> {
+  const handler = getClaudeHandler()
+  return handler.continue(params)
+}
+
+/**
+ * Update Claude session settings
+ */
+export async function claudeUpdateSettings(params: {
+  sessionId: string
+  model?: string
+  permissionMode?: PermissionMode
+  maxThinkingTokens?: number
+}): Promise<void> {
+  const handler = getClaudeHandler()
+  const { sessionId, ...settings } = params
+  return handler.updateSettings(sessionId, settings)
 }
