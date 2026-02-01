@@ -40,6 +40,7 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
         KODA_SOCKET: socketPath,
         // Use in-memory database for tests
         KODA_DB_PATH: ':memory:',
+        NODE_ENV: 'test',
       },
       cwd: path.join(__dirname, '..'),
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -127,8 +128,7 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
         jsonrpc: '2.0',
         method: 'workspace.create',
         params: {
-          directoryName: 'test-workspace',
-          workspaceType: 'standard',
+          name: 'test-workspace',
         },
         id: 3,
       });
@@ -139,8 +139,7 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
       if ('result' in response) {
         expect(response.result).toMatchObject({
           id: expect.any(String),
-          directoryName: 'test-workspace',
-          workspaceType: 'standard',
+          name: 'test-workspace',
         });
       } else {
         throw new Error(`Expected result, got error: ${JSON.stringify(response.error)}`);
@@ -153,7 +152,7 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
         jsonrpc: '2.0',
         method: 'workspace.create',
         params: {
-          directoryName: 'list-test-workspace',
+          name: 'list-test-workspace',
         },
         id: 100,
       });
@@ -247,14 +246,14 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
     });
 
     it('should handle request with large params', async () => {
-      // Simulate a large workspace path or config
+      // Simulate a large workspace name
       const largeString = 'x'.repeat(10000);
 
       const response = await sendRpcRequest({
         jsonrpc: '2.0',
         method: 'workspace.create',
         params: {
-          directoryName: largeString,
+          name: largeString,
         },
         id: 'large-params',
       });
@@ -262,7 +261,7 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
       expect(response.id).toBe('large-params');
 
       if ('result' in response) {
-        expect((response.result as { directoryName: string }).directoryName).toBe(largeString);
+        expect((response.result as { name: string }).name).toBe(largeString);
       } else {
         throw new Error(`Expected result, got error: ${JSON.stringify(response.error)}`);
       }

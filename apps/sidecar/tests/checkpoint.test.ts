@@ -12,7 +12,7 @@ import {
   restoreCheckpoint,
   diffCheckpoints,
   getCheckpoint,
-  getCheckpointsByWorkspace,
+  getCheckpointsByWorktree,
   type SaveCheckpointInput,
 } from '../src/checkpoint/service.js';
 
@@ -20,8 +20,8 @@ describe('Git Checkpoint System', () => {
   let dbPath: string;
   let sqlite: Database.Database;
   let db: ReturnType<typeof drizzle<typeof schema>>;
-  let testWorkspaceId: string;
-  let testUserId: string;
+  let testWorktreeId: string;
+  let testRepoId: string;
   let testRepoPath: string;
 
   /**
@@ -64,19 +64,25 @@ describe('Git Checkpoint System', () => {
     sqlite = new Database(dbPath);
     db = drizzle(sqlite, { schema });
 
-    // Set up test user and workspace
-    testUserId = `user-checkpoint-test-${Date.now()}`;
-    testWorkspaceId = `ws-checkpoint-test-${Date.now()}`;
-
     // Create test repo
     testRepoPath = createTestRepo();
 
-    db.insert(schema.users).values({ id: testUserId, name: 'Checkpoint Test User' }).run();
-    db.insert(schema.workspaces)
+    // Set up test repo and worktree (new schema)
+    testRepoId = `repo-checkpoint-test-${Date.now()}`;
+    testWorktreeId = `wt-checkpoint-test-${Date.now()}`;
+
+    db.insert(schema.repos).values({
+      id: testRepoId,
+      name: 'checkpoint-test-repo',
+      remoteUrl: 'https://github.com/test/checkpoint-repo.git',
+      rootPath: testRepoPath,
+    }).run();
+    db.insert(schema.worktrees)
       .values({
-        id: testWorkspaceId,
-        ownerUserId: testUserId,
-        directoryName: testRepoPath,
+        id: testWorktreeId,
+        repoId: testRepoId,
+        branch: 'main',
+        worktreePath: testRepoPath,
       })
       .run();
   });
@@ -115,7 +121,7 @@ describe('Git Checkpoint System', () => {
 
     it('should save a checkpoint with HEAD, index, and worktree state', () => {
       const input: SaveCheckpointInput = {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-1',
         repoPath: localRepoPath,
       };
@@ -124,7 +130,7 @@ describe('Git Checkpoint System', () => {
 
       expect(checkpoint).toBeDefined();
       expect(checkpoint.id).toBeDefined();
-      expect(checkpoint.workspaceId).toBe(testWorkspaceId);
+      expect(checkpoint.worktreeId).toBe(testWorktreeId);
       expect(checkpoint.turnId).toBe('turn-1');
       expect(checkpoint.headOid).toBeDefined();
       expect(checkpoint.headOid).toMatch(/^[0-9a-f]{40}$/); // Valid git SHA
@@ -139,7 +145,7 @@ describe('Git Checkpoint System', () => {
       execSync('git add staged.txt', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-staged',
         repoPath: localRepoPath,
       });
@@ -155,7 +161,7 @@ describe('Git Checkpoint System', () => {
       fs.writeFileSync(testFile, 'unstaged content\n');
 
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-unstaged',
         repoPath: localRepoPath,
       });
@@ -167,7 +173,7 @@ describe('Git Checkpoint System', () => {
 
     it('should create unique checkpoints for different turns', () => {
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-a',
         repoPath: localRepoPath,
       });
@@ -178,7 +184,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Add file1"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-b',
         repoPath: localRepoPath,
       });
@@ -201,7 +207,7 @@ describe('Git Checkpoint System', () => {
 
     it('should retrieve an existing checkpoint by id', () => {
       const created = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-get-test',
         repoPath: localRepoPath,
       });
@@ -220,7 +226,7 @@ describe('Git Checkpoint System', () => {
     });
   });
 
-  describe('getCheckpointsByWorkspace', () => {
+  describe('getCheckpointsByWorktree', () => {
     let localRepoPath: string;
 
     beforeEach(() => {
@@ -231,10 +237,10 @@ describe('Git Checkpoint System', () => {
       cleanupTestRepo(localRepoPath);
     });
 
-    it('should retrieve all checkpoints for a workspace', () => {
+    it('should retrieve all checkpoints for a worktree', () => {
       // Create multiple checkpoints
       saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-list-1',
         repoPath: localRepoPath,
       });
@@ -244,12 +250,12 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Change"', { cwd: localRepoPath, stdio: 'pipe' });
 
       saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-list-2',
         repoPath: localRepoPath,
       });
 
-      const checkpoints = getCheckpointsByWorkspace(db, testWorkspaceId);
+      const checkpoints = getCheckpointsByWorktree(db, testWorktreeId);
 
       expect(checkpoints.length).toBeGreaterThanOrEqual(2);
       expect(checkpoints.some((c) => c.turnId === 'turn-list-1')).toBe(true);
@@ -271,7 +277,7 @@ describe('Git Checkpoint System', () => {
     it('should restore HEAD to the checkpoint state', () => {
       // Save checkpoint at initial state
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-restore-head',
         repoPath: localRepoPath,
       });
@@ -301,7 +307,7 @@ describe('Git Checkpoint System', () => {
       fs.writeFileSync(testFile, 'original content\n');
 
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-restore-worktree',
         repoPath: localRepoPath,
       });
@@ -324,7 +330,7 @@ describe('Git Checkpoint System', () => {
       execSync('git add staged-restore.txt', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-restore-index',
         repoPath: localRepoPath,
       });
@@ -362,7 +368,7 @@ describe('Git Checkpoint System', () => {
 
     it('should return empty diff for identical checkpoints', () => {
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-same',
         repoPath: localRepoPath,
       });
@@ -376,7 +382,7 @@ describe('Git Checkpoint System', () => {
 
     it('should show files added between checkpoints', () => {
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-add-before',
         repoPath: localRepoPath,
       });
@@ -387,7 +393,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Add file"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-add-after',
         repoPath: localRepoPath,
       });
@@ -406,7 +412,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Modify README"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-mod-before',
         repoPath: localRepoPath,
       });
@@ -417,7 +423,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Further modify README"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-mod-after',
         repoPath: localRepoPath,
       });
@@ -436,7 +442,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Add file to delete"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-del-before',
         repoPath: localRepoPath,
       });
@@ -447,7 +453,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Delete file"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-del-after',
         repoPath: localRepoPath,
       });
@@ -465,7 +471,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Add content"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-content-before',
         repoPath: localRepoPath,
       });
@@ -475,7 +481,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Modify content"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-content-after',
         repoPath: localRepoPath,
       });
@@ -490,7 +496,7 @@ describe('Git Checkpoint System', () => {
 
     it('should provide summary statistics', () => {
       const checkpoint1 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-stats-before',
         repoPath: localRepoPath,
       });
@@ -502,7 +508,7 @@ describe('Git Checkpoint System', () => {
       execSync('git commit -m "Add files"', { cwd: localRepoPath, stdio: 'pipe' });
 
       const checkpoint2 = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-stats-after',
         repoPath: localRepoPath,
       });
@@ -517,7 +523,7 @@ describe('Git Checkpoint System', () => {
 
     it('should throw an error for non-existent checkpoint', () => {
       const checkpoint = saveCheckpoint(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         turnId: 'turn-diff-error',
         repoPath: localRepoPath,
       });

@@ -11,7 +11,7 @@ import {
   getSession,
   updateSession,
   deleteSession,
-  getSessionsByWorkspace,
+  getSessionsByWorktree,
   addMessage,
   getMessages,
   getMessageById,
@@ -25,8 +25,8 @@ describe('Session Persistence', () => {
   let dbPath: string;
   let sqlite: Database.Database;
   let db: ReturnType<typeof drizzle<typeof schema>>;
-  let testWorkspaceId: string;
-  let testUserId: string;
+  let testWorktreeId: string;
+  let testRepoId: string;
 
   beforeAll(() => {
     // Create temporary database for testing
@@ -39,16 +39,21 @@ describe('Session Persistence', () => {
     sqlite = new Database(dbPath);
     db = drizzle(sqlite, { schema });
 
-    // Set up test user and workspace
-    testUserId = `user-test-${Date.now()}`;
-    testWorkspaceId = `ws-test-${Date.now()}`;
+    // Set up test repo and worktree (new schema)
+    testRepoId = `repo-test-${Date.now()}`;
+    testWorktreeId = `wt-test-${Date.now()}`;
 
-    db.insert(schema.users).values({ id: testUserId, name: 'Test User' }).run();
-    db.insert(schema.workspaces)
+    db.insert(schema.repos).values({
+      id: testRepoId,
+      name: 'test-repo',
+      remoteUrl: 'https://github.com/test/repo.git',
+      rootPath: '/tmp/test-repo',
+    }).run();
+    db.insert(schema.worktrees)
       .values({
-        id: testWorkspaceId,
-        ownerUserId: testUserId,
-        directoryName: 'test-workspace',
+        id: testWorktreeId,
+        repoId: testRepoId,
+        branch: 'test-workspace',
       })
       .run();
   });
@@ -74,7 +79,7 @@ describe('Session Persistence', () => {
     describe('createSession', () => {
       it('should create a new session with all required fields', () => {
         const input: CreateSessionInput = {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         };
@@ -83,7 +88,7 @@ describe('Session Persistence', () => {
 
         expect(session).toBeDefined();
         expect(session.id).toBeDefined();
-        expect(session.workspaceId).toBe(testWorkspaceId);
+        expect(session.worktreeId).toBe(testWorktreeId);
         expect(session.agentType).toBe('claude');
         expect(session.model).toBe('claude-sonnet-4-5');
         expect(session.status).toBe('idle');
@@ -92,7 +97,7 @@ describe('Session Persistence', () => {
 
       it('should create a session with custom status', () => {
         const input: CreateSessionInput = {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'codex',
           model: 'codex-1',
           status: 'running',
@@ -105,13 +110,13 @@ describe('Session Persistence', () => {
 
       it('should create a forked session', () => {
         const originalSession = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
 
         const forkedSession = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'kimi',
           model: 'kimi-k1.5',
           forkedFromSessionId: originalSession.id,
@@ -124,7 +129,7 @@ describe('Session Persistence', () => {
     describe('getSession', () => {
       it('should retrieve an existing session by id', () => {
         const created = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -146,7 +151,7 @@ describe('Session Persistence', () => {
     describe('updateSession', () => {
       it('should update session status', () => {
         const session = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -159,7 +164,7 @@ describe('Session Persistence', () => {
 
       it('should update context token count', () => {
         const session = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -171,7 +176,7 @@ describe('Session Persistence', () => {
 
       it('should update multiple fields at once', () => {
         const session = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -195,7 +200,7 @@ describe('Session Persistence', () => {
 
       it('should update the updatedAt timestamp', () => {
         const session = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -214,7 +219,7 @@ describe('Session Persistence', () => {
     describe('deleteSession', () => {
       it('should delete an existing session', () => {
         const session = createSession(db, {
-          workspaceId: testWorkspaceId,
+          worktreeId: testWorktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
@@ -232,51 +237,51 @@ describe('Session Persistence', () => {
       });
     });
 
-    describe('getSessionsByWorkspace', () => {
-      it('should retrieve all sessions for a workspace', () => {
-        // Create a new workspace for this test to avoid interference
-        const workspaceId = `ws-query-test-${Date.now()}`;
-        db.insert(schema.workspaces)
+    describe('getSessionsByWorktree', () => {
+      it('should retrieve all sessions for a worktree', () => {
+        // Create a new worktree for this test to avoid interference
+        const worktreeId = `wt-query-test-${Date.now()}`;
+        db.insert(schema.worktrees)
           .values({
-            id: workspaceId,
-            ownerUserId: testUserId,
-            directoryName: 'query-test',
+            id: worktreeId,
+            repoId: testRepoId,
+            branch: 'query-test',
           })
           .run();
 
         createSession(db, {
-          workspaceId,
+          worktreeId,
           agentType: 'claude',
           model: 'claude-sonnet-4-5',
         });
         createSession(db, {
-          workspaceId,
+          worktreeId,
           agentType: 'codex',
           model: 'codex-1',
         });
         createSession(db, {
-          workspaceId,
+          worktreeId,
           agentType: 'kimi',
           model: 'kimi-k1.5',
         });
 
-        const sessions = getSessionsByWorkspace(db, workspaceId);
+        const sessions = getSessionsByWorktree(db, worktreeId);
 
         expect(sessions).toHaveLength(3);
         expect(sessions.map((s) => s.agentType).sort()).toEqual(['claude', 'codex', 'kimi']);
       });
 
-      it('should return empty array for workspace with no sessions', () => {
-        const workspaceId = `ws-empty-${Date.now()}`;
-        db.insert(schema.workspaces)
+      it('should return empty array for worktree with no sessions', () => {
+        const worktreeId = `wt-empty-${Date.now()}`;
+        db.insert(schema.worktrees)
           .values({
-            id: workspaceId,
-            ownerUserId: testUserId,
-            directoryName: 'empty-test',
+            id: worktreeId,
+            repoId: testRepoId,
+            branch: 'empty-test',
           })
           .run();
 
-        const sessions = getSessionsByWorkspace(db, workspaceId);
+        const sessions = getSessionsByWorktree(db, worktreeId);
 
         expect(sessions).toEqual([]);
       });
@@ -289,7 +294,7 @@ describe('Session Persistence', () => {
     beforeEach(() => {
       // Create a fresh session for each message test
       const session = createSession(db, {
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         agentType: 'claude',
         model: 'claude-sonnet-4-5',
       });
@@ -398,7 +403,7 @@ describe('Session Persistence', () => {
 
       it('should support pagination with limit', () => {
         for (let i = 1; i <= 10; i++) {
-          addMessage(db, { sessionId: testSessionId, role: 'user', content: `Message ${i}` });
+          addMessage(db, { sessionId: testSessionId, role: 'user', content: `Message ${String(i)}` });
         }
 
         const options: GetMessagesOptions = { limit: 5 };
@@ -411,7 +416,7 @@ describe('Session Persistence', () => {
 
       it('should support pagination with offset', () => {
         for (let i = 1; i <= 10; i++) {
-          addMessage(db, { sessionId: testSessionId, role: 'user', content: `Message ${i}` });
+          addMessage(db, { sessionId: testSessionId, role: 'user', content: `Message ${String(i)}` });
         }
 
         const options: GetMessagesOptions = { limit: 5, offset: 5 };
@@ -459,13 +464,13 @@ describe('Session Persistence', () => {
   });
 
   describe('Index Performance', () => {
-    it('should have index on sessions.workspace_id', () => {
+    it('should have index on sessions.worktree_id', () => {
       const indexes = sqlite
         .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='sessions'")
         .all() as { name: string }[];
 
       const indexNames = indexes.map((i) => i.name);
-      expect(indexNames.some((name) => name.includes('workspace'))).toBe(true);
+      expect(indexNames.some((name) => name.includes('worktree'))).toBe(true);
     });
 
     it('should have index on session_messages.session_id', () => {
