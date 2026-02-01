@@ -1,13 +1,18 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { useSetAtom } from 'jotai'
 import { cn } from '@/lib/utils'
 import { useWorktreeDiff } from '@/hooks/useRpc'
+import { useFileSystem } from '@/hooks/useFileSystem'
+import { openFileAtom } from '@/store/fileExplorer'
 import { Undo2, ChevronDown, SquareDot, Plus, Minus } from 'lucide-react'
 import type { FileDiff } from '@/lib/rpc'
 
 interface DiffViewProps {
   /** Worktree ID for loading diff data */
   workspaceId: string
+  /** Root path of the worktree for resolving file paths */
+  rootPath?: string
 }
 
 /**
@@ -45,7 +50,13 @@ function splitPath(path: string): { directory: string; filename: string } {
 /**
  * File row component
  */
-function FileRow({ file }: { file: FileDiff }) {
+function FileRow({
+  file,
+  onClick,
+}: {
+  file: FileDiff
+  onClick?: () => void
+}) {
   const { directory, filename } = splitPath(file.path)
   const { icon: StatusIcon, color: statusColor } = getStatusStyle(file.status)
 
@@ -53,6 +64,7 @@ function FileRow({ file }: { file: FileDiff }) {
     <div
       className="group flex items-center py-1 px-3 mx-2 gap-1.5 hover:bg-accent has-[button:hover]:bg-transparent rounded-md cursor-pointer text-sm relative"
       data-state="closed"
+      onClick={onClick}
     >
       {/* File path */}
       <div className="flex-1 min-w-0 overflow-hidden flex items-center gap-2">
@@ -136,12 +148,36 @@ function FileRow({ file }: { file: FileDiff }) {
  *
  * Shows git diff of worktree against its merge base (target branch)
  */
-export function DiffView({ workspaceId }: DiffViewProps) {
+export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const openFile = useSetAtom(openFileAtom)
+  const { readFile } = useFileSystem()
 
   // Fetch worktree diff
   const { data: diffData, isLoading } = useWorktreeDiff(workspaceId)
   const files = diffData?.files ?? []
+
+  // Handle file click - open in editor tab
+  const handleFileClick = useCallback(
+    async (file: FileDiff) => {
+      if (!rootPath || file.status === 'deleted') return
+
+      const fullPath = `${rootPath}/${file.path}`
+      const filename = file.path.split('/').pop() ?? file.path
+
+      try {
+        const content = await readFile(fullPath)
+        openFile({
+          path: fullPath,
+          name: filename,
+          content,
+        })
+      } catch (err) {
+        console.error('Failed to open file:', err)
+      }
+    },
+    [rootPath, readFile, openFile]
+  )
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -202,7 +238,7 @@ export function DiffView({ workspaceId }: DiffViewProps) {
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <FileRow file={file} />
+              <FileRow file={file} onClick={() => void handleFileClick(file)} />
             </div>
           )
         })}

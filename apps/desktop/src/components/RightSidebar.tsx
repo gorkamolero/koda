@@ -189,7 +189,7 @@ export function RightSidebar({
           <FileExplorer rootPath={rootPath} />
         )}
         {activeTab === 'changes' && (
-          <DiffView workspaceId={workspaceId} />
+          <DiffView workspaceId={workspaceId} rootPath={rootPath} />
         )}
         {activeTab === 'checks' && <ChecksView workspaceId={workspaceId} />}
         {activeTab === 'review' && <ReviewView workspaceId={workspaceId} />}
