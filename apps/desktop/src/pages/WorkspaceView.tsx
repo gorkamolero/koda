@@ -195,16 +195,16 @@ export function WorkspaceView() {
           {!isLoadingWorktree && !hasRepo && activeTab === 'chat' && (
             <div className="h-full flex flex-col items-center justify-center px-8">
               <div className="max-w-md text-center">
-                <FolderPlus className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">
+                <FolderPlus className="w-12 h-12 text-text-dim mx-auto mb-4" />
+                <h3 className="text-sm font-medium text-text-muted mb-1">
                   No repository connected
                 </h3>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Connect a git repository to enable agent features like file editing, code review, and version control.
+                <p className="text-xs text-text-faint mb-4">
+                  Connect a git repository to enable file editing, code review, and version control.
                 </p>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-surface-control hover:bg-surface-control-hover text-text-primary transition-colors"
                   onClick={() => {
                     // TODO: Open repo connect dialog
                     console.log('Connect repo clicked')
