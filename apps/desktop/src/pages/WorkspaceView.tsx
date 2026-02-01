@@ -106,7 +106,7 @@ export function WorkspaceView(): React.ReactElement {
 
         <div className="flex-1 overflow-hidden">
           {activeTab === 'chat' && (
-            <AgentChat workspaceId={id} sessionId={activeSessionId} />
+            <AgentChat worktreeId={id} sessionId={activeSessionId} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (
