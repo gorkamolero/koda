@@ -140,6 +140,18 @@ import {
 } from './handlers/pty.js';
 import { getNotificationEmitter } from './rpc/notifications.js';
 
+// Import pulse handlers
+import {
+  rpcStartPulse,
+  rpcStopPulse,
+  rpcGetPulseStatus,
+  rpcListActivePulses,
+  StartPulseSchema,
+  StopPulseSchema,
+  GetPulseStatusSchema,
+  getPulseManager,
+} from './pulse/index.js';
+
 /**
  * Get the Unix socket path based on platform
  */
@@ -248,6 +260,12 @@ function registerMethods() {
   router.register('pty.get', getPty, GetPtySchema);
   router.register('pty.list', listPtySessions);
 
+  // Pulse management
+  router.register('pulse.start', rpcStartPulse, StartPulseSchema);
+  router.register('pulse.stop', rpcStopPulse, StopPulseSchema);
+  router.register('pulse.status', rpcGetPulseStatus, GetPulseStatusSchema);
+  router.register('pulse.listActive', rpcListActivePulses);
+
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);
 }
@@ -336,6 +354,7 @@ async function main() {
     const shutdown = async () => {
       console.log('\nShutting down...');
       cleanupAllSessions(); // Close all PTY sessions
+      await getPulseManager().stopAll(); // Stop all pulse processes
       if (httpServer) {
         await httpServer.stop();
       }

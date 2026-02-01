@@ -191,3 +191,20 @@ export async function onRpcError(
     callback(event.payload)
   })
 }
+
+/**
+ * Subscribe to JSON-RPC notifications from sidecar
+ * This is for notifications sent by the sidecar (e.g., pulse status updates)
+ */
+export async function onNotification<T>(
+  method: string,
+  callback: (payload: T) => void
+): Promise<UnlistenFn> {
+  if (!isTauriContext()) {
+    // In E2E tests, return a no-op unlisten function
+    return () => {}
+  }
+  return listen<T>(`rpc-notification:${method}`, (event) => {
+    callback(event.payload)
+  })
+}
