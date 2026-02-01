@@ -9,6 +9,7 @@ import {
   generateMessageId,
   planModeAtom,
   exitPlanModeAtom,
+  AGENT_MODELS,
 } from '@/store/chat'
 import { rpcRequest } from '@/lib/tauri'
 import {
@@ -20,11 +21,26 @@ import {
   type ClaudeGetMessagesParams,
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
-import { InputArea } from './InputArea'
-import { ModelSelector } from './ModelSelector'
 import { PlanModeIndicator } from './PlanModeIndicator'
 import { ContextMeter } from '@/components/ContextMeter'
 import { useNotifications } from '@/hooks/useNotifications'
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputSubmit,
+  PromptInputSelect,
+  PromptInputSelectTrigger,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectValue,
+  PromptInputActionMenu,
+  PromptInputActionMenuTrigger,
+  PromptInputActionMenuContent,
+  PromptInputActionAddAttachments,
+  type PromptInputMessage,
+} from '@/components/ai-elements/prompt-input'
 
 interface AgentChatProps {
   workspaceId: string
@@ -32,17 +48,28 @@ interface AgentChatProps {
 }
 
 /**
- * Main agent chat component
- * Combines MessageList, InputArea, ModelSelector, and ContextMeter
+ * Main agent chat component - Conductor-style layout
+ * 
+ * Structure:
+ * ┌─────────────────────────────────────┐
+ * │ Plan Mode Indicator (if active)    │
+ * ├─────────────────────────────────────┤
+ * │ Message List (virtuoso)            │
+ * │                                    │
+ * ├─────────────────────────────────────┤
+ * │ Composer (ai-elements PromptInput) │
+ * │ [+] [textarea] [model ▼] [context] │
+ * └─────────────────────────────────────┘
  */
 export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps) {
-  // TODO: Use sessionId to scope messages to specific session
   void _sessionId
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
   const addMessage = useSetAtom(addMessageAtom)
   const updateMessage = useSetAtom(updateMessageAtom)
+  const isStreaming = useAtomValue(isStreamingAtom)
   const setIsStreaming = useSetAtom(isStreamingAtom)
   const selectedModel = useAtomValue(selectedModelAtom)
+  const setSelectedModel = useSetAtom(selectedModelAtom)
   const planMode = useAtomValue(planModeAtom)
   const exitPlanMode = useSetAtom(exitPlanModeAtom)
   const { showToast } = useNotifications()
@@ -59,7 +86,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
     setCurrentWorkspaceId(workspaceId)
     return () => {
       setCurrentWorkspaceId(null)
-      // Clean up polling on unmount
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
       }
@@ -81,17 +107,12 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
 
       for (const msg of messages) {
         messageIndexRef.current = msg.index + 1
-
-        // Process the event based on Claude stream-json format
         const event = msg.event
 
-        // Handle assistant messages (streaming text content)
         if (event.type === 'assistant') {
-          // Stream-json format: message has 'text' directly, not content array
           const message = event.message as { type?: string; text?: string } | undefined
           if (message?.text) {
             accumulatedTextRef.current += message.text
-
             if (currentMessageIdRef.current) {
               updateMessage({
                 id: currentMessageIdRef.current,
@@ -103,7 +124,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
             }
           }
         } else if (event.type === 'result') {
-          // Session complete - result contains final text if not already accumulated
           const resultText = (event as { result?: string }).result
           const isError = (event as { is_error?: boolean }).is_error
 
@@ -116,7 +136,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           }
 
           if (currentMessageIdRef.current) {
-            // Use accumulated text if available, otherwise use result
             const finalContent = accumulatedTextRef.current || resultText || 'Done'
             updateMessage({
               id: currentMessageIdRef.current,
@@ -127,7 +146,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
             })
           }
           
-          // Stop polling
           if (pollingRef.current) {
             clearInterval(pollingRef.current)
             pollingRef.current = null
@@ -135,7 +153,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           activeSessionRef.current = null
           setIsStreaming(false)
         } else if (event.type === 'tool_use') {
-          // Tool call - append to accumulated text as indicator
           const toolName = (event as { tool?: string }).tool ?? 'tool'
           if (currentMessageIdRef.current) {
             updateMessage({
@@ -147,7 +164,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
             })
           }
         } else if (event.type === 'tool_result') {
-          // Tool result - just update status indicator
           if (currentMessageIdRef.current && !accumulatedTextRef.current) {
             updateMessage({
               id: currentMessageIdRef.current,
@@ -160,7 +176,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         }
       }
 
-      // Also check session status
       if (activeSessionRef.current) {
         const session = await rpcRequest<ClaudeSessionInfo | null>(
           RPC_METHODS.CLAUDE_GET_SESSION,
@@ -192,7 +207,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
 
   const handleSendMessage = useCallback(
     async (content: string) => {
-      // Add user message
       addMessage({
         role: 'user',
         content,
@@ -200,13 +214,11 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         model: selectedModel,
       })
 
-      // Call sidecar to start Claude session
       setIsStreaming(true)
       accumulatedTextRef.current = ''
       messageIndexRef.current = 0
 
       try {
-        // Create placeholder for assistant response with known ID for later updates
         const messageId = generateMessageId()
         currentMessageIdRef.current = messageId
         addMessage({
@@ -217,7 +229,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           model: selectedModel,
         })
 
-        // Start Claude session
         const result = await rpcRequest<ClaudeStartResult>(
           RPC_METHODS.CLAUDE_START,
           {
@@ -228,7 +239,6 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
 
         activeSessionRef.current = result.sessionId
 
-        // Start polling for messages
         pollingRef.current = setInterval(() => {
           void pollMessages()
         }, 300)
@@ -247,17 +257,24 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
     [selectedModel, workspaceId, setIsStreaming, addMessage, pollMessages]
   )
 
+  // Handle PromptInput submit
+  const handleSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      if (message.text.trim()) {
+        void handleSendMessage(message.text)
+      }
+    },
+    [handleSendMessage]
+  )
+
+  // Get chat status for submit button
+  const chatStatus = isStreaming ? 'streaming' : undefined
+
   return (
     <div
       data-testid="agent-chat-container"
-      className="h-full flex flex-col"
+      className="h-full flex flex-col bg-background"
     >
-      {/* Header with model selector and context meter */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
-        <ModelSelector />
-        <ContextMeter />
-      </div>
-
       {/* Plan mode indicator */}
       <PlanModeIndicator
         isActive={planMode.isActive}
@@ -272,8 +289,63 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         <MessageList />
       </div>
 
-      {/* Input area */}
-      <InputArea onSendMessage={(msg) => void handleSendMessage(msg)} />
+      {/* Conductor-style Composer */}
+      <div className="px-4 pb-4 pt-2">
+        <PromptInput
+          onSubmit={handleSubmit}
+          accept="image/*"
+          multiple
+          className="relative shadow-sm bg-[hsl(var(--composer-background))] focus-within:ring-0 focus-within:outline-none rounded-lg"
+        >
+          {/* Textarea */}
+          <PromptInputTextarea
+            placeholder="Ask to make changes, @mention files, run /commands"
+            className="bg-transparent border-none focus:ring-0 resize-none"
+            disabled={isStreaming}
+          />
+
+          {/* Footer with tools, model selector, and submit */}
+          <PromptInputFooter className="px-3 pb-2">
+            <PromptInputTools>
+              {/* Attachments menu */}
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger />
+                <PromptInputActionMenuContent>
+                  <PromptInputActionAddAttachments />
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
+
+              {/* Model selector */}
+              <PromptInputSelect
+                value={selectedModel}
+                onValueChange={setSelectedModel}
+              >
+                <PromptInputSelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
+                  <PromptInputSelectValue placeholder="Select model" />
+                </PromptInputSelectTrigger>
+                <PromptInputSelectContent>
+                  {AGENT_MODELS.map((model) => (
+                    <PromptInputSelectItem key={model.id} value={model.id}>
+                      {model.name}
+                    </PromptInputSelectItem>
+                  ))}
+                </PromptInputSelectContent>
+              </PromptInputSelect>
+            </PromptInputTools>
+
+            <div className="flex items-center gap-2">
+              {/* Context meter */}
+              <ContextMeter />
+
+              {/* Submit button */}
+              <PromptInputSubmit
+                status={chatStatus}
+                disabled={isStreaming}
+              />
+            </div>
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
     </div>
   )
 }

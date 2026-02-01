@@ -21,12 +21,50 @@
     "core:tray:default",
     "shell:allow-execute",
     "shell:allow-open",
-    "fs:allow-read",
-    "fs:allow-write",
-    "fs:allow-mkdir",
-    "fs:allow-remove",
-    "fs:allow-exists",
-    "fs:allow-read-dir",
+    {
+      "identifier": "fs:allow-read",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$RESOURCE/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$RESOURCE/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$HOME/.koda/**" },
+        { "path": "$APPDATA/**" }
+      ]
+    },
     "sql:allow-execute",
     "sql:allow-select",
     "http:default",
@@ -39,6 +77,7 @@
     "dialog:allow-ask",
     "dialog:allow-confirm",
     "opener:allow-open-url",
-    "opener:allow-open-path"
+    "opener:allow-open-path",
+    "opener:allow-reveal-item-in-dir"
   ]
 }

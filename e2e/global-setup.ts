@@ -30,9 +30,14 @@ export default async function globalSetup() {
 
   if (skipWebServer) {
     // Testing against already-running app - use its real database
-    console.log('Mode: Testing against RUNNING APP (SKIP_WEBSERVER=1)')
-    console.log('Using real database and socket')
-    console.log('NOTE: Tests will use/modify the real app database!')
+    console.log('\x1b[33m⚠️  WARNING: SKIP_WEBSERVER mode\x1b[0m')
+    console.log('\x1b[33m─────────────────────────────────────────────────\x1b[0m')
+    console.log('Mode: Testing against RUNNING APP')
+    console.log('This will WRITE TEST DATA to your REAL database!')
+    console.log('')
+    console.log('Test workspaces created will appear in your dev app.')
+    console.log('To use isolated test database, run without SKIP_WEBSERVER.')
+    console.log('\x1b[33m─────────────────────────────────────────────────\x1b[0m')
 
     // Make sure test env vars are NOT set so seed uses real socket
     delete process.env.KODA_TEST_DB
