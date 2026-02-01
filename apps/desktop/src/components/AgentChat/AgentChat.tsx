@@ -9,6 +9,7 @@ import {
   generateMessageId,
   planModeAtom,
   exitPlanModeAtom,
+  pendingPromptAtom,
   type MessageMention,
 } from '@/store/chat'
 import { rpcRequest, isTauriContext } from '@/lib/tauri'
@@ -55,6 +56,8 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
   const selectedModel = useAtomValue(selectedModelAtom)
   const planMode = useAtomValue(planModeAtom)
   const exitPlanMode = useSetAtom(exitPlanModeAtom)
+  const pendingPrompt = useAtomValue(pendingPromptAtom)
+  const setPendingPrompt = useSetAtom(pendingPromptAtom)
   const { showToast } = useNotifications()
   
   // Track active session
@@ -219,6 +222,14 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
     },
     [selectedModel, worktreeId, setIsStreaming, addMessage]
   )
+
+  // Process pending prompts from other components (e.g., PR buttons)
+  useEffect(() => {
+    if (pendingPrompt) {
+      void handleSendMessage(pendingPrompt)
+      setPendingPrompt(null)
+    }
+  }, [pendingPrompt, handleSendMessage, setPendingPrompt])
 
   return (
     <div

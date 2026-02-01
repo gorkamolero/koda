@@ -524,3 +524,24 @@ export const undoLastActionAtom = atom(
     set(messageHistoryAtom, newHistory)
   }
 )
+
+// ============================================================================
+// Pending Prompt (for sending messages from other components)
+// ============================================================================
+
+/**
+ * Pending prompt atom - when set, AgentChat will send this message
+ * Used by components like RightSidebar to send commands to the agent
+ */
+export const pendingPromptAtom = atom<string | null>(null)
+
+/**
+ * Send a prompt to the agent from any component
+ * Sets the pending prompt which AgentChat will pick up and process
+ */
+export const sendAgentPromptAtom = atom(
+  null,
+  (_get, set, prompt: string) => {
+    set(pendingPromptAtom, prompt)
+  }
+)

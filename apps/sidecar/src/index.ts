@@ -85,6 +85,7 @@ import {
   listWorktreesByWorkspace,
   addWorktreeToWorkspace,
   removeWorktreeFromWorkspace,
+  getWorktreeDiff,
   CreateWorktreeSchema,
   DeleteWorktreeSchema,
   GetWorktreeSchema,
@@ -93,6 +94,7 @@ import {
   ListWorktreesByWorkspaceSchema,
   AddWorktreeToWorkspaceSchema,
   RemoveWorktreeFromWorkspaceSchema,
+  GetWorktreeDiffSchema,
 } from './handlers/worktree.js';
 
 // Import workspace repo handlers
@@ -151,6 +153,14 @@ import {
   GetPulseStatusSchema,
   getPulseManager,
 } from './pulse/index.js';
+
+// Import GitHub handlers
+import {
+  createPr,
+  getChecks,
+  CreatePrSchema,
+  GetChecksSchema,
+} from './handlers/github.js';
 
 /**
  * Get the Unix socket path based on platform
@@ -238,6 +248,7 @@ function registerMethods() {
   router.register('worktree.listByWorkspace', listWorktreesByWorkspace, ListWorktreesByWorkspaceSchema);
   router.register('worktree.addToWorkspace', addWorktreeToWorkspace, AddWorktreeToWorkspaceSchema);
   router.register('worktree.removeFromWorkspace', removeWorktreeFromWorkspace, RemoveWorktreeFromWorkspaceSchema);
+  router.register('worktree.getDiff', getWorktreeDiff, GetWorktreeDiffSchema);
 
   // Workspace repo management (multi-repo support)
   router.register('workspaceRepo.attach', attachRepo, AttachRepoSchema);
@@ -265,6 +276,10 @@ function registerMethods() {
   router.register('pulse.stop', rpcStopPulse, StopPulseSchema);
   router.register('pulse.status', rpcGetPulseStatus, GetPulseStatusSchema);
   router.register('pulse.listActive', rpcListActivePulses);
+
+  // GitHub operations
+  router.register('github.createPr', createPr, CreatePrSchema);
+  router.register('github.getChecks', getChecks, GetChecksSchema);
 
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);
