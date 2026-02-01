@@ -102,6 +102,8 @@ interface UseKeyboardShortcutsOptions {
   onToggleTerminal?: () => void
   /** Callback for toggling right sidebar */
   onToggleSidebar?: () => void
+  /** Callback for focusing the chat input */
+  onFocusChat?: () => void
 }
 
 /**
@@ -117,7 +119,7 @@ interface UseKeyboardShortcutsOptions {
  * - Cmd+Enter: Send message (when in chat input)
  */
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
-  const { onSwitchTab, onSendMessage, tabCount = 4, onToggleTerminal, onToggleSidebar } = options
+  const { onSwitchTab, onSendMessage, tabCount = 4, onToggleTerminal, onToggleSidebar, onFocusChat } = options
 
   const toggleCommandPalette = useSetAtom(toggleCommandPaletteAtom)
   const toggleSidebar = useSetAtom(toggleSidebarAtom)
@@ -177,6 +179,16 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         preventDefault: true,
         ignoreWhenInputFocused: true,
       },
+      {
+        key: 'l',
+        metaKey: true,
+        description: 'Focus chat input',
+        handler: () => {
+          onFocusChat?.()
+        },
+        preventDefault: true,
+        ignoreWhenInputFocused: false, // Works even when typing elsewhere
+      },
       // Tab switching shortcuts
       ...Array.from({ length: 9 }, (_, i) => ({
         key: String(i + 1),
@@ -191,7 +203,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         ignoreWhenInputFocused: true,
       })),
     ],
-    [toggleCommandPalette, setQuickOpenVisible, toggleSidebar, onSwitchTab, tabCount, onToggleTerminal, onToggleSidebar]
+    [toggleCommandPalette, setQuickOpenVisible, toggleSidebar, onSwitchTab, tabCount, onToggleTerminal, onToggleSidebar, onFocusChat]
   )
 
   // Update commands for command palette
@@ -258,6 +270,16 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         },
       },
       {
+        id: 'focus-chat',
+        name: 'Focus Chat Input',
+        description: 'Jump to the chat input field',
+        shortcut: 'Cmd+L',
+        category: 'navigation',
+        action: () => {
+          onFocusChat?.()
+        },
+      },
+      {
         id: 'keyboard-shortcuts',
         name: 'Keyboard Shortcuts',
         description: 'View all available keyboard shortcuts',
@@ -270,7 +292,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     ]
 
     setCommands(commands)
-  }, [setCommands, setQuickOpenVisible, toggleSidebar, onSwitchTab, onToggleTerminal, onToggleSidebar])
+  }, [setCommands, setQuickOpenVisible, toggleSidebar, onSwitchTab, onToggleTerminal, onToggleSidebar, onFocusChat])
 
   // Global keyboard event handler
   const handleKeyDown = useCallback(
