@@ -6,6 +6,10 @@ import './index.css'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
+import { startSidecarRpcListener } from './lib/sidecarRpc'
+
+// Start listening for sidecar notifications (PTY data, streaming, etc.)
+void startSidecarRpcListener()
 
 // Create a new router instance
 const router = createRouter({ routeTree })

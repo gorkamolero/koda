@@ -209,6 +209,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
         })
       })
 
+
       console.log(`[Terminal] Created PTY session ${result.sessionId} (PID: ${result.pid})`)
     } catch (err) {
       console.error('[Terminal] Failed to create PTY session:', err)

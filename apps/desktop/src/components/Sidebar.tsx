@@ -380,7 +380,7 @@ function WorkspaceRow({
         to="/workspace/$id"
         params={{ id: workspace.id }}
         className={cn(
-          'group flex items-start gap-2 px-3 py-2 rounded-md transition-colors',
+          'group relative flex items-start gap-2 px-3 py-2 rounded-md transition-colors',
           'hover:bg-surface-hover',
           isActive && 'bg-surface-active'
         )}
@@ -422,12 +422,12 @@ function WorkspaceRow({
           </div>
         </div>
 
-        {/* Archive action (visible on hover) */}
+        {/* Archive action - floating icon button on hover */}
         <button
           className={cn(
+            'absolute right-1.5 top-1.5',
             'opacity-0 group-hover:opacity-100 transition-opacity',
-            'p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary',
-            'flex items-center gap-1 text-xs'
+            'p-1 rounded hover:bg-surface-control text-text-dim hover:text-text-primary'
           )}
           onClick={(e) => {
             e.preventDefault()
@@ -438,15 +438,9 @@ function WorkspaceRow({
           title={isArchived ? 'Restore' : 'Archive'}
         >
           {isArchived ? (
-            <>
-              <ArchiveRestore className="w-3.5 h-3.5" />
-              <span>Restore</span>
-            </>
+            <ArchiveRestore className="w-3.5 h-3.5" />
           ) : (
-            <>
-              <Archive className="w-3.5 h-3.5" />
-              <span>Archive</span>
-            </>
+            <Archive className="w-3.5 h-3.5" />
           )}
         </button>
       </Link>

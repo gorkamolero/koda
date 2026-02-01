@@ -2,9 +2,133 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
-import type { Worktree } from '@/lib/rpc'
+import type { Worktree, WorktreeStatus } from '@/lib/rpc'
+import { cn } from '@/lib/utils'
+import {
+  Archive,
+  ArchiveRestore,
+  Check,
+  AlertCircle,
+} from 'lucide-react'
 
 type CreateMode = 'choose' | 'repo' | 'branch' | 'standalone'
+
+// ============================================================================
+// Status Indicator
+// ============================================================================
+
+interface StatusConfig {
+  icon: React.ReactNode
+  colorClass: string
+}
+
+function getStatusConfig(status?: WorktreeStatus | null): StatusConfig {
+  if (status === 'done') {
+    return { icon: <Check className="w-3.5 h-3.5" />, colorClass: 'text-green-500' }
+  }
+  if (status === 'blocked' || status === 'needs-review') {
+    return { icon: <AlertCircle className="w-3.5 h-3.5" />, colorClass: 'text-orange-500' }
+  }
+  return {
+    icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
+    colorClass: 'text-text-dim',
+  }
+}
+
+// ============================================================================
+// Time Ago Helper
+// ============================================================================
+
+function formatTimeAgo(date: string | null | undefined): string {
+  if (!date) return ''
+
+  const diffMs = Date.now() - new Date(date).getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${String(diffMins)}m ago`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${String(diffHours)}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${String(diffDays)}d ago`
+}
+
+// ============================================================================
+// Workspace Card (Sidebar-style design)
+// ============================================================================
+
+function WorkspaceCard({ workspace, onClick }: { workspace: Worktree; onClick: () => void }) {
+  const status = workspace.manualStatus ?? workspace.derivedStatus
+  const { icon, colorClass } = getStatusConfig(status)
+  const isArchived = workspace.state === 'archived'
+  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
+  const timeAgo = formatTimeAgo(workspace.updatedAt)
+
+  return (
+    <button
+      data-testid="workspace-card"
+      onClick={onClick}
+      className={cn(
+        'group relative flex items-start gap-3 p-3 rounded-lg border transition-colors text-left w-full',
+        'hover:bg-surface-hover hover:border-border-accent',
+        isArchived
+          ? 'border-border-subtle bg-surface-inset opacity-60'
+          : 'border-border-subtle bg-surface-base'
+      )}
+    >
+      {/* Status icon */}
+      <div className={cn('mt-0.5 flex-shrink-0 flex items-center justify-center w-4', colorClass)}>
+        {icon}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text-primary truncate">
+            {displayName}
+          </span>
+          {isArchived && (
+            <Archive className="w-3 h-3 text-text-dim flex-shrink-0" />
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-text-faint mt-0.5">
+          <span className="truncate">{workspace.branch || 'no branch'}</span>
+          {timeAgo && (
+            <>
+              <span>·</span>
+              <span>{timeAgo}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Archive action - floating icon button on hover */}
+      <div
+        className={cn(
+          'absolute right-2 top-1/2 -translate-y-1/2',
+          'opacity-0 group-hover:opacity-100 transition-opacity',
+          'p-1.5 rounded-md hover:bg-surface-control text-text-muted hover:text-text-primary'
+        )}
+        onClick={(e) => {
+          e.stopPropagation()
+          // TODO: Implement archive/restore
+          console.log(isArchived ? 'Restore:' : 'Archive:', workspace.id)
+        }}
+        role="button"
+        tabIndex={0}
+        title={isArchived ? 'Restore' : 'Archive'}
+      >
+        {isArchived ? (
+          <ArchiveRestore className="w-4 h-4" />
+        ) : (
+          <Archive className="w-4 h-4" />
+        )}
+      </div>
+    </button>
+  )
+}
 
 export function WorkspaceList() {
   const navigate = useNavigate()
@@ -389,22 +513,11 @@ export function WorkspaceList() {
       {hasWorkspaces ? (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3" data-testid="workspace-grid">
           {workspaces.map((workspace) => (
-            <button
+            <WorkspaceCard
               key={workspace.id}
-              data-testid="workspace-card"
+              workspace={workspace}
               onClick={() => { handleWorkspaceClick(workspace); }}
-              className="text-left p-4 border border-border-subtle rounded-lg hover:border-border-accent hover:bg-surface-hover transition-colors"
-            >
-              <h3 className="font-medium text-text-primary">{workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'}</h3>
-              <p className="text-sm text-text-muted mt-1">
-                {workspace.branch || 'no branch'}
-              </p>
-              {workspace.createdAt && (
-                <p className="text-xs text-text-faint mt-2">
-                  Created {new Date(workspace.createdAt).toLocaleDateString()}
-                </p>
-              )}
-            </button>
+            />
           ))}
         </div>
       ) : (

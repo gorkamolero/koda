@@ -92,6 +92,8 @@ export function createPty(params: z.infer<typeof CreatePtySchema>): {
       ...env,
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
+      // Disable zsh's PROMPT_EOL_MARK (the % shown when output doesn't end with newline)
+      PROMPT_EOL_MARK: '',
     },
   })
 
