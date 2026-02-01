@@ -81,9 +81,10 @@ export default defineConfig({
 
   // Start desktop dev server before running tests
   // Uses different ports (1421/3848) than dev server (1420/3847)
+  // Uses tauri.test.conf.json which has devUrl set to port 1421
   // NOTE: There is no "skip webserver" mode - tests MUST use isolated database
   webServer: {
-    command: 'pnpm --filter desktop tauri dev',
+    command: 'pnpm --filter desktop tauri dev --config src-tauri/tauri.test.conf.json',
     url: `http://localhost:${TEST_VITE_PORT}`,
     reuseExistingServer: false, // Always start fresh for test isolation
     timeout: 120000, // 2 minutes for Tauri to build and start
@@ -96,8 +97,6 @@ export default defineConfig({
       KODA_SOCKET: TEST_SOCKET_PATH,
       KODA_HTTP_PORT: String(TEST_HTTP_RPC_PORT),
       VITE_PORT: String(TEST_VITE_PORT),
-      // Override Tauri's devUrl to match the test port
-      TAURI_DEV_URL: `http://localhost:${TEST_VITE_PORT}`,
       NODE_ENV: 'test',
     },
   },
