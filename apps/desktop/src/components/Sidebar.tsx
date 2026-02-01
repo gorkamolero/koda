@@ -1,8 +1,8 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useAllWorktrees, useRepos, useSidecar } from '@/hooks/useRpc'
+import { useAllWorktrees, useRepos, useWorkspaces, useSidecar } from '@/hooks/useRpc'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
-import type { Worktree, Repo, WorktreeStatus } from '@/lib/rpc'
+import type { Worktree, Repo, Workspace, WorktreeStatus } from '@/lib/rpc'
 import { useState, useMemo, useRef } from 'react'
 import {
   Plus,
@@ -23,6 +23,8 @@ import {
   Copy,
   PinOff,
   ArchiveRestore,
+  Users,
+  GitBranch,
 } from 'lucide-react'
 import { KodaSpinner } from '@/components/KodaSpinner'
 
@@ -253,6 +255,64 @@ function RepoActionsDropdown({
 }
 
 // ============================================================================
+// Workspace Actions Dropdown (for workspace container)
+// ============================================================================
+
+function WorkspaceActionsDropdown({
+  workspace,
+  onClose,
+}: {
+  workspace: Workspace
+  onClose: () => void
+}): React.ReactElement {
+  return (
+    <DropdownMenu isOpen onClose={onClose}>
+      <MenuItem
+        icon={<Plus className="w-4 h-4" />}
+        onClick={() => {
+          onClose()
+          // TODO: Add repo to workspace
+          console.log('Add repo to workspace:', workspace.id)
+        }}
+      >
+        Add repository
+      </MenuItem>
+      <MenuItem
+        icon={<Users className="w-4 h-4" />}
+        onClick={() => {
+          onClose()
+          // TODO: Share workspace
+          console.log('Share workspace:', workspace.id)
+        }}
+      >
+        Share workspace
+      </MenuItem>
+      <MenuItem
+        icon={<Copy className="w-4 h-4" />}
+        onClick={() => {
+          onClose()
+          void navigator.clipboard.writeText(workspace.name)
+        }}
+      >
+        Copy name
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem
+        icon={<Trash2 className="w-4 h-4" />}
+        onClick={() => {
+          onClose()
+          // TODO: Delete workspace
+          console.log('Delete workspace:', workspace.id)
+        }}
+        destructive
+      >
+        Delete workspace
+      </MenuItem>
+    </DropdownMenu>
+  )
+}
+
+// ============================================================================
 // Workspace Context Menu
 // ============================================================================
 
@@ -464,41 +524,120 @@ function WorkspaceRow({
 }
 
 // ============================================================================
-// Repo Group
+// Repo Section (within a workspace - shows repo with its worktrees)
 // ============================================================================
 
-function RepoGroup({
+function RepoSection({
   repo,
-  workspaces,
+  worktrees,
   activeWorkspaceId,
 }: {
   repo: Repo
-  workspaces: Worktree[]
+  worktrees: Worktree[]
+  activeWorkspaceId?: string
+}): React.ReactElement {
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const repoName = repo.name ?? repo.rootPath.split('/').pop() ?? 'Repository'
+
+  return (
+    <div className="mb-1 group/repo">
+      {/* Repo header */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => { setIsExpanded(!isExpanded) }}
+          className="flex items-center gap-2 flex-1 px-2 py-1 rounded-md hover:bg-surface-hover transition-colors text-left"
+        >
+          <GitBranch className="w-3.5 h-3.5 text-text-dim flex-shrink-0" />
+          <span className="text-text-muted text-xs font-medium truncate flex-1">
+            {repoName}
+          </span>
+          <span className="text-xs text-text-faint">{worktrees.length}</span>
+          <ExpandChevron isExpanded={isExpanded} className="w-3 h-3 text-text-dim" />
+        </button>
+
+        {/* Actions (visible on hover) */}
+        <div className="flex items-center opacity-0 group-hover/repo:opacity-100 transition-opacity relative">
+          <button
+            className="p-0.5 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
+            title="More actions"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowDropdown(!showDropdown)
+            }}
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Dropdown menu */}
+          {showDropdown && (
+            <RepoActionsDropdown repo={repo} onClose={() => { setShowDropdown(false) }} />
+          )}
+        </div>
+      </div>
+
+      {/* Worktrees */}
+      {isExpanded && (
+        <div className="ml-2">
+          {worktrees.map((wt) => (
+            <WorkspaceRow
+              key={wt.id}
+              workspace={wt}
+              isActive={wt.id === activeWorkspaceId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Workspace Group (top-level container)
+// ============================================================================
+
+interface WorkspaceGroupData {
+  workspace: Workspace
+  repoWorktrees: Map<string, { repo: Repo; worktrees: Worktree[] }>
+}
+
+function WorkspaceGroup({
+  data,
+  activeWorkspaceId,
+}: {
+  data: WorkspaceGroupData
   activeWorkspaceId?: string
 }): React.ReactElement {
   const navigate = useNavigate()
   const [isExpanded, setIsExpanded] = useState(true)
   const [showDropdown, setShowDropdown] = useState(false)
-  const repoName = repo.name ?? repo.rootPath.split('/').pop() ?? 'Repository'
-  const initial = (repoName[0] ?? 'R').toUpperCase()
+  const { workspace, repoWorktrees } = data
+  const initial = (workspace.name[0] ?? 'W').toUpperCase()
+  const totalWorktrees = Array.from(repoWorktrees.values()).reduce((sum, { worktrees }) => sum + worktrees.length, 0)
+  const isEmpty = repoWorktrees.size === 0
 
   return (
     <div className="mb-3">
-      {/* Repo header */}
+      {/* Workspace header */}
       <div className="flex items-center gap-1 group">
         <button
           onClick={() => { setIsExpanded(!isExpanded) }}
           className="flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors"
         >
           {/* Avatar */}
-          <div className="w-6 h-6 rounded bg-surface-control flex items-center justify-center text-xs font-semibold text-text-muted">
+          <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-border-subtle flex items-center justify-center text-xs font-semibold text-text-muted">
             {initial}
           </div>
 
           {/* Name */}
           <span className="text-text-primary text-sm font-medium truncate flex-1 text-left">
-            {repoName}
+            {workspace.name}
           </span>
+
+          {/* Count */}
+          {totalWorktrees > 0 && (
+            <span className="text-xs text-text-faint">{totalWorktrees}</span>
+          )}
 
           <ExpandChevron isExpanded={isExpanded} className="w-4 h-4 text-text-dim flex-shrink-0" />
         </button>
@@ -517,11 +656,11 @@ function RepoGroup({
           </button>
           <button
             className="p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
-            title="New workspace"
+            title="Add worktree"
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to home with repo pre-selected for new workspace
-              void navigate({ to: '/', search: { repoId: repo.id } })
+              // Navigate to workspace view to add a worktree
+              void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
             }}
           >
             <Plus className="w-4 h-4" />
@@ -529,22 +668,30 @@ function RepoGroup({
 
           {/* Dropdown menu */}
           {showDropdown && (
-            <RepoActionsDropdown repo={repo} onClose={() => { setShowDropdown(false) }} />
+            <WorkspaceActionsDropdown workspace={workspace} onClose={() => { setShowDropdown(false) }} />
           )}
         </div>
       </div>
 
-      {/* Workspaces */}
+      {/* Content */}
       {isExpanded && (
         <div className="ml-2 mt-1">
-          {workspaces.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-faint italic">No workspaces</div>
+          {isEmpty ? (
+            <Link
+              to="/workspace/$id"
+              params={{ id: workspace.id }}
+              className="flex items-center gap-2 px-3 py-2 text-xs text-text-faint hover:text-text-muted hover:bg-surface-hover rounded-md transition-colors"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
+              <span>Connect a repository...</span>
+            </Link>
           ) : (
-            workspaces.map((ws) => (
-              <WorkspaceRow
-                key={ws.id}
-                workspace={ws}
-                isActive={ws.id === activeWorkspaceId}
+            Array.from(repoWorktrees.values()).map(({ repo, worktrees }) => (
+              <RepoSection
+                key={repo.id}
+                repo={repo}
+                worktrees={worktrees}
+                activeWorkspaceId={activeWorkspaceId}
               />
             ))
           )}
@@ -742,72 +889,119 @@ function ArchivedWorkspacesSection({
 }
 
 // ============================================================================
-// Workspace List (grouped by repo)
+// Workspace List (grouped by workspace, then by repo)
 // ============================================================================
 
 function WorkspaceList(): React.ReactElement {
-  const { data: workspaces, isLoading: loadingWorkspaces } = useAllWorktrees()
+  const { data: worktrees, isLoading: loadingWorktrees } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
+  const { data: workspaces, isLoading: loadingWorkspaces } = useWorkspaces()
   const params = useParams({ strict: false })
   const activeId = (params as { id?: string }).id
 
-  // Separate pinned, active, and archived workspaces
-  const { pinnedWorkspaces, archivedWorkspaces, groupedWorkspaces } = useMemo(() => {
-    if (!workspaces || !repos) {
+  // Build workspace-centric structure:
+  // Map<workspaceId, { workspace, repoWorktrees: Map<repoId, { repo, worktrees[] }> }>
+  const { pinnedWorkspaces, archivedWorkspaces, workspaceGroups } = useMemo(() => {
+    if (!worktrees || !repos || !workspaces) {
       return {
         pinnedWorkspaces: [] as Worktree[],
         archivedWorkspaces: [] as Worktree[],
-        groupedWorkspaces: new Map<string, { repo: Repo; workspaces: Worktree[] }>(),
+        workspaceGroups: [] as WorkspaceGroupData[],
       }
     }
 
     const pinned: Worktree[] = []
     const archived: Worktree[] = []
-    const groups = new Map<string, { repo: Repo; workspaces: Worktree[] }>()
-
-    // Initialize groups for all repos
+    
+    // Create a map of repos by ID for quick lookup
+    const repoMap = new Map<string, Repo>()
     for (const repo of repos) {
-      groups.set(repo.id, { repo, workspaces: [] })
+      repoMap.set(repo.id, repo)
     }
 
-    // Categorize workspaces
+    // Initialize workspace groups
+    const wsGroups = new Map<string, WorkspaceGroupData>()
     for (const ws of workspaces) {
-      if (ws.state === 'archived') {
-        archived.push(ws)
-      } else if (ws.pinnedAt) {
-        pinned.push(ws)
-      } else if (ws.repoId && groups.has(ws.repoId)) {
-        groups.get(ws.repoId)?.workspaces.push(ws)
+      wsGroups.set(ws.id, {
+        workspace: ws,
+        repoWorktrees: new Map(),
+      })
+    }
+
+    // Categorize worktrees into workspaces
+    for (const wt of worktrees) {
+      // Handle pinned/archived first (these float to special sections)
+      if (wt.state === 'archived') {
+        archived.push(wt)
+        continue
+      }
+      if (wt.pinnedAt) {
+        pinned.push(wt)
+        // Also add to workspace group so it appears in both places
+      }
+
+      // Parse workspaceIds to find which workspace(s) this worktree belongs to
+      let wsIds: string[] = []
+      if (wt.workspaceIds) {
+        try {
+          wsIds = JSON.parse(wt.workspaceIds) as string[]
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      // Add worktree to each workspace it belongs to
+      for (const wsId of wsIds) {
+        const group = wsGroups.get(wsId)
+        if (group && wt.repoId) {
+          const repo = repoMap.get(wt.repoId)
+          if (repo) {
+            if (!group.repoWorktrees.has(wt.repoId)) {
+              group.repoWorktrees.set(wt.repoId, { repo, worktrees: [] })
+            }
+            group.repoWorktrees.get(wt.repoId)?.worktrees.push(wt)
+          }
+        }
       }
     }
 
-    // Sort pinned by pinnedAt (most recently pinned first)
+    // Sort pinned by pinnedAt
     pinned.sort((a, b) => {
       const aTime = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0
       const bTime = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0
       return bTime - aTime
     })
 
-    // Sort archived by updatedAt (most recently archived first)
+    // Sort archived by updatedAt
     archived.sort((a, b) => {
       const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
       const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
       return bTime - aTime
     })
 
-    // Sort workspaces within each group by updatedAt (most recent first)
-    for (const group of groups.values()) {
-      group.workspaces.sort((a, b) => {
-        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-        return bTime - aTime
-      })
+    // Sort worktrees within each repo by updatedAt
+    for (const group of wsGroups.values()) {
+      for (const { worktrees: wts } of group.repoWorktrees.values()) {
+        wts.sort((a, b) => {
+          const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+          const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+          return bTime - aTime
+        })
+      }
     }
 
-    return { pinnedWorkspaces: pinned, archivedWorkspaces: archived, groupedWorkspaces: groups }
-  }, [workspaces, repos])
+    // Convert to array and sort workspaces by updatedAt
+    const groupsArray = Array.from(wsGroups.values())
+    groupsArray.sort((a, b) => {
+      const aTime = a.workspace.updatedAt ? new Date(a.workspace.updatedAt).getTime() : 0
+      const bTime = b.workspace.updatedAt ? new Date(b.workspace.updatedAt).getTime() : 0
+      return bTime - aTime
+    })
 
-  if (loadingWorkspaces || loadingRepos) {
+    return { pinnedWorkspaces: pinned, archivedWorkspaces: archived, workspaceGroups: groupsArray }
+  }, [worktrees, repos, workspaces])
+
+  if (loadingWorktrees || loadingRepos || loadingWorkspaces) {
     return (
       <div className="flex items-center justify-center py-8">
         <KodaSpinner style="matrix" />
@@ -815,34 +1009,33 @@ function WorkspaceList(): React.ReactElement {
     )
   }
 
-  const hasNoWorkspaces = groupedWorkspaces.size === 0 && pinnedWorkspaces.length === 0
+  const hasNoWorkspaces = workspaceGroups.length === 0 && pinnedWorkspaces.length === 0
 
   if (hasNoWorkspaces) {
     return (
       <div className="px-4 py-8 text-center">
         <FolderPlus className="w-10 h-10 text-text-dim mx-auto mb-3" />
-        <p className="text-text-muted text-sm mb-1">No repositories yet</p>
-        <p className="text-text-faint text-xs">Add a repository to get started</p>
+        <p className="text-text-muted text-sm mb-1">No workspaces yet</p>
+        <p className="text-text-faint text-xs">Create a workspace to get started</p>
       </div>
     )
   }
 
   return (
     <div className="px-2">
-      {/* Pinned workspaces at top */}
+      {/* Pinned worktrees at top */}
       <PinnedWorkspacesSection workspaces={pinnedWorkspaces} activeWorkspaceId={activeId} />
 
-      {/* Regular workspaces grouped by repo */}
-      {Array.from(groupedWorkspaces.values()).map(({ repo, workspaces: repoWorkspaces }) => (
-        <RepoGroup
-          key={repo.id}
-          repo={repo}
-          workspaces={repoWorkspaces}
+      {/* Workspaces (each with repos and worktrees nested) */}
+      {workspaceGroups.map((data) => (
+        <WorkspaceGroup
+          key={data.workspace.id}
+          data={data}
           activeWorkspaceId={activeId}
         />
       ))}
 
-      {/* Archived workspaces at bottom */}
+      {/* Archived worktrees at bottom */}
       <ArchivedWorkspacesSection workspaces={archivedWorkspaces} activeWorkspaceId={activeId} />
     </div>
   )
