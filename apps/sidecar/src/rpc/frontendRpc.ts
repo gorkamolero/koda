@@ -67,7 +67,7 @@ export const GetTerminalOutputResponseSchema = z.object({
 })
 
 export const ExitPlanModeResponseSchema = z.object({
-  success: z.boolean(),
+  approved: z.boolean(),
 })
 
 // ============================================================================
@@ -273,10 +273,10 @@ export class FrontendRpcClient {
   }
 
   /**
-   * Exit plan mode
+   * Exit plan mode - requires frontend approval
    */
-  async exitPlanMode(): Promise<ExitPlanModeResponse> {
-    const result = await this.call(FRONTEND_RPC_METHODS.EXIT_PLAN_MODE)
+  async exitPlanMode(params: { turnId: number }): Promise<ExitPlanModeResponse> {
+    const result = await this.call(FRONTEND_RPC_METHODS.EXIT_PLAN_MODE, params)
     return ExitPlanModeResponseSchema.parse(result)
   }
 }

@@ -54,6 +54,8 @@ import {
   claudeGetSession,
   claudeGetSettings,
   claudeGetMessages,
+  claudeContinue,
+  claudeUpdateSettings,
   ClaudeStartParamsSchema,
   ClaudeResumeParamsSchema,
   ClaudeCancelParamsSchema,
@@ -187,6 +189,8 @@ function registerMethods() {
   router.register('claude.getSession', claudeGetSession, ClaudeGetSessionParamsSchema);
   router.register('claude.getSettings', claudeGetSettings);
   router.register('claude.getMessages', claudeGetMessages, ClaudeGetMessagesParamsSchema);
+  router.register('claude.continue', claudeContinue);
+  router.register('claude.updateSettings', claudeUpdateSettings);
 
   // Kimi agent
   router.register('kimi.session.create', createKimiSession, CreateKimiSessionSchema);
