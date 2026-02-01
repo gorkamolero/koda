@@ -52,7 +52,7 @@ async function clickNewWorkspaceButton(page: import('@playwright/test').Page): P
  */
 test.describe('Workspace CRUD', () => {
   test.describe('Listing Workspaces', () => {
-    test('displays workspaces from database', async ({ page }) => {
+    test('displays workspaces page with header', async ({ page }) => {
       const loaded = await waitForWorkspacesPage(page)
       if (!loaded) {
         test.skip(true, 'Sidecar connection failed')
@@ -96,7 +96,7 @@ test.describe('Workspace CRUD', () => {
   })
 
   test.describe('Create Workspace Flow', () => {
-    test('modal shows repo selection step', async ({ page }) => {
+    test('modal shows "New Workspace" heading with repo selection', async ({ page }) => {
       const loaded = await waitForWorkspacesPage(page)
       if (!loaded) {
         test.skip(true, 'Sidecar connection failed')
@@ -109,13 +109,18 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      // Should show repo selection (h2 element)
-      const modalHeading = getModalHeading(page, 'Select Repository')
+      // Should show "New Workspace" heading
+      const modalHeading = getModalHeading(page, 'New Workspace')
       await expect(modalHeading).toBeVisible({ timeout: 5000 })
+
+      // Should show instruction text
+      await expect(page.getByText('Select a git repository to create a new workspace branch')).toBeVisible()
+
+      // Should have "Add Git Repository" button
       await expect(page.getByText('Add Git Repository')).toBeVisible()
     })
 
-    test('shows existing repos if any', async ({ page }) => {
+    test('shows existing repos when available', async ({ page }) => {
       const loaded = await waitForWorkspacesPage(page)
       if (!loaded) {
         test.skip(true, 'Sidecar connection failed')
@@ -128,11 +133,11 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      // Wait for modal content
-      const modalHeading = getModalHeading(page, 'Select Repository')
+      // Wait for modal
+      const modalHeading = getModalHeading(page, 'New Workspace')
       await expect(modalHeading).toBeVisible({ timeout: 5000 })
 
-      // If repos exist, "Recent Repositories" section will be visible
+      // Check for repo list
       const repoList = page.getByTestId('repo-list')
       const hasRepos = await repoList.isVisible().catch(() => false)
 
@@ -140,7 +145,10 @@ test.describe('Workspace CRUD', () => {
       await expect(page.getByText('Add Git Repository')).toBeVisible()
 
       if (hasRepos) {
-        // Repo list should be present with buttons
+        // Should show "Recent Repositories" label
+        await expect(page.getByText('Recent Repositories')).toBeVisible()
+
+        // Repo list should contain buttons
         const repoButtons = repoList.locator('button')
         expect(await repoButtons.count()).toBeGreaterThan(0)
       }
@@ -159,15 +167,15 @@ test.describe('Workspace CRUD', () => {
         return
       }
 
-      const selectRepoHeading = getModalHeading(page, 'Select Repository')
-      await expect(selectRepoHeading).toBeVisible({ timeout: 5000 })
+      const modalHeading = getModalHeading(page, 'New Workspace')
+      await expect(modalHeading).toBeVisible({ timeout: 5000 })
 
       // Check if there are existing repos to select
       const repoList = page.getByTestId('repo-list')
       const hasRepos = await repoList.isVisible().catch(() => false)
 
       if (hasRepos) {
-        // Click first repo button using testid pattern
+        // Click first repo button
         const repoButtons = repoList.locator('button')
         await repoButtons.first().click()
         await page.waitForTimeout(300)
@@ -176,9 +184,12 @@ test.describe('Workspace CRUD', () => {
         const branchHeading = getModalHeading(page, 'Create Branch')
         await expect(branchHeading).toBeVisible({ timeout: 5000 })
 
-        // Check for branch name input
+        // Check for branch name input with placeholder
         const branchInput = page.locator('input[placeholder*="feature"]')
         await expect(branchInput).toBeVisible()
+
+        // Should show info about git worktree
+        await expect(page.getByText('A git worktree will be created')).toBeVisible()
       } else {
         test.skip(true, 'No repos available to select')
       }
@@ -213,12 +224,88 @@ test.describe('Workspace CRUD', () => {
         await page.getByTestId('modal-back-button').click()
         await page.waitForTimeout(300)
 
-        // Should be back at repo selection
-        const selectRepoHeading = getModalHeading(page, 'Select Repository')
-        await expect(selectRepoHeading).toBeVisible({ timeout: 5000 })
+        // Should be back at "New Workspace" step
+        const newWorkspaceHeading = getModalHeading(page, 'New Workspace')
+        await expect(newWorkspaceHeading).toBeVisible({ timeout: 5000 })
       } else {
         test.skip(true, 'No repos available')
       }
+    })
+
+    test('cancel button closes modal', async ({ page }) => {
+      const loaded = await waitForWorkspacesPage(page)
+      if (!loaded) {
+        test.skip(true, 'Sidecar connection failed')
+        return
+      }
+
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
+        test.skip(true, 'New Workspace button not visible')
+        return
+      }
+
+      const modalHeading = getModalHeading(page, 'New Workspace')
+      await expect(modalHeading).toBeVisible({ timeout: 5000 })
+
+      // Click cancel
+      await page.getByRole('button', { name: 'Cancel' }).click()
+      await page.waitForTimeout(300)
+
+      // Modal should be closed
+      await expect(modalHeading).not.toBeVisible()
+    })
+  })
+
+  test.describe('Create Workspace E2E', () => {
+    test('creating workspace navigates to it and shows in list', async ({ page }) => {
+      const loaded = await waitForWorkspacesPage(page)
+      if (!loaded) {
+        test.skip(true, 'Sidecar connection failed')
+        return
+      }
+
+      const clicked = await clickNewWorkspaceButton(page)
+      if (!clicked) {
+        test.skip(true, 'New Workspace button not visible')
+        return
+      }
+
+      // Check for repos
+      const repoList = page.getByTestId('repo-list')
+      const hasRepos = await repoList.isVisible().catch(() => false)
+
+      if (!hasRepos) {
+        test.skip(true, 'No repos available - cannot test full create flow')
+        return
+      }
+
+      // Select first repo
+      const repoButtons = repoList.locator('button')
+      await repoButtons.first().click()
+      await page.waitForTimeout(300)
+
+      // Enter unique branch name
+      const branchName = `e2e-test-${Date.now()}`
+      const branchInput = page.locator('input[placeholder*="feature"]')
+      await expect(branchInput).toBeVisible({ timeout: 5000 })
+      await branchInput.fill(branchName)
+
+      // Click create
+      await page.getByRole('button', { name: 'Create Workspace' }).click()
+
+      // Wait for navigation to workspace view
+      await expect(page).toHaveURL(/\/workspace\//, { timeout: 15000 })
+
+      // Should show workspace view with chat
+      await expect(page.getByTestId('agent-chat-container')).toBeVisible({ timeout: 10000 })
+
+      // Go back to workspace list
+      await page.goto('/')
+      await page.waitForLoadState('networkidle')
+
+      // The new workspace should appear in the list
+      await expect(page.getByText(branchName)).toBeVisible({ timeout: 10000 })
     })
   })
 
@@ -238,13 +325,12 @@ test.describe('Workspace CRUD', () => {
       if (cardCount > 0) {
         await workspaceCards.first().click()
         await expect(page).toHaveURL(/\/workspace\//)
-        await expect(page.getByTestId('topbar-tabs')).toBeVisible()
       } else {
         test.skip(true, 'No workspaces to open')
       }
     })
 
-    test('workspace view shows tabs', async ({ page }) => {
+    test('workspace view shows chat container', async ({ page }) => {
       const loaded = await waitForWorkspacesPage(page)
       if (!loaded) {
         test.skip(true, 'Sidecar connection failed')
@@ -259,12 +345,98 @@ test.describe('Workspace CRUD', () => {
         await workspaceCards.first().click()
         await expect(page).toHaveURL(/\/workspace\//)
 
-        // Should show tab navigation (using testid for stability)
-        await expect(page.getByTestId('tab-chat')).toBeVisible()
-        await expect(page.getByTestId('tab-files')).toBeVisible()
-        await expect(page.getByTestId('tab-diff')).toBeVisible()
+        // Should show agent chat container
+        await expect(page.getByTestId('agent-chat-container')).toBeVisible({ timeout: 10000 })
       } else {
         test.skip(true, 'No workspaces')
+      }
+    })
+  })
+
+  test.describe('Error States', () => {
+    test('invalid workspace ID shows error state with back button', async ({ page }) => {
+      // Navigate directly to a non-existent workspace
+      await page.goto('/workspace/invalid-workspace-id-12345')
+      await page.waitForLoadState('networkidle')
+
+      // Should show error state
+      await expect(page.getByText('Workspace not found')).toBeVisible({ timeout: 10000 })
+
+      // Should have back button
+      const backButton = page.getByRole('button', { name: 'Back to Workspaces' })
+      await expect(backButton).toBeVisible()
+
+      // Clicking back should navigate to home
+      await backButton.click()
+      await expect(page).toHaveURL('/')
+    })
+  })
+
+  test.describe('Sidebar Integration', () => {
+    test('sidebar shows workspaces heading', async ({ page }) => {
+      const loaded = await waitForWorkspacesPage(page)
+      if (!loaded) {
+        test.skip(true, 'Sidecar connection failed')
+        return
+      }
+
+      // Open a workspace to see the sidebar
+      const workspaceCards = page.locator('button').filter({
+        has: page.locator('h3'),
+      })
+
+      if ((await workspaceCards.count()) > 0) {
+        await workspaceCards.first().click()
+        await expect(page).toHaveURL(/\/workspace\//)
+
+        // Sidebar should be visible with "Workspaces" text
+        await expect(page.getByText('Workspaces').first()).toBeVisible({ timeout: 5000 })
+      } else {
+        test.skip(true, 'No workspaces to test sidebar')
+      }
+    })
+
+    test('clicking workspace in sidebar navigates to it', async ({ page }) => {
+      const loaded = await waitForWorkspacesPage(page)
+      if (!loaded) {
+        test.skip(true, 'Sidecar connection failed')
+        return
+      }
+
+      // Open a workspace first
+      const workspaceCards = page.locator('button').filter({
+        has: page.locator('h3'),
+      })
+
+      const cardCount = await workspaceCards.count()
+      if (cardCount < 2) {
+        test.skip(true, 'Need at least 2 workspaces to test sidebar navigation')
+        return
+      }
+
+      // Open first workspace
+      await workspaceCards.first().click()
+      await expect(page).toHaveURL(/\/workspace\//)
+      const firstUrl = page.url()
+
+      // Wait for sidebar to load
+      await page.waitForTimeout(500)
+
+      // Find workspace links in sidebar (they're <a> tags with href containing /workspace/)
+      const sidebarLinks = page.locator('a[href*="/workspace/"]')
+      const linkCount = await sidebarLinks.count()
+
+      if (linkCount > 1) {
+        // Click a different workspace in sidebar
+        const secondLink = sidebarLinks.nth(1)
+        await secondLink.click()
+
+        // URL should change
+        await page.waitForTimeout(500)
+        expect(page.url()).not.toBe(firstUrl)
+        await expect(page).toHaveURL(/\/workspace\//)
+      } else {
+        test.skip(true, 'Not enough workspaces in sidebar')
       }
     })
   })
