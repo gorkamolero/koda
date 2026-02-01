@@ -6,22 +6,15 @@ import {
   isStreamingAtom,
   addMessageAtom,
   selectedModelAtom,
-  estimateTokenCount,
   clearMessagesAtom,
   type MessageMention,
 } from '@/store/chat'
 import { thinkingEnabledDefaultAtom, planModeEnabledAtom } from '@/store/settings'
-import { Send, Loader2, ImagePlus, X, Brain, Map } from 'lucide-react'
+import { ArrowUp, Loader2, Plus, Brain, Map } from 'lucide-react'
 import { CommandPopover } from './CommandPopover'
 import { MentionPopover, type FileSuggestion } from './MentionPopover'
 import { filterCommands, type SlashCommand } from '@/lib/slashCommands'
 import { detectMentionContext, completeMention, parseMentions } from '@/hooks/useMentionParser'
-
-interface AttachedImage {
-  id: string
-  file: File
-  preview: string
-}
 
 interface InputAreaProps {
   onSendMessage?: (message: string, images?: File[]) => void
@@ -29,9 +22,12 @@ interface InputAreaProps {
 }
 
 /**
- * Chat input area (Composer) with textarea, send button, image attachment, and slash commands
+ * Conductor-style chat input:
+ * - Rounded box with textarea
+ * - Bottom-left: Model selector, Thinking toggle, Plan toggle
+ * - Bottom-right: Add button, Send button
  */
-export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
+export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React.ReactElement {
   const [inputValue, setInputValue] = useAtom(inputValueAtom)
   const isStreaming = useAtomValue(isStreamingAtom)
   const addMessage = useSetAtom(addMessageAtom)
@@ -41,10 +37,6 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
   const [planModeEnabled, setPlanModeEnabled] = useAtom(planModeEnabledAtom)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Image attachments state
-  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
-  const [isDragOver, setIsDragOver] = useState(false)
 
   // Slash command state
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0)
@@ -64,11 +56,9 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
     return detectMentionContext(inputValue, cursorPosition)
   }, [inputValue, cursorPosition, showCommandPopover])
 
-  // Mock file suggestions - in real app this would query the file system
+  // Mock file suggestions
   const mentionSuggestions = useMemo((): FileSuggestion[] => {
     if (!mentionContext.isActive) return []
-
-    // This would be replaced with actual file system query
     const mockFiles: FileSuggestion[] = [
       { path: 'src/components/App.tsx', name: 'App.tsx', isDirectory: false, extension: 'tsx' },
       { path: 'src/components/AgentChat/InputArea.tsx', name: 'InputArea.tsx', isDirectory: false, extension: 'tsx' },
@@ -78,7 +68,6 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
       { path: 'package.json', name: 'package.json', isDirectory: false, extension: 'json' },
       { path: 'README.md', name: 'README.md', isDirectory: false, extension: 'md' },
     ]
-
     const query = mentionContext.query.toLowerCase()
     return mockFiles.filter(f =>
       f.path.toLowerCase().includes(query) ||
@@ -86,9 +75,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
     ).slice(0, 8)
   }, [mentionContext])
 
-  // Reset selection when commands change
   const handleCommandSelect = useCallback((command: SlashCommand) => {
-    // Execute the command
     switch (command.trigger) {
       case '/clear':
         clearMessages()
@@ -103,7 +90,6 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
         setInputValue('')
         break
       case '/help':
-        // Show help in chat
         addMessage({
           role: 'system',
           content: 'Available commands: /search, /context, /clear, /model, /diff, /terminal, /help',
@@ -112,7 +98,6 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
         setInputValue('')
         break
       default:
-        // For commands with args, insert the trigger and a space
         if (command.hasArgs) {
           setInputValue(`${command.trigger} `)
         } else {
@@ -123,21 +108,16 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
     textareaRef.current?.focus()
   }, [clearMessages, addMessage, setInputValue, onSwitchTab])
 
-  // Handle @mention selection
   const handleMentionSelect = useCallback((suggestion: FileSuggestion) => {
     if (!mentionContext.isActive) return
-
     const { text, newCursorPosition } = completeMention(
       inputValue,
       mentionContext.startIndex,
       cursorPosition,
       suggestion.path
     )
-
     setInputValue(text)
     setMentionSelectedIndex(0)
-
-    // Update cursor position after React re-render
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         textareaRef.current.selectionStart = newCursorPosition
@@ -149,41 +129,27 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
 
   const handleSend = useCallback(() => {
     const trimmedValue = inputValue.trim()
-    if ((!trimmedValue && attachedImages.length === 0) || isStreaming) return
+    if (!trimmedValue || isStreaming) return
 
-    // Parse mentions from the message
     const parsedMentions = parseMentions(trimmedValue)
     const mentions: MessageMention[] = parsedMentions.map(m => ({
       path: m.path,
       displayName: m.displayName,
     }))
 
-    // Add user message with mentions
     addMessage({
       role: 'user',
-      content: trimmedValue || '(Image attached)',
+      content: trimmedValue,
       status: 'complete',
       mentions: mentions.length > 0 ? mentions : undefined,
     })
 
-    // Get image files before clearing
-    const imageFiles = attachedImages.map(img => img.file)
-
-    // Clear input
     setInputValue('')
-    
-    // Clean up image previews
-    attachedImages.forEach(img => { URL.revokeObjectURL(img.preview) })
-    setAttachedImages([])
-
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
-
-    // Notify parent with images
-    onSendMessage?.(trimmedValue, imageFiles.length > 0 ? imageFiles : undefined)
-  }, [inputValue, isStreaming, addMessage, setInputValue, onSendMessage, attachedImages])
+    onSendMessage?.(trimmedValue)
+  }, [inputValue, isStreaming, addMessage, setInputValue, onSendMessage])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -202,9 +168,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
         if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey)) {
           event.preventDefault()
           const selected = filteredCommands[commandSelectedIndex]
-          if (selected) {
-            handleCommandSelect(selected)
-          }
+          if (selected) handleCommandSelect(selected)
           return
         }
         if (event.key === 'Escape') {
@@ -229,31 +193,27 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
         if (event.key === 'Tab') {
           event.preventDefault()
           const selected = mentionSuggestions[mentionSelectedIndex]
-          if (selected) {
-            handleMentionSelect(selected)
-          }
+          if (selected) handleMentionSelect(selected)
           return
         }
         if (event.key === 'Escape') {
-          // Just close the popover by moving cursor
           setCursorPosition(0)
           setMentionSelectedIndex(0)
           return
         }
       }
 
-      // Cmd+Enter or Ctrl+Enter sends the message
+      // Cmd+Enter or Ctrl+Enter sends
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         event.preventDefault()
         handleSend()
         return
       }
-      // Enter without shift sends the message
+      // Enter without shift sends
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault()
         handleSend()
       }
-      // Shift+Enter adds a new line (default behavior)
     },
     [handleSend, showCommandPopover, filteredCommands, commandSelectedIndex, handleCommandSelect, setInputValue, mentionContext.isActive, mentionSuggestions, mentionSelectedIndex, handleMentionSelect]
   )
@@ -262,11 +222,8 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       const value = event.target.value
       setInputValue(value)
-
-      // Track cursor position for @mentions
       setCursorPosition(event.target.selectionStart)
 
-      // Auto-resize textarea
       const textarea = textareaRef.current
       if (textarea) {
         textarea.style.height = 'auto'
@@ -276,279 +233,182 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps) {
     [setInputValue]
   )
 
-  // Handle image attachment
-  const handleImageAttach = useCallback((files: FileList | File[]) => {
-    const imageFiles = Array.from(files).filter(file => 
-      file.type.startsWith('image/')
-    )
-
-    const newImages: AttachedImage[] = imageFiles.map(file => ({
-      id: `img-${String(Date.now())}-${Math.random().toString(36).slice(2)}`,
-      file,
-      preview: URL.createObjectURL(file),
-    }))
-
-    setAttachedImages(prev => [...prev, ...newImages])
-  }, [])
-
-  // Handle paste event for images
   const handlePaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items
     if (!items) return
-
-    const imageItems = Array.from(items).filter(item => 
-      item.type.startsWith('image/')
-    )
-
+    const imageItems = Array.from(items).filter(item => item.type.startsWith('image/'))
     if (imageItems.length > 0) {
       event.preventDefault()
-      const files = imageItems
-        .map(item => item.getAsFile())
-        .filter((file): file is File => file !== null)
-      handleImageAttach(files)
+      // TODO: Handle image paste
     }
-  }, [handleImageAttach])
+  }, [])
 
-  // Handle drag over
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    setIsDragOver(true)
   }, [])
 
-  // Handle drag leave
-  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setIsDragOver(false)
-  }, [])
-
-  // Handle drop
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    setIsDragOver(false)
-
-    const files = event.dataTransfer?.files
-    if (files) {
-      handleImageAttach(files)
-    }
-  }, [handleImageAttach])
-
-  // Remove attached image
-  const removeImage = useCallback((id: string) => {
-    setAttachedImages(prev => {
-      const image = prev.find(img => img.id === id)
-      if (image) {
-        URL.revokeObjectURL(image.preview)
-      }
-      return prev.filter(img => img.id !== id)
-    })
+    // TODO: Handle file drop
   }, [])
 
-  const inputTokenCount = estimateTokenCount(inputValue)
+  // Model display name
+  const modelDisplayName = selectedModel.includes('opus') ? 'Opus 4.5' :
+    selectedModel.includes('sonnet') ? 'Sonnet 4' :
+    selectedModel.includes('haiku') ? 'Haiku' : 'Claude'
+
+  const canSend = inputValue.trim().length > 0 && !isStreaming
 
   return (
-    <div
-      className={cn(
-        "glass bg-surface-composer border-t border-border-subtle px-4 py-3",
-        isDragOver && "ring-2 ring-border-accent ring-inset"
-      )}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <div className="max-w-4xl mx-auto">
-        {/* Attached images preview */}
-        {attachedImages.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-3">
-            {attachedImages.map((image) => (
-              <div
-                key={image.id}
-                className="relative group"
-              >
-                <img
-                  src={image.preview}
-                  alt="Attached"
-                  className="h-16 w-16 object-cover rounded-lg border border-border-subtle"
-                />
-                <button
-                  onClick={() => { removeImage(image.id) }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 flex items-center justify-center bg-status-error text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
+    <div className="px-4 py-3">
+      <div
+        className={cn(
+          "relative px-4 py-3 min-h-36 rounded-lg border border-border",
+          "bg-background/50 shadow-sm",
+          "focus-within:ring-1 focus-within:ring-ring/20"
         )}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Slash command popover */}
+        <CommandPopover
+          isOpen={showCommandPopover}
+          commands={filteredCommands}
+          selectedIndex={commandSelectedIndex}
+          onSelect={handleCommandSelect}
+          onClose={() => {
+            setInputValue('')
+            setCommandSelectedIndex(0)
+          }}
+        />
 
-        {/* Meta bar */}
-        <div className="flex items-center gap-3 mb-2 text-xs">
-          <span className="text-text-faint">
-            Model: <span className="text-text-muted">{selectedModel}</span>
-          </span>
+        {/* @mention popover */}
+        <MentionPopover
+          isOpen={mentionContext.isActive}
+          suggestions={mentionSuggestions}
+          selectedIndex={mentionSelectedIndex}
+          query={mentionContext.query}
+          onSelect={handleMentionSelect}
+          onClose={() => {
+            setCursorPosition(0)
+            setMentionSelectedIndex(0)
+          }}
+        />
 
-          <span className="text-text-dim">•</span>
+        {/* Textarea - takes up most of the space, with bottom padding for controls */}
+        <div className="min-h-[80px] max-h-[200px] overflow-y-auto mb-10">
+          <textarea
+            ref={textareaRef}
+            data-testid="chat-input"
+            value={inputValue}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onSelect={(e) => { setCursorPosition(e.currentTarget.selectionStart) }}
+            placeholder="Ask to make changes, @mention files, run /commands"
+            disabled={isStreaming}
+            spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            className={cn(
+              "w-full min-h-[80px] resize-none bg-transparent",
+              "text-sm text-foreground placeholder:text-muted-foreground",
+              "focus:outline-none",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
+          />
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+        />
+
+        {/* Bottom left controls: Model, Thinking, Plan */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-1">
+          {/* Model selector */}
+          <button
+            type="button"
+            className="h-7 flex items-center gap-1.5 px-2.5 text-xs font-medium rounded-md hover:bg-accent text-foreground/90 transition-colors"
+          >
+            {/* Claude icon */}
+            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" className="size-3" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+              <path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"></path>
+            </svg>
+            <span>{modelDisplayName}</span>
+          </button>
 
           {/* Thinking toggle */}
           <button
+            type="button"
             onClick={() => { setThinkingEnabled(!thinkingEnabled) }}
             className={cn(
-              "flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors",
+              "h-6 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-all duration-200",
               thinkingEnabled
-                ? "bg-status-success/20 text-status-success"
-                : "text-text-faint hover:text-text-muted"
+                ? "bg-sky-500/90 hover:bg-sky-500/80 text-white"
+                : "hover:bg-accent text-muted-foreground hover:text-foreground"
             )}
             title={thinkingEnabled ? "Thinking enabled" : "Thinking disabled"}
           >
-            <Brain className="w-3 h-3" />
+            <Brain className="size-4" />
             <span>Thinking</span>
           </button>
 
-          <span className="text-text-dim">•</span>
-
           {/* Plan mode toggle */}
           <button
+            type="button"
             onClick={() => { setPlanModeEnabled(!planModeEnabled) }}
             className={cn(
-              "flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors",
+              "h-6 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-all duration-200",
               planModeEnabled
-                ? "bg-text-accent/20 text-text-accent"
-                : "text-text-faint hover:text-text-muted"
+                ? "bg-amber-500/90 hover:bg-amber-500/80 text-white"
+                : "hover:bg-accent text-muted-foreground hover:text-foreground"
             )}
-            title={planModeEnabled ? "Plan mode enabled - agent will create a plan before executing" : "Plan mode disabled"}
+            title={planModeEnabled ? "Plan mode enabled" : "Plan mode disabled"}
           >
-            <Map className="w-3 h-3" />
-            <span>Plan</span>
+            <Map className="size-4" />
           </button>
-
-          {isStreaming && (
-            <>
-              <span className="text-text-dim">•</span>
-              <span className="text-text-accent animate-pulse flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Generating...
-              </span>
-            </>
-          )}
         </div>
 
-        {/* Input row */}
-        <div className="flex items-end gap-3">
-          {/* Image attachment button */}
+        {/* Bottom right controls: Add, Send */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-2">
+          {/* Add/attach button */}
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming}
-            className="h-12 w-12 flex items-center justify-center rounded-xl bg-surface-control border border-border-subtle text-text-muted hover:text-text-primary hover:border-border-strong transition-colors disabled:opacity-50"
-            title="Attach image (or paste/drop)"
+            className="h-7 px-2.5 flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title="Attach files"
           >
-            <ImagePlus className="w-5 h-5" />
+            <Plus className="size-4" />
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => { if (e.target.files) handleImageAttach(e.target.files) }}
-          />
-
-          {/* Textarea with command popover */}
-          <div className="flex-1 relative">
-            {/* Slash command popover */}
-            <CommandPopover
-              isOpen={showCommandPopover}
-              commands={filteredCommands}
-              selectedIndex={commandSelectedIndex}
-              onSelect={handleCommandSelect}
-              onClose={() => {
-                setInputValue('')
-                setCommandSelectedIndex(0)
-              }}
-            />
-
-            {/* @mention popover */}
-            <MentionPopover
-              isOpen={mentionContext.isActive}
-              suggestions={mentionSuggestions}
-              selectedIndex={mentionSelectedIndex}
-              query={mentionContext.query}
-              onSelect={handleMentionSelect}
-              onClose={() => {
-                setCursorPosition(0)
-                setMentionSelectedIndex(0)
-              }}
-            />
-
-            <textarea
-              ref={textareaRef}
-              data-testid="chat-input"
-              value={inputValue}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onSelect={(e) => { setCursorPosition(e.currentTarget.selectionStart) }}
-              placeholder={isDragOver ? "Drop images here..." : "Message... (@ for files, / for commands)"}
-              disabled={isStreaming}
-              rows={1}
-              className={cn(
-                'w-full resize-none rounded-xl',
-                'bg-surface-control border border-border-subtle',
-                'px-4 py-3 text-sm text-text-primary',
-                'placeholder:text-text-dim',
-                'focus:outline-none focus:border-border-accent focus:ring-1 focus:ring-border-accent-soft',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'transition-colors'
-              )}
-              style={{ minHeight: '48px', maxHeight: '200px' }}
-            />
-
-            {/* Token count indicator */}
-            {inputValue.length > 0 && (
-              <div className="absolute bottom-3 right-3 text-xs text-text-dim">
-                ~{inputTokenCount} tokens
-              </div>
-            )}
-          </div>
 
           {/* Send button */}
           <button
             data-testid="send-button"
+            type="button"
             onClick={handleSend}
-            disabled={(!inputValue.trim() && attachedImages.length === 0) || isStreaming}
+            disabled={!canSend}
             className={cn(
-              'btn-primary h-12 px-5',
-              'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none'
+              "h-6 w-6 flex items-center justify-center rounded-sm transition-colors",
+              canSend
+                ? "bg-foreground/80 hover:bg-foreground text-background"
+                : "bg-foreground/30 text-background cursor-not-allowed"
             )}
-            title={`Send message using ${selectedModel}`}
+            title="Send message"
           >
             {isStreaming ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Send className="w-5 h-5" />
+              <ArrowUp className="size-4" strokeWidth={1.5} />
             )}
           </button>
-        </div>
-
-        {/* Hint text */}
-        <div className="mt-2 text-xs text-text-dim flex items-center justify-between">
-          <span className="flex items-center gap-1">
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
-              Enter
-            </kbd>
-            <span className="text-text-faint">or</span>
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
-              ⌘↵
-            </kbd>
-            <span className="text-text-faint">to send</span>
-          </span>
-          <span className="text-text-faint">
-            <kbd className="px-1.5 py-0.5 rounded bg-surface-control text-text-faint font-mono text-[10px]">
-              ⇧↵
-            </kbd>
-            <span className="ml-1">for new line</span>
-          </span>
         </div>
       </div>
     </div>

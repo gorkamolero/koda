@@ -6,13 +6,11 @@ import type {
   ToolUseContentBlock,
   ToolResultContentBlock,
 } from '@/store/chat'
-import { Bot, Terminal } from 'lucide-react'
-import { MessageActionBar } from './MessageActionBar'
 import { ToolCallSummary } from './ToolCallSummary'
 import { WorkingIndicator } from './WorkingIndicator'
 
 // AI Elements imports
-import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import { MessageResponse } from '@/components/ai-elements/message'
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import { CodeBlock } from '@/components/ai-elements/code-block'
@@ -25,6 +23,7 @@ import { Shimmer } from '@/components/ai-elements/shimmer'
 
 interface MessageItemProps {
   message: ChatMessage
+  turnIndex: number
   onAnswerQuestion?: (toolUseId: string, answers: (string | string[])[]) => void
 }
 
@@ -40,7 +39,7 @@ function mapStatusToToolState(status?: string, hasResult?: boolean): AIElementsT
 }
 
 // ============================================================================
-// Tool Block Renderer (using AI Elements)
+// Tool Block Renderer
 // ============================================================================
 
 function renderToolBlock(
@@ -49,8 +48,6 @@ function renderToolBlock(
 ): React.ReactNode {
   const toolState = mapStatusToToolState(block.status, !!result)
   const toolName = block.name
-
-  // For code-related tools, show syntax-highlighted output
   const isCodeOutput = ['Read', 'Grep', 'Glob'].includes(toolName) && result?.output
 
   return (
@@ -84,7 +81,6 @@ function renderToolBlock(
   )
 }
 
-// Safely convert unknown input value to string
 function safeStr(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback
   if (typeof value === 'string') return value
@@ -92,7 +88,6 @@ function safeStr(value: unknown, fallback = ''): string {
   return fallback
 }
 
-// Helper to generate a friendly title for the tool
 function getToolTitle(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
     case 'Bash':
@@ -121,7 +116,6 @@ function getFileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-// Returns a language string for Shiki - cast to BundledLanguage at call site
 function getLanguageFromTool(toolName: string, input: Record<string, unknown>): string {
   if (toolName === 'Grep' || toolName === 'Glob') return 'text'
   const path = safeStr(input.file_path ?? input.path)
@@ -161,7 +155,6 @@ function renderContentBlock(
     }
 
     case 'tool_result':
-      // Rendered with tool_use block
       return null
 
     case 'thinking':
@@ -182,161 +175,110 @@ function renderContentBlock(
 }
 
 // ============================================================================
-// MessageItem Component
+// MessageItem Component - Conductor-style clean layout
 // ============================================================================
 
 export const MessageItem = memo(function MessageItem({
   message,
+  turnIndex,
   onAnswerQuestion: _onAnswerQuestion,
 }: MessageItemProps) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
   const isStreaming = message.status === 'streaming'
   const isError = message.status === 'error'
-
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
 
-  // Use AI Elements Message for structure
+  // System messages - centered, minimal
+  if (isSystem) {
+    return (
+      <div
+        data-testid={`message-${message.id}`}
+        data-turn-index={turnIndex}
+        className="pb-3 max-w-6xl mx-auto scroll-mt-24"
+      >
+        <div className="flex justify-center px-7 py-2">
+          <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+            {message.content}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // User messages - right-aligned with highlight background
+  if (isUser) {
+    return (
+      <div
+        data-testid={`message-${message.id}`}
+        data-turn-index={turnIndex}
+        className="pb-3 max-w-6xl mx-auto scroll-mt-24"
+      >
+        <div className="flex flex-col gap-1 w-full px-7 py-2">
+          <div className="flex justify-end">
+            <div className="relative min-w-0 max-w-full">
+              <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-accent/50 text-foreground">
+                <MessageResponse>{message.content}</MessageResponse>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Assistant messages - left-aligned, no avatar, clean
   return (
     <div
       data-testid={`message-${message.id}`}
-      data-role={message.role}
-      data-status={message.status}
-      className="px-4 py-4 group relative"
+      data-turn-index={turnIndex}
+      className="pb-3 max-w-6xl mx-auto scroll-mt-24"
     >
-      {/* Action bar - shows on hover for non-system messages */}
-      {!isSystem && !isStreaming && (
-        <MessageActionBar
-          message={message}
-          className="absolute right-4 top-4 z-10"
-        />
-      )}
+      <div className="flex flex-col gap-1 w-full px-7 py-2">
+        {/* Tool call summary if present */}
+        {hasContentBlocks && message.contentBlocks && (
+          <ToolCallSummary
+            contentBlocks={message.contentBlocks}
+            className="mb-2"
+          />
+        )}
 
-      <Message from={isUser ? 'user' : isSystem ? 'system' : 'assistant'}>
-        {/* Avatar for assistant */}
-        {!isUser && !isSystem && (
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-card-strong flex items-center justify-center">
-              <Bot className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div className="flex-1 min-w-0">
-              {/* Header */}
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-sm font-medium">Agent</span>
-                {message.model && (
-                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                    {message.model}
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {formatTimestamp(message.timestamp)}
-                </span>
-              </div>
-
-              {/* Tool call summary (collapsible) */}
-              {hasContentBlocks && message.contentBlocks && (
-                <ToolCallSummary
-                  contentBlocks={message.contentBlocks}
-                  className="mb-3"
-                />
-              )}
-
-              {/* Content */}
-              <MessageContent className={cn(isError && 'border-l-2 border-destructive pl-3')}>
-                {hasContentBlocks && message.contentBlocks ? (
-                  <div className="space-y-3">
-                    {message.contentBlocks.map((block, idx) => (
-                      <div key={`${block.type}-${String(idx)}`}>
-                        {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    {isStreaming ? (
-                      <Shimmer duration={1.5}>{message.content || 'Thinking...'}</Shimmer>
-                    ) : (
-                      <MessageResponse>{message.content}</MessageResponse>
-                    )}
-                  </>
-                )}
-
-                {/* Error indicator */}
-                {isError && !hasContentBlocks && (
-                  <div className="mt-2 text-xs text-destructive flex items-center gap-1.5">
-                    Failed to generate response
-                  </div>
-                )}
-              </MessageContent>
-
-              {/* Working indicator (during streaming) */}
-              {isStreaming && (
-                <WorkingIndicator
-                  startTime={message.startTime ?? message.timestamp}
-                  className="mt-2"
-                />
-              )}
-
-              {/* Token count and response time (after completion) */}
-              {!isStreaming && (
-                <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-                  {message.tokenCount !== undefined && message.tokenCount > 0 && (
-                    <span>~{message.tokenCount.toLocaleString()} tokens</span>
-                  )}
-                  {message.responseTimeMs !== undefined && message.responseTimeMs > 0 && (
-                    <span className="flex items-center gap-1">
-                      <span className="text-status-success">⏱</span>
-                      {formatResponseTime(message.responseTimeMs)}
-                    </span>
-                  )}
+        {/* Main content */}
+        <div className={cn("min-w-0", isError && "border-l-2 border-destructive pl-3")}>
+          {hasContentBlocks && message.contentBlocks ? (
+            <div className="space-y-3">
+              {message.contentBlocks.map((block, idx) => (
+                <div key={`${block.type}-${String(idx)}`}>
+                  {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
                 </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              {isStreaming ? (
+                <Shimmer duration={1.5}>{message.content || 'Thinking...'}</Shimmer>
+              ) : (
+                <MessageResponse>{message.content}</MessageResponse>
               )}
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* User message */}
-        {isUser && (
-          <MessageContent>
-            <MessageResponse>{message.content}</MessageResponse>
-            <div className="mt-1 text-xs text-muted-foreground/70 text-right">
-              {formatTimestamp(message.timestamp)}
+          {/* Error indicator */}
+          {isError && !hasContentBlocks && (
+            <div className="mt-2 text-xs text-destructive">
+              Failed to generate response
             </div>
-          </MessageContent>
-        )}
+          )}
+        </div>
 
-        {/* System message */}
-        {isSystem && (
-          <div className="flex items-center justify-center">
-            <MessageContent className="bg-muted px-4 py-2 rounded-lg text-center">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  System
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">{message.content}</p>
-            </MessageContent>
-          </div>
+        {/* Working indicator during streaming */}
+        {isStreaming && (
+          <WorkingIndicator
+            startTime={message.startTime ?? message.timestamp}
+            className="mt-2"
+          />
         )}
-      </Message>
+      </div>
     </div>
   )
 })
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatResponseTime(ms: number): string {
-  if (ms < 1000) return `${String(ms)}ms`
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
-  const minutes = Math.floor(ms / 60000)
-  const seconds = Math.round((ms % 60000) / 1000)
-  return `${String(minutes)}m ${String(seconds)}s`
-}
