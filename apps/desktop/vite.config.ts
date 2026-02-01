@@ -6,6 +6,9 @@ import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Port can be overridden via VITE_PORT env var (used by E2E tests)
+const port = parseInt(process.env.VITE_PORT || '1420', 10)
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), TanStackRouterVite()],
@@ -16,7 +19,7 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
-    port: 1420,
+    port,
     strictPort: true,
   },
   envPrefix: ['VITE_', 'TAURI_'],
