@@ -427,6 +427,32 @@ export function useCheckpoints(worktreeId: string) {
 }
 
 // ============================================================================
+// Diff Stats Hook
+// ============================================================================
+
+interface DiffStats {
+  filesChanged: number
+  insertions: number
+  deletions: number
+}
+
+/**
+ * Get diff stats for a workspace (changed files count, etc.)
+ * TODO: Implement actual RPC call when diff stats endpoint is ready
+ */
+export function useWorkspaceDiffStats(workspaceId: string) {
+  return useQuery({
+    queryKey: ['workspace-diff-stats', workspaceId],
+    queryFn: async (): Promise<DiffStats> => {
+      // Placeholder until we have a proper diff stats endpoint
+      return { filesChanged: 0, insertions: 0, deletions: 0 }
+    },
+    enabled: !!workspaceId,
+    retry: false,
+  })
+}
+
+// ============================================================================
 // Session Hooks
 // ============================================================================
 

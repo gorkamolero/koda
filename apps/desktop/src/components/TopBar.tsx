@@ -1,131 +1,88 @@
-import { useState, useCallback } from 'react'
-import {
-  ChevronDown,
-  GitBranch,
-  ExternalLink,
-  MessageSquare,
-  Terminal,
-  FileText,
-  CheckCircle2,
-  Eye,
-  Share2,
-  Check,
-} from 'lucide-react'
+import { ChevronDown, GitBranch, FolderOpen, MessageSquare, FileText, Plus, ChevronLeft } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import { PresenceAvatars } from '@/components/PresenceAvatars'
 import type { Worktree } from '@/lib/rpc'
+import { invoke } from '@tauri-apps/api/core'
 
-type Tab = 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review'
+type Tab = 'chat' | 'spec' | 'scratchpad'
 
 interface TopBarProps {
   workspace: Worktree | undefined
   activeTab: Tab
   onTabChange: (tab: Tab) => void
+  sessions?: { id: string; name: string }[]
+  activeSessionId?: string
+  onSessionChange?: (sessionId: string) => void
+  onNewSession?: () => void
 }
 
 /**
- * Conductor-style top bar with branch selector, tabs, and actions.
+ * Conductor-style top bar with TWO header rows:
+ *
+ * Row 1 (workspace-header): [Workspace name] [branch] [origin] [Open in Finder]
+ * Row 2 (session-tabs): [Scratchpad] [+ New] [Session tabs...]
  */
-export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps): React.ReactElement {
-  const [copied, setCopied] = useState(false)
-
+export function TopBar({
+  workspace,
+  activeTab,
+  onTabChange,
+  sessions = [],
+  activeSessionId,
+  onSessionChange,
+  onNewSession,
+}: TopBarProps): React.ReactElement {
   const branch = workspace?.branch ?? 'main'
   const workspaceName = workspace?.worktreePath?.split('/').pop() ?? workspace?.branch ?? 'Workspace'
+  const rootPath = workspace?.worktreePath ?? ''
 
-  const handleShare = useCallback(async (): Promise<void> => {
-    if (!workspace?.id) return
-    await navigator.clipboard.writeText(workspace.id)
-    setCopied(true)
-    setTimeout(() => { setCopied(false) }, 2000)
-  }, [workspace?.id])
+  const handleOpenInFinder = (): void => {
+    if (rootPath) {
+      void invoke('plugin:opener|reveal_item_in_dir', { path: rootPath })
+    }
+  }
 
   return (
-    <div className="flex items-center justify-between h-10 px-3 border-b border-border bg-background">
-      {/* Left section: Branch info */}
-      <div className="flex items-center gap-2">
-        {/* Branch selector dropdown */}
-        <button className="flex items-center gap-1.5 px-2 py-1 text-sm font-medium rounded hover:bg-accent transition-colors">
-          <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate max-w-[200px]">{branch}</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
+    <div className="flex flex-col border-b border-border">
+      {/* Row 1: Workspace header with branch info */}
+      <div className="flex items-center justify-between h-9 px-3 bg-background/50">
+        {/* Left: Workspace name and branch */}
+        <div className="flex items-center gap-2">
+          {/* Back to workspaces + Workspace name */}
+          <Link
+            to="/"
+            className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>{workspaceName}</span>
+          </Link>
 
-        {/* Origin indicator */}
-        <span className="text-xs text-muted-foreground">
-          origin/main
-        </span>
+          {/* Branch selector */}
+          <button className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded hover:bg-accent transition-colors">
+            <GitBranch className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground">{branch}</span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          </button>
 
-        {/* Workspace badge */}
-        <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-accent text-accent-foreground">
-          {workspaceName}
-        </span>
+          {/* Origin indicator */}
+          <span className="text-xs text-muted-foreground/60">
+            ← origin/main
+          </span>
+        </div>
 
-        {/* Open dropdown */}
-        <button className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
+        {/* Right: Open in Finder */}
+        <button
+          onClick={handleOpenInFinder}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+          title="Open in Finder"
+        >
+          <FolderOpen className="h-3.5 w-3.5" />
           <span>Open</span>
           <ChevronDown className="h-3 w-3" />
         </button>
       </div>
 
-      {/* Center section: Navigation Tabs */}
-      <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5" data-testid="topbar-tabs">
-        {/* Chat tab with icon */}
-        <TabButton
-          active={activeTab === 'chat'}
-          onClick={() => { onTabChange('chat') }}
-          icon={<MessageSquare className="h-3.5 w-3.5" />}
-          testId="tab-chat"
-        >
-          Chat
-        </TabButton>
-
-        {/* Code tabs */}
-        <TabButton
-          active={activeTab === 'files'}
-          onClick={() => { onTabChange('files') }}
-          testId="tab-files"
-        >
-          All files
-        </TabButton>
-
-        <TabButton
-          active={activeTab === 'diff'}
-          onClick={() => { onTabChange('diff') }}
-          testId="tab-diff"
-        >
-          Changes
-        </TabButton>
-
-        {/* Checks tab */}
-        <TabButton
-          active={activeTab === 'checks'}
-          onClick={() => { onTabChange('checks') }}
-          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-          testId="tab-checks"
-        >
-          Checks
-        </TabButton>
-
-        {/* Review tab */}
-        <TabButton
-          active={activeTab === 'review'}
-          onClick={() => { onTabChange('review') }}
-          icon={<Eye className="h-3.5 w-3.5" />}
-          testId="tab-review"
-        >
-          Review
-        </TabButton>
-
-        {/* Terminal tab with icon */}
-        <TabButton
-          active={activeTab === 'terminal'}
-          onClick={() => { onTabChange('terminal') }}
-          icon={<Terminal className="h-3.5 w-3.5" />}
-          testId="tab-terminal"
-        >
-          Terminal
-        </TabButton>
-
+      {/* Row 2: Session tabs */}
+      <div className="flex items-center gap-1 h-9 px-2 bg-muted/30">
         {/* Scratchpad tab */}
         <TabButton
           active={activeTab === 'scratchpad'}
@@ -135,36 +92,48 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps): Reac
         >
           Scratchpad
         </TabButton>
-      </div>
 
-      {/* Right section: Presence + Actions */}
-      <div className="flex items-center gap-3">
-        {/* Presence avatars (shows other users in workspace) */}
-        <PresenceAvatars maxVisible={4} size="sm" />
+        {/* Separator */}
+        <div className="h-4 w-px bg-border mx-1" />
 
-        {/* Share button - copies workspace ID for collaboration */}
-        <button
-          onClick={() => void handleShare()}
-          title={copied ? 'Copied!' : 'Copy workspace ID to share'}
-          className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-accent transition-colors"
-        >
-          {copied ? (
-            <>
-              <Check className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">Copied</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="h-3 w-3" />
-              <span>Share</span>
-            </>
-          )}
-        </button>
+        {/* New session button */}
+        {onNewSession && (
+          <button
+            onClick={onNewSession}
+            className="flex items-center justify-center size-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="New chat"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
 
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-          <ExternalLink className="h-3 w-3" />
-          Create PR
-        </button>
+        {/* Chat sessions as tabs */}
+        {sessions.length > 0 ? (
+          sessions.map((session) => (
+            <TabButton
+              key={session.id}
+              active={activeSessionId === session.id && activeTab === 'chat'}
+              onClick={() => {
+                onSessionChange?.(session.id)
+                onTabChange('chat')
+              }}
+              icon={<MessageSquare className="h-3.5 w-3.5" />}
+              testId={`tab-session-${session.id}`}
+            >
+              {session.name || 'Chat'}
+            </TabButton>
+          ))
+        ) : (
+          /* Default Chat tab when no sessions */
+          <TabButton
+            active={activeTab === 'chat'}
+            onClick={() => { onTabChange('chat') }}
+            icon={<MessageSquare className="h-3.5 w-3.5" />}
+            testId="tab-chat"
+          >
+            Chat
+          </TabButton>
+        )}
       </div>
     </div>
   )
@@ -173,12 +142,15 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps): Reac
 interface TabButtonProps {
   active: boolean
   onClick: () => void
+  badge?: number
   icon?: React.ReactNode
   children: React.ReactNode
   testId?: string
+  closable?: boolean
+  onClose?: () => void
 }
 
-function TabButton({ active, onClick, icon, children, testId }: TabButtonProps): React.ReactElement {
+function TabButton({ active, onClick, badge, icon, children, testId }: TabButtonProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
@@ -193,6 +165,16 @@ function TabButton({ active, onClick, icon, children, testId }: TabButtonProps):
     >
       {icon}
       {children}
+      {badge !== undefined && (
+        <span className={cn(
+          'px-1.5 py-0.5 text-[10px] font-semibold rounded-full',
+          active
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-muted-foreground'
+        )}>
+          {badge}
+        </span>
+      )}
     </button>
   )
 }

@@ -21,9 +21,7 @@ import {
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
-import { ModelSelector } from './ModelSelector'
 import { PlanModeIndicator } from './PlanModeIndicator'
-import { ContextMeter } from '@/components/ContextMeter'
 import { useNotifications } from '@/hooks/useNotifications'
 
 interface AgentChatProps {
@@ -252,12 +250,6 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
       data-testid="agent-chat-container"
       className="h-full flex flex-col"
     >
-      {/* Header with model selector and context meter */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
-        <ModelSelector />
-        <ContextMeter />
-      </div>
-
       {/* Plan mode indicator */}
       <PlanModeIndicator
         isActive={planMode.isActive}
