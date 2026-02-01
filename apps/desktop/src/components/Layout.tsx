@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { useSetAtom } from 'jotai'
 import { Sidebar } from './Sidebar'
 import { NotificationProvider } from './Toast'
@@ -6,6 +6,7 @@ import { useSidecar } from '@/hooks/useRpc'
 import { useSidebarResize } from '@/hooks/useResizable'
 import { initializeThemeAtom } from '@/store/theme'
 import { cn } from '@/lib/utils'
+import { KodaLoadingScreen } from '@/components/KodaSpinner'
 
 interface LayoutProps {
   children: ReactNode
@@ -85,11 +86,31 @@ function SidebarResizer({
 export function Layout({ children }: LayoutProps) {
   const initializeTheme = useSetAtom(initializeThemeAtom)
   const sidebar = useSidebarResize()
+  const { status } = useSidecar()
+  const [showLoading, setShowLoading] = useState(true)
 
   // Initialize theme on mount
   useEffect(() => {
     initializeTheme()
   }, [initializeTheme])
+
+  // Show loading screen until sidecar connects (with minimum display time)
+  useEffect(() => {
+    if (status?.running) {
+      // Small delay for smooth transition
+      const timer = setTimeout(() => { setShowLoading(false) }, 300)
+      return () => { clearTimeout(timer) }
+    }
+  }, [status?.running])
+
+  // Show KODA loading screen during initial connection
+  if (showLoading && !status?.running) {
+    return (
+      <div className="h-screen w-screen bg-surface-messages flex items-center justify-center">
+        <KodaLoadingScreen message="Initializing" />
+      </div>
+    )
+  }
 
   return (
     <NotificationProvider>

@@ -12,7 +12,6 @@ import {
   MoreHorizontal,
   Check,
   AlertCircle,
-  Loader2,
   HelpCircle,
   Archive,
   FolderPlus,
@@ -25,6 +24,7 @@ import {
   PinOff,
   ArchiveRestore,
 } from 'lucide-react'
+import { KodaSpinner } from '@/components/KodaSpinner'
 
 // ============================================================================
 // Shared Components
@@ -810,7 +810,7 @@ function WorkspaceList(): React.ReactElement {
   if (loadingWorkspaces || loadingRepos) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 text-text-muted animate-spin" />
+        <KodaSpinner style="matrix" />
       </div>
     )
   }

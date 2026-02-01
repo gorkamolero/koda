@@ -17,11 +17,6 @@ interface WorkingIndicatorProps {
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 const SPINNER_INTERVAL = 80 // ms per frame
 
-// Alternative spinners:
-// const SPINNER_FRAMES = ['◐', '◓', '◑', '◒']
-// const SPINNER_FRAMES = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
-// const SPINNER_FRAMES = ['|', '/', '-', '\\']
-
 // ============================================================================
 // WorkingIndicator Component
 // ============================================================================
