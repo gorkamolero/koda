@@ -136,7 +136,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
 
       // Configure markdown settings
       monaco.languages.setLanguageConfiguration('markdown', {
-        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g,
+        wordPattern: /(-?\d*\.\d\w*)|([^`~!@#%^&*()=+[\]{}\\|;:'",.<>/?s-]+)/g,
       })
 
       // Set editor options

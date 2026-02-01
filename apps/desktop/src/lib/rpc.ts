@@ -386,7 +386,7 @@ export interface Session {
 }
 
 export interface ClaudeStartParams {
-  worktreeId: string
+  workspaceId: string
   prompt: string
   options?: {
     model?: string

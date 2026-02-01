@@ -38,10 +38,10 @@ async function httpRpcRequest<T = unknown>(
     }),
   })
 
-  const data = await response.json()
+  const data = await response.json() as { result?: T; error?: { message?: string } }
 
   if (data.error) {
-    throw new Error(data.error.message || 'RPC error')
+    throw new Error(data.error.message ?? 'RPC error')
   }
 
   return data.result as T

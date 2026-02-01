@@ -458,7 +458,7 @@ interface DiffStats {
 export function useWorkspaceDiffStats(workspaceId: string) {
   return useQuery({
     queryKey: ['workspace-diff-stats', workspaceId],
-    queryFn: async (): Promise<DiffStats> => {
+    queryFn: (): DiffStats => {
       // Placeholder until we have a proper diff stats endpoint
       return { filesChanged: 0, insertions: 0, deletions: 0 }
     },

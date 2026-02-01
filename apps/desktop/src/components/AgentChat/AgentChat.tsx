@@ -86,12 +86,16 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
 
         // Handle assistant messages (streaming text content)
         if (event.type === 'assistant') {
-          // Stream-json format: message has 'text' directly, not content array
-          const message = event.message as { type?: string; text?: string } | undefined
-          if (message?.text) {
-            accumulatedTextRef.current += message.text
+          // SDK format: message.content is an array of content blocks
+          const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
+          if (message?.content) {
+            for (const block of message.content) {
+              if (block.type === 'text' && block.text) {
+                accumulatedTextRef.current += block.text
+              }
+            }
 
-            if (currentMessageIdRef.current) {
+            if (currentMessageIdRef.current && accumulatedTextRef.current) {
               updateMessage({
                 id: currentMessageIdRef.current,
                 update: {
@@ -221,7 +225,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
         const result = await rpcRequest<ClaudeStartResult>(
           RPC_METHODS.CLAUDE_START,
           {
-            worktreeId,
+            workspaceId: worktreeId,
             prompt: content,
           } satisfies ClaudeStartParams
         )
