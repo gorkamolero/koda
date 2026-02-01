@@ -9,6 +9,7 @@ import {
   selectedModelAtom,
   generateMessageId,
   planModeAtom,
+  enterPlanModeAtom,
   exitPlanModeAtom,
   AGENT_MODELS,
   type AgentModel,
@@ -32,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ContextStatsPopover } from './ContextStatsPopover'
 
 interface AgentChatProps {
   workspaceId: string
@@ -68,6 +70,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
   const selectedModel = useAtomValue(selectedModelAtom)
   const setSelectedModel = useSetAtom(selectedModelAtom)
   const planMode = useAtomValue(planModeAtom)
+  const enterPlanMode = useSetAtom(enterPlanModeAtom)
   const exitPlanMode = useSetAtom(exitPlanModeAtom)
   const { showToast } = useNotifications()
 
@@ -331,7 +334,12 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
       <div className="px-4 pb-4 pt-2">
         <form
           onSubmit={handleSubmit}
-          className="relative bg-[hsl(var(--composer-background))] rounded-lg border border-border"
+          className={cn(
+            'relative bg-[hsl(var(--composer-background))] rounded-lg border-2 transition-colors',
+            planMode.isActive
+              ? 'border-blue-500/50 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]'
+              : 'border-border'
+          )}
         >
           {/* Textarea */}
           <textarea
@@ -395,14 +403,29 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
                 <span>Thinking</span>
               </button>
 
-              {/* Context/Plan icon */}
+              {/* Plan mode toggle */}
               <button
                 type="button"
-                className="flex items-center justify-center size-7 text-muted-foreground hover:text-foreground rounded transition-colors"
-                title="View context"
+                onClick={() => {
+                  if (planMode.isActive) {
+                    exitPlanMode()
+                  } else {
+                    enterPlanMode({ title: 'Plan Mode', steps: [] })
+                  }
+                }}
+                className={cn(
+                  'flex items-center justify-center size-7 rounded transition-colors',
+                  planMode.isActive
+                    ? 'bg-blue-500/20 text-blue-500'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+                title={planMode.isActive ? 'Exit plan mode' : 'Enter plan mode'}
               >
                 <Map className="h-4 w-4" />
               </button>
+
+              {/* Context stats popover */}
+              <ContextStatsPopover />
             </div>
 
             {/* Right side: Add, Submit */}
