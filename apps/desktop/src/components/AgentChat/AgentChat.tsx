@@ -27,7 +27,7 @@ import { ContextMeter } from '@/components/ContextMeter'
 import { useNotifications } from '@/hooks/useNotifications'
 
 interface AgentChatProps {
-  workspaceId: string
+  worktreeId: string
   sessionId?: string
 }
 
@@ -35,7 +35,7 @@ interface AgentChatProps {
  * Main agent chat component
  * Combines MessageList, InputArea, ModelSelector, and ContextMeter
  */
-export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps) {
+export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps) {
   // TODO: Use sessionId to scope messages to specific session
   void _sessionId
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
@@ -56,7 +56,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
 
   // Set current workspace when component mounts
   useEffect(() => {
-    setCurrentWorkspaceId(workspaceId)
+    setCurrentWorkspaceId(worktreeId)
     return () => {
       setCurrentWorkspaceId(null)
       // Clean up polling on unmount
@@ -64,7 +64,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         clearInterval(pollingRef.current)
       }
     }
-  }, [workspaceId, setCurrentWorkspaceId])
+  }, [worktreeId, setCurrentWorkspaceId])
 
   // Poll for messages from active session
   const pollMessages = useCallback(async () => {
@@ -221,7 +221,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         const result = await rpcRequest<ClaudeStartResult>(
           RPC_METHODS.CLAUDE_START,
           {
-            worktreeId: workspaceId,
+            worktreeId,
             prompt: content,
           } satisfies ClaudeStartParams
         )
@@ -244,7 +244,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         })
       }
     },
-    [selectedModel, workspaceId, setIsStreaming, addMessage, pollMessages]
+    [selectedModel, worktreeId, setIsStreaming, addMessage, pollMessages]
   )
 
   return (
