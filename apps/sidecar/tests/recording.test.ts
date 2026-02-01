@@ -29,7 +29,8 @@ describe('Session Recording', () => {
   let dbPath: string;
   let sqlite: Database.Database;
   let db: ReturnType<typeof drizzle<typeof schema>>;
-  let testWorkspaceId: string;
+  let testRepoId: string;
+  let testWorktreeId: string;
   let testUserId: string;
   let testSessionId: string;
 
@@ -44,16 +45,26 @@ describe('Session Recording', () => {
     sqlite = new Database(dbPath);
     db = drizzle(sqlite, { schema });
 
-    // Set up test user and workspace
+    // Set up test user, repo, and worktree
     testUserId = `user-test-${Date.now()}`;
-    testWorkspaceId = `ws-test-${Date.now()}`;
+    testRepoId = `repo-test-${Date.now()}`;
+    testWorktreeId = `wt-test-${Date.now()}`;
 
     db.insert(schema.users).values({ id: testUserId, name: 'Test User' }).run();
-    db.insert(schema.workspaces)
+    db.insert(schema.repos)
       .values({
-        id: testWorkspaceId,
-        ownerUserId: testUserId,
-        directoryName: 'test-workspace',
+        id: testRepoId,
+        name: 'test-repo',
+        rootPath: '/tmp/test-repo',
+      })
+      .run();
+    db.insert(schema.worktrees)
+      .values({
+        id: testWorktreeId,
+        repoId: testRepoId,
+        branch: 'test-branch',
+        worktreePath: '/tmp/test-repo/.worktrees/test-branch',
+        state: 'active',
       })
       .run();
   });
@@ -78,7 +89,7 @@ describe('Session Recording', () => {
   beforeEach(() => {
     // Create a fresh session for each test
     const session = createSession(db, {
-      workspaceId: testWorkspaceId,
+      worktreeId: testWorktreeId,
       agentType: 'claude',
       model: 'claude-sonnet-4-5',
     });

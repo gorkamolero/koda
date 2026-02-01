@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import { RpcServer } from './server.js';
 import { router } from './rpc/router.js';
 import { HttpRpcServer } from './httpServer.js';
-import { getDbPath } from './db/index.js';
+import { getDbPath, initDbWithMigrations } from './db/index.js';
 import { runMigrations } from './db/migrate.js';
 
 // Import handlers
@@ -223,11 +223,20 @@ function registerMethods() {
 
 /**
  * Initialize database with migrations
+ * For :memory: databases, ensures migrations run on the same connection
  */
 async function initDatabase() {
   const dbPath = getDbPath();
-  runMigrations(dbPath);
-  console.log('Database migrations complete');
+
+  if (dbPath === ':memory:') {
+    // For in-memory databases, init and migrate on same connection
+    initDbWithMigrations(dbPath);
+    console.log('In-memory database initialized with migrations');
+  } else {
+    // For file-based databases, run migrations (uses separate connection)
+    runMigrations(dbPath);
+    console.log('Database migrations complete');
+  }
 }
 
 /**
@@ -249,24 +258,36 @@ async function main() {
     await server.start();
 
     // Start HTTP server for E2E testing and development
-    // In development, always start on default port unless explicitly disabled
-    // In production, only start if KODA_HTTP_PORT is explicitly set
+    // - Skip in test mode (NODE_ENV=test) unless explicitly requested
+    // - In production, only start if KODA_HTTP_PORT is explicitly set
+    // - In development, start on default port with graceful fallback
     let httpServer: HttpRpcServer | null = null;
     const isProduction = process.env.NODE_ENV === 'production';
+    const isTest = process.env.NODE_ENV === 'test';
     const httpPort = process.env.KODA_HTTP_PORT;
     const defaultDevPort = 3847;
 
-    if (httpPort) {
+    if (httpPort && httpPort !== '0') {
       // Explicit port specified - use it
       const port = parseInt(httpPort, 10);
       if (!isNaN(port)) {
         httpServer = new HttpRpcServer(port);
-        await httpServer.start();
+        try {
+          await httpServer.start();
+        } catch (err) {
+          console.warn('Failed to start HTTP server on port', port, '-', err);
+          httpServer = null;
+        }
       }
-    } else if (!isProduction) {
-      // Development mode - start HTTP server on default port
+    } else if (!isProduction && !isTest) {
+      // Development mode - start HTTP server on default port (non-fatal if fails)
       httpServer = new HttpRpcServer(defaultDevPort);
-      await httpServer.start();
+      try {
+        await httpServer.start();
+      } catch (err) {
+        console.warn('Failed to start HTTP server on default port -', err);
+        httpServer = null;
+      }
     }
 
     console.log('Koda sidecar ready');

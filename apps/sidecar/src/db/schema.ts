@@ -401,7 +401,7 @@ export const sessionRecordings = sqliteTable(
     name: text('name'),
     description: text('description'),
     status: text('status').default('recording'), // 'recording', 'completed', 'error'
-    startedAt: timestamp(),
+    startedAt: text('started_at').notNull().default(sql`(datetime('now'))`),
     endedAt: text('ended_at'),
     durationMs: integer('duration_ms'),
     frameCount: integer('frame_count').default(0),

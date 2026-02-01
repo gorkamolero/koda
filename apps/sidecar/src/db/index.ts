@@ -4,18 +4,25 @@ import * as schema from './schema.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { runMigrationsOnConnection } from './migrate.js';
 
 /**
  * Get the database path based on platform
- * If KODA_TEST_DB env var is set, use that path instead (for E2E tests)
+ * Supports environment variable overrides for testing:
+ * - KODA_DB_PATH: Direct database path override (e.g., ':memory:' for tests)
+ * - KODA_TEST_DB: Alias for KODA_DB_PATH (legacy)
  */
 export function getDbPath(): string {
-  // Check for test database override
-  if (process.env.KODA_TEST_DB) {
-    const testDbPath = process.env.KODA_TEST_DB;
-    const testDbDir = path.dirname(testDbPath);
+  // Check for database path override (used by tests)
+  const dbPathOverride = process.env.KODA_DB_PATH || process.env.KODA_TEST_DB;
+  if (dbPathOverride) {
+    // Handle special ':memory:' case
+    if (dbPathOverride === ':memory:') {
+      return ':memory:';
+    }
+    const testDbDir = path.dirname(dbPathOverride);
     fs.mkdirSync(testDbDir, { recursive: true });
-    return testDbPath;
+    return dbPathOverride;
   }
 
   const platform = os.platform();
@@ -48,29 +55,81 @@ export function getDbPath(): string {
 }
 
 /**
- * Initialize database connection
+ * Global database instances
  */
-export function initDb(dbPath?: string) {
+let sqlite: Database.Database | null = null;
+let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+/**
+ * Initialize database connection and run migrations
+ * For :memory: databases, runs migrations on the same connection
+ */
+export function initDbWithMigrations(dbPath?: string) {
   const finalPath = dbPath || getDbPath();
-  const sqlite = new Database(finalPath);
+  sqlite = new Database(finalPath);
 
-  // Enable WAL mode for better concurrency
-  sqlite.pragma('journal_mode = WAL');
+  // Enable WAL mode for better concurrency (not supported for in-memory DBs)
+  if (finalPath !== ':memory:') {
+    sqlite.pragma('journal_mode = WAL');
+  }
 
-  return drizzle(sqlite, { schema });
+  // Run migrations on this connection
+  runMigrationsOnConnection(sqlite);
+
+  db = drizzle(sqlite, { schema });
+  return db;
 }
 
 /**
- * Global database instance
+ * Initialize database connection without migrations
+ * Use this when you want to run migrations separately (for file-based DBs)
  */
-let db: ReturnType<typeof initDb> | null = null;
+export function initDb(dbPath?: string) {
+  const finalPath = dbPath || getDbPath();
+  sqlite = new Database(finalPath);
+
+  // Enable WAL mode for better concurrency (not supported for in-memory DBs)
+  if (finalPath !== ':memory:') {
+    sqlite.pragma('journal_mode = WAL');
+  }
+
+  db = drizzle(sqlite, { schema });
+  return db;
+}
 
 /**
  * Get or create database instance
+ * For :memory: databases, also runs migrations
  */
 export function getDb() {
   if (!db) {
-    db = initDb();
+    const dbPath = getDbPath();
+    if (dbPath === ':memory:') {
+      // For in-memory, init with migrations on same connection
+      db = initDbWithMigrations(dbPath);
+    } else {
+      // For file-based, just init (migrations should have been run separately)
+      db = initDb(dbPath);
+    }
   }
   return db;
+}
+
+/**
+ * Get the underlying SQLite connection
+ * Useful for running migrations on existing connection
+ */
+export function getSqlite(): Database.Database | null {
+  return sqlite;
+}
+
+/**
+ * Reset the global database instance (for testing)
+ */
+export function resetDb() {
+  if (sqlite) {
+    sqlite.close();
+  }
+  sqlite = null;
+  db = null;
 }

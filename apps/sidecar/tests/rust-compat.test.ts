@@ -40,6 +40,7 @@ describe('Rust/Tauri Compatibility', () => {
         ...process.env,
         KODA_SOCKET: socketPath,
         KODA_DB_PATH: ':memory:',
+        NODE_ENV: 'test',
       },
       cwd: path.join(__dirname, '..'),
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -199,9 +200,9 @@ describe('Rust/Tauri Compatibility', () => {
 
   describe('Data Type Serialization', () => {
     it('should serialize workspace response in serde_json compatible format', async () => {
-      // Create a workspace
+      // Create a workspace (now containers with name, not directoryName)
       const createReq =
-        '{"jsonrpc":"2.0","id":400,"method":"workspace.create","params":{"directoryName":"rust-test","workspaceType":"standard"}}';
+        '{"jsonrpc":"2.0","id":400,"method":"workspace.create","params":{"name":"rust-test-workspace"}}';
       const createResp = await sendRawAndReceive(createReq);
 
       expect(createResp.id).toBe(400);
@@ -216,9 +217,9 @@ describe('Rust/Tauri Compatibility', () => {
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
         );
 
-        // Other fields should be plain JSON types
-        expect(typeof workspace.directoryName).toBe('string');
-        expect(workspace.directoryName).toBe('rust-test');
+        // Workspaces now have 'name' instead of 'directoryName'
+        expect(typeof workspace.name).toBe('string');
+        expect(workspace.name).toBe('rust-test-workspace');
       }
     });
 
