@@ -106,6 +106,14 @@ export type ContentBlock =
   | ThinkingContentBlock
 
 /**
+ * A file mention in a message
+ */
+export interface MessageMention {
+  path: string
+  displayName: string
+}
+
+/**
  * A single chat message
  */
 export interface ChatMessage {
@@ -118,6 +126,12 @@ export interface ChatMessage {
   status: MessageStatus
   model?: AgentModel
   tokenCount?: number
+  /** Time in ms from user request to response completion (assistant messages only) */
+  responseTimeMs?: number
+  /** File @mentions in this message */
+  mentions?: MessageMention[]
+  /** Start time for tracking elapsed time during streaming */
+  startTime?: number
 }
 
 /**
@@ -298,6 +312,16 @@ export const addMessageAtom = atom(
 )
 
 /**
+ * Clear all messages action atom
+ */
+export const clearMessagesAtom = atom(
+  null,
+  (_get, set) => {
+    set(messagesAtom, [])
+  }
+)
+
+/**
  * Update message action atom (for streaming updates)
  */
 export const updateMessageAtom = atom(
@@ -398,5 +422,105 @@ export const exitPlanModeAtom = atom(
       steps: [],
       currentStepIndex: 0,
     })
+  }
+)
+
+// ============================================================================
+// Message History & Undo/Split
+// ============================================================================
+
+/**
+ * Message history for undo functionality
+ * Stores snapshots of messages array for reverting
+ */
+export const messageHistoryAtom = atom<ChatMessage[][]>([])
+
+/**
+ * Maximum history entries to keep
+ */
+const MAX_HISTORY_ENTRIES = 50
+
+/**
+ * Push current messages to history (call before making changes)
+ */
+export const pushHistoryAtom = atom(
+  null,
+  (get, set) => {
+    const messages = get(messagesAtom)
+    const history = get(messageHistoryAtom)
+
+    // Don't push if messages are empty
+    if (messages.length === 0) return
+
+    // Keep history bounded
+    const newHistory = [...history, [...messages]].slice(-MAX_HISTORY_ENTRIES)
+    set(messageHistoryAtom, newHistory)
+  }
+)
+
+/**
+ * Revert conversation to the state at a specific message
+ * Removes all messages after the specified message
+ */
+export const revertToMessageAtom = atom(
+  null,
+  (get, set, messageId: string) => {
+    const messages = get(messagesAtom)
+
+    // Push current state to history before reverting
+    set(pushHistoryAtom)
+
+    // Find the message index
+    const messageIndex = messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) return
+
+    // Keep messages up to and including the target message
+    const newMessages = messages.slice(0, messageIndex + 1)
+    set(messagesAtom, newMessages)
+  }
+)
+
+/**
+ * Split/fork conversation at a specific message
+ * Creates a new conversation branch starting from this point
+ * For now, this just reverts to the message (full branching TBD)
+ */
+export const splitAtMessageAtom = atom(
+  null,
+  (get, set, messageId: string) => {
+    const messages = get(messagesAtom)
+
+    // Push current state to history
+    set(pushHistoryAtom)
+
+    // Find the message index
+    const messageIndex = messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) return
+
+    // For now, split behaves like revert
+    // Full branching would require conversation tree support
+    const newMessages = messages.slice(0, messageIndex + 1)
+    set(messagesAtom, newMessages)
+
+    // Could emit event for UI to show "forked from X" indicator
+  }
+)
+
+/**
+ * Undo last action (pop from history)
+ */
+export const undoLastActionAtom = atom(
+  null,
+  (get, set) => {
+    const history = get(messageHistoryAtom)
+    if (history.length === 0) return
+
+    const previousState = history[history.length - 1]
+    const newHistory = history.slice(0, -1)
+
+    if (previousState) {
+      set(messagesAtom, previousState)
+    }
+    set(messageHistoryAtom, newHistory)
   }
 )

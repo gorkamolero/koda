@@ -138,12 +138,25 @@ export function WorkspaceView() {
     [tabs]
   )
 
+  // Focus chat input handler for ⌘L shortcut
+  const handleFocusChat = useCallback(() => {
+    const chatInput = document.querySelector<HTMLTextAreaElement>('[data-testid="chat-input"]')
+    if (chatInput) {
+      chatInput.focus()
+      // Switch to chat tab if not already there
+      if (activeTab !== 'chat') {
+        setActiveTab('chat')
+      }
+    }
+  }, [activeTab])
+
   // Register keyboard shortcuts
   useKeyboardShortcuts({
     onSwitchTab: handleSwitchTab,
     tabCount: tabs.length,
     onToggleTerminal: () => { setShowTerminal((prev) => !prev) },
     onToggleSidebar: () => { setShowRightPanel((prev) => !prev) },
+    onFocusChat: handleFocusChat,
   })
 
   return (

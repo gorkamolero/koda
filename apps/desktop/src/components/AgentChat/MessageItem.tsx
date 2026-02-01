@@ -7,6 +7,9 @@ import type {
   ToolResultContentBlock,
 } from '@/store/chat'
 import { Bot, Terminal } from 'lucide-react'
+import { MessageActionBar } from './MessageActionBar'
+import { ToolCallSummary } from './ToolCallSummary'
+import { WorkingIndicator } from './WorkingIndicator'
 
 // AI Elements imports
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
@@ -81,26 +84,34 @@ function renderToolBlock(
   )
 }
 
+// Safely convert unknown input value to string
+function safeStr(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return fallback
+}
+
 // Helper to generate a friendly title for the tool
 function getToolTitle(toolName: string, input: Record<string, unknown>): string {
   switch (toolName) {
     case 'Bash':
-      return String(input.description ?? input.command ?? 'Execute command').slice(0, 50)
+      return safeStr(input.description ?? input.command, 'Execute command').slice(0, 50)
     case 'Read':
-      return `Read ${getFileName(String(input.file_path ?? input.path ?? ''))}`
+      return `Read ${getFileName(safeStr(input.file_path ?? input.path))}`
     case 'Edit':
     case 'Write':
-      return `${toolName} ${getFileName(String(input.file_path ?? input.path ?? ''))}`
+      return `${toolName} ${getFileName(safeStr(input.file_path ?? input.path))}`
     case 'Glob':
-      return `Find ${String(input.pattern ?? '')}`
+      return `Find ${safeStr(input.pattern)}`
     case 'Grep':
-      return `Search: ${String(input.pattern ?? '').slice(0, 30)}`
+      return `Search: ${safeStr(input.pattern).slice(0, 30)}`
     case 'WebFetch':
-      return `Fetch ${String(input.url ?? '').slice(0, 40)}`
+      return `Fetch ${safeStr(input.url).slice(0, 40)}`
     case 'WebSearch':
-      return `Search: ${String(input.query ?? '').slice(0, 30)}`
+      return `Search: ${safeStr(input.query).slice(0, 30)}`
     case 'Task':
-      return String(input.description ?? 'Run agent')
+      return safeStr(input.description, 'Run agent')
     default:
       return toolName
   }
@@ -113,7 +124,7 @@ function getFileName(path: string): string {
 // Returns a language string for Shiki - cast to BundledLanguage at call site
 function getLanguageFromTool(toolName: string, input: Record<string, unknown>): string {
   if (toolName === 'Grep' || toolName === 'Glob') return 'text'
-  const path = String(input.file_path ?? input.path ?? '')
+  const path = safeStr(input.file_path ?? input.path)
   const ext = path.split('.').pop()?.toLowerCase()
   const langMap: Record<string, string> = {
     ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
@@ -191,8 +202,16 @@ export const MessageItem = memo(function MessageItem({
       data-testid={`message-${message.id}`}
       data-role={message.role}
       data-status={message.status}
-      className="px-4 py-4"
+      className="px-4 py-4 group relative"
     >
+      {/* Action bar - shows on hover for non-system messages */}
+      {!isSystem && !isStreaming && (
+        <MessageActionBar
+          message={message}
+          className="absolute right-4 top-4 z-10"
+        />
+      )}
+
       <Message from={isUser ? 'user' : isSystem ? 'system' : 'assistant'}>
         {/* Avatar for assistant */}
         {!isUser && !isSystem && (
@@ -214,13 +233,21 @@ export const MessageItem = memo(function MessageItem({
                 </span>
               </div>
 
+              {/* Tool call summary (collapsible) */}
+              {hasContentBlocks && message.contentBlocks && (
+                <ToolCallSummary
+                  contentBlocks={message.contentBlocks}
+                  className="mb-3"
+                />
+              )}
+
               {/* Content */}
               <MessageContent className={cn(isError && 'border-l-2 border-destructive pl-3')}>
-                {hasContentBlocks ? (
+                {hasContentBlocks && message.contentBlocks ? (
                   <div className="space-y-3">
-                    {message.contentBlocks!.map((block, idx) => (
+                    {message.contentBlocks.map((block, idx) => (
                       <div key={`${block.type}-${String(idx)}`}>
-                        {renderContentBlock(block, message.contentBlocks!, isStreaming)}
+                        {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
                       </div>
                     ))}
                   </div>
@@ -242,10 +269,26 @@ export const MessageItem = memo(function MessageItem({
                 )}
               </MessageContent>
 
-              {/* Token count */}
-              {message.tokenCount !== undefined && message.tokenCount > 0 && (
-                <div className="mt-1.5 text-xs text-muted-foreground">
-                  ~{message.tokenCount.toLocaleString()} tokens
+              {/* Working indicator (during streaming) */}
+              {isStreaming && (
+                <WorkingIndicator
+                  startTime={message.startTime ?? message.timestamp}
+                  className="mt-2"
+                />
+              )}
+
+              {/* Token count and response time (after completion) */}
+              {!isStreaming && (
+                <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                  {message.tokenCount !== undefined && message.tokenCount > 0 && (
+                    <span>~{message.tokenCount.toLocaleString()} tokens</span>
+                  )}
+                  {message.responseTimeMs !== undefined && message.responseTimeMs > 0 && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-status-success">⏱</span>
+                      {formatResponseTime(message.responseTimeMs)}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -288,4 +331,12 @@ export const MessageItem = memo(function MessageItem({
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp)
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatResponseTime(ms: number): string {
+  if (ms < 1000) return `${String(ms)}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.round((ms % 60000) / 1000)
+  return `${String(minutes)}m ${String(seconds)}s`
 }

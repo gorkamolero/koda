@@ -58,6 +58,12 @@ export const availableModelsAtom = atom<ModelOption[]>([
  */
 export const thinkingEnabledDefaultAtom = atomWithStorage('settings:thinkingEnabled', true)
 
+/**
+ * Whether plan mode is enabled by default
+ * When enabled, agent will create a plan before executing
+ */
+export const planModeEnabledAtom = atomWithStorage('settings:planModeEnabled', false)
+
 // =============================================================================
 // Branch Settings
 // =============================================================================
@@ -246,6 +252,7 @@ export const resetAllSettingsAtom = atom(null, (_get, set) => {
   // Model settings
   set(defaultModelAtom, 'claude')
   set(thinkingEnabledDefaultAtom, true)
+  set(planModeEnabledAtom, false)
 
   // Branch settings
   set(branchPrefixTypeAtom, 'feature')
