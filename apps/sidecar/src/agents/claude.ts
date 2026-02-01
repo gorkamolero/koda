@@ -2,9 +2,9 @@
  * Claude Code Handler
  *
  * Manages Claude Code sessions using the Claude Agent SDK.
- * Integrates the Conductor MCP server for interactive tools.
+ * Integrates the Koda MCP server for interactive tools.
  *
- * Architecture (following Conductor's pattern):
+ * Architecture:
  * - Uses @anthropic-ai/claude-agent-sdk for session management
  * - Multi-turn async generator pattern for continuous conversation
  * - canUseTool callback for ExitPlanMode approval and path validation
@@ -19,7 +19,7 @@ import * as os from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { query, type Query, type SDKMessage, type Options } from '@anthropic-ai/claude-agent-sdk'
-import { createConductorMCPServer } from '../mcp/conductorMCPServer.js'
+import { createKodaMCPServer } from '../mcp/kodaMCPServer.js'
 import { getFrontendRpcClient, type FrontendRpcClient } from '../rpc/frontendRpc.js'
 import { getNotificationEmitter } from '../rpc/notifications.js'
 import { getDb } from '../db/index.js'
@@ -556,17 +556,17 @@ export class ClaudeHandler extends EventEmitter {
     this.sessions.set(sessionId, session)
     this.messageBuffers.set(sessionId, [])
 
-    // Create MCP server for Conductor tools
-    const conductorMcp = createConductorMCPServer(sessionId, params.workspaceId, frontendRpc)
+    // Create MCP server for Koda tools
+    const kodaMcp = createKodaMCPServer(sessionId, params.workspaceId, frontendRpc)
 
-    // Build SDK options with Conductor patterns
+    // Build SDK options
     const sdkOptions: Options = {
       cwd,
       env: this.buildEnv(),
       abortController,
       model: session.currentSettings.model,
       mcpServers: {
-        conductor: conductorMcp,
+        koda: kodaMcp,
       },
       // Conductor patterns
       canUseTool: createCanUseTool(session, frontendRpc),
@@ -782,8 +782,8 @@ export class ClaudeHandler extends EventEmitter {
 
     const abortController = new AbortController()
 
-    // Create MCP server for Conductor tools
-    const conductorMcp = createConductorMCPServer(params.sessionId, session.workspaceId, getFrontendRpcClient())
+    // Create MCP server for Koda tools
+    const kodaMcp = createKodaMCPServer(params.sessionId, session.workspaceId, getFrontendRpcClient())
 
     // Build SDK options with resume
     const sdkOptions: Options = {
@@ -792,7 +792,7 @@ export class ClaudeHandler extends EventEmitter {
       abortController,
       resume: params.sessionId, // Use SDK's native resume
       mcpServers: {
-        conductor: conductorMcp,
+        koda: kodaMcp,
       },
     }
 

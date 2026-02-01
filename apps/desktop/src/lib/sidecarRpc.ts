@@ -13,8 +13,15 @@
  * 6. Rust sends response back to sidecar over socket
  */
 
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { invoke } from '@tauri-apps/api/core'
+// Note: Tauri APIs are dynamically imported to avoid errors in browser context (E2E tests)
+type UnlistenFn = () => void
+
+/**
+ * Check if we're running in Tauri context
+ */
+function isTauriContext(): boolean {
+  return typeof window !== 'undefined' && '__TAURI__' in window
+}
 
 // ============================================================================
 // Types
@@ -188,6 +195,12 @@ function handleNotification(notification: SidecarNotification): void {
  * Send RPC response back to sidecar via Tauri
  */
 async function sendRpcResponse(response: SidecarRpcResponse): Promise<void> {
+  if (!isTauriContext()) {
+    // In E2E tests, we can't send responses via Tauri
+    console.log('[SidecarRpc] Skipping response in non-Tauri context:', response)
+    return
+  }
+  const { invoke } = await import('@tauri-apps/api/core')
   await invoke('send_rpc_response', { response: JSON.stringify(response) })
 }
 
@@ -202,6 +215,14 @@ let notificationUnlisten: UnlistenFn | null = null
  * Start listening for sidecar RPC requests and notifications
  */
 export async function startSidecarRpcListener(): Promise<void> {
+  if (!isTauriContext()) {
+    // In E2E tests, we don't have Tauri events
+    console.log('[SidecarRpc] Skipping listener setup in non-Tauri context')
+    return
+  }
+
+  const { listen } = await import('@tauri-apps/api/event')
+
   // Listen for RPC requests (bidirectional - need response)
   rpcRequestUnlisten = await listen<SidecarRpcRequest>('sidecar-rpc-request', (event) => {
     console.log('[SidecarRpc] Received request:', event.payload.method)

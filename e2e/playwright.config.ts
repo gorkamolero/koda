@@ -90,13 +90,14 @@ export default defineConfig({
     timeout: 120000, // 2 minutes for Tauri to build and start
     stdout: 'pipe',
     stderr: 'pipe',
-    // Pass test environment variables to the sidecar
+    // Pass test environment variables to the sidecar and frontend
     env: {
       ...process.env,
       KODA_TEST_DB: TEST_DB_PATH,
       KODA_SOCKET: TEST_SOCKET_PATH,
       KODA_HTTP_PORT: String(TEST_HTTP_RPC_PORT),
       VITE_PORT: String(TEST_VITE_PORT),
+      VITE_HTTP_RPC_PORT: String(TEST_HTTP_RPC_PORT), // For frontend HTTP fallback
       NODE_ENV: 'test',
     },
   },

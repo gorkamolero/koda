@@ -1,5 +1,5 @@
 /**
- * Conductor MCP Tools
+ * Koda MCP Tools
  *
  * Custom MCP tools that enable bidirectional communication between
  * Claude and the frontend. These tools allow Claude to:
@@ -137,9 +137,9 @@ export interface McpToolDefinition {
 }
 
 /**
- * All Conductor MCP tools
+ * All Koda MCP tools
  */
-export const CONDUCTOR_MCP_TOOLS: McpToolDefinition[] = [
+export const KODA_MCP_TOOLS: McpToolDefinition[] = [
   {
     name: 'AskUserQuestion',
     description: `Ask the user questions during execution. Allows gathering preferences, clarifying instructions,
@@ -173,11 +173,11 @@ dev servers, build processes, or debugging running processes.`,
 // ============================================================================
 
 /**
- * Conductor MCP tool handler
+ * Koda MCP tool handler
  *
  * Bridges MCP tool invocations to frontend RPC calls.
  */
-export class ConductorToolHandler {
+export class KodaToolHandler {
   private frontendRpc: FrontendRpcClient | null = null
   private workspaceId: string | null = null
 
@@ -283,14 +283,14 @@ export class ConductorToolHandler {
 // Singleton
 // ============================================================================
 
-let handlerInstance: ConductorToolHandler | null = null
+let handlerInstance: KodaToolHandler | null = null
 
 /**
  * Get the singleton tool handler instance
  */
-export function getConductorToolHandler(): ConductorToolHandler {
+export function getKodaToolHandler(): KodaToolHandler {
   if (!handlerInstance) {
-    handlerInstance = new ConductorToolHandler()
+    handlerInstance = new KodaToolHandler()
   }
   return handlerInstance
 }

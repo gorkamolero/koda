@@ -1,7 +1,7 @@
 /**
- * Conductor MCP Server
+ * Koda MCP Server
  *
- * Creates an SDK-type MCP server that provides Conductor-specific tools to Claude.
+ * Creates an SDK-type MCP server that provides Koda-specific tools to Claude.
  * This server is hosted in-process by the Claude Agent SDK and enables:
  * - AskUserQuestion: Interactive Q&A with the user
  * - GetWorkspaceDiff: View workspace changes
@@ -20,27 +20,27 @@ import {
   type GetWorkspaceDiffResult,
   type DiffCommentResult,
   type GetTerminalOutputResult,
-} from './conductorTools.js'
+} from './kodaTools.js'
 
 // ============================================================================
 // MCP Server Factory
 // ============================================================================
 
 /**
- * Create a Conductor MCP server for a specific session
+ * Create a Koda MCP server for a specific session
  *
  * @param sessionId - The Claude session ID
  * @param workspaceId - The workspace ID for diff/comment operations
  * @param frontendRpc - Optional FrontendRpcClient override (for testing)
  * @returns SDK-type MCP server configuration
  */
-export function createConductorMCPServer(
+export function createKodaMCPServer(
   sessionId: string,
   workspaceId: string,
   frontendRpc?: FrontendRpcClient
 ): { type: 'sdk'; name: string; instance: McpServer } {
   const mcpServer = new McpServer(
-    { name: 'conductor', version: '1.0.0' },
+    { name: 'koda', version: '1.0.0' },
     { capabilities: { tools: {} } }
   )
 
@@ -72,8 +72,8 @@ IMPORTANT: An 'Other' option that allows free-form input is automatically provid
       ).max(4).describe('Up to 4 questions to ask the user'),
     },
     async (args: { questions: Array<{ question: string; options: string[]; multiSelect?: boolean }> }) => {
-      console.log(`[conductorMCPServer] AskUserQuestion invoked for session ${sessionId}`)
-      console.log(`[conductorMCPServer] Questions:`, JSON.stringify(args.questions, null, 2))
+      console.log(`[kodaMCPServer] AskUserQuestion invoked for session ${sessionId}`)
+      console.log(`[kodaMCPServer] Questions:`, JSON.stringify(args.questions, null, 2))
 
       const client = getClient()
       if (!client.isConnected()) {
@@ -84,7 +84,7 @@ IMPORTANT: An 'Other' option that allows free-form input is automatically provid
 
       try {
         const result = await client.askUserQuestion(args.questions) as AskUserQuestionResult
-        console.log(`[conductorMCPServer] Received answers for ${sessionId}:`, result)
+        console.log(`[kodaMCPServer] Received answers for ${sessionId}:`, result)
 
         if (result.cancelled) {
           return {
@@ -123,7 +123,7 @@ IMPORTANT: An 'Other' option that allows free-form input is automatically provid
     'GetWorkspaceDiff',
     `You can use this tool to see what the user is currently working on, or when the user refers to the "workspace diff", "PR diff", or "all changes".
 This compares all changes on the current branch (including uncommitted changes) against the merge base.
-It's the same diff the user will see in the Conductor UI, and the same diff that will be used in any PRs.
+It's the same diff the user will see in the Koda UI, and the same diff that will be used in any PRs.
 With stat: true, returns git diff --stat style output showing per-file statistics.
 With file: 'path/to/file', returns the full unified diff for that specific file.
 With no parameters, returns the full unified diff for all changes.`,
@@ -132,8 +132,8 @@ With no parameters, returns the full unified diff for all changes.`,
       stat: z.boolean().optional().describe('If true, return git diff --stat style output with per-file statistics'),
     },
     async (args: { file?: string; stat?: boolean }) => {
-      console.log(`[conductorMCPServer] GetWorkspaceDiff invoked for session ${sessionId}`)
-      console.log(`[conductorMCPServer] getDiff args:`, JSON.stringify(args, null, 2))
+      console.log(`[kodaMCPServer] GetWorkspaceDiff invoked for session ${sessionId}`)
+      console.log(`[kodaMCPServer] getDiff args:`, JSON.stringify(args, null, 2))
 
       const client = getClient()
       if (!client.isConnected()) {
@@ -183,7 +183,7 @@ With no parameters, returns the full unified diff for all changes.`,
       ).describe('Comments to post on the diff'),
     },
     async (args: { comments: Array<{ file: string; lineNumber: number; body: string }> }) => {
-      console.log(`[conductorMCPServer] DiffComment invoked for session ${sessionId}`)
+      console.log(`[kodaMCPServer] DiffComment invoked for session ${sessionId}`)
 
       const client = getClient()
       if (!client.isConnected()) {
@@ -234,8 +234,8 @@ Returns the terminal output along with information about what type of terminal i
       maxLines: z.number().optional().describe('Maximum number of lines to return. Defaults to 1000.'),
     },
     async (args: { source?: 'spotlight' | 'run_script' | 'terminal' | 'auto'; maxLines?: number }) => {
-      console.log(`[conductorMCPServer] GetTerminalOutput invoked for session ${sessionId}`)
-      console.log(`[conductorMCPServer] GetTerminalOutput args:`, JSON.stringify(args, null, 2))
+      console.log(`[kodaMCPServer] GetTerminalOutput invoked for session ${sessionId}`)
+      console.log(`[kodaMCPServer] GetTerminalOutput args:`, JSON.stringify(args, null, 2))
 
       const client = getClient()
       if (!client.isConnected()) {
@@ -288,7 +288,7 @@ Returns the terminal output along with information about what type of terminal i
     }
   )
 
-  return { type: 'sdk', name: 'conductor', instance: mcpServer }
+  return { type: 'sdk', name: 'koda', instance: mcpServer }
 }
 
 // ============================================================================

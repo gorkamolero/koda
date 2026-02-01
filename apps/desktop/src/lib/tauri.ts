@@ -1,5 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { SidecarStatus, JsonRpcError } from '@/lib/rpc'
 
 /**
@@ -11,10 +9,14 @@ function isTauriContext(): boolean {
 }
 
 /**
- * HTTP RPC port for E2E testing
+ * HTTP RPC URL for E2E testing
  * When running in browser context without Tauri, we use HTTP to reach the sidecar
+ * Port is configurable via VITE_HTTP_RPC_PORT env var (tests use 3848, dev uses 3847)
  */
-const HTTP_RPC_URL = 'http://localhost:3847/rpc'
+function getHttpRpcUrl(): string {
+  const port = (import.meta as { env?: { VITE_HTTP_RPC_PORT?: string } }).env?.VITE_HTTP_RPC_PORT || '3847'
+  return `http://localhost:${port}/rpc`
+}
 
 /**
  * Send RPC request via HTTP (for E2E testing)
@@ -23,7 +25,7 @@ async function httpRpcRequest<T = unknown>(
   method: string,
   params?: unknown
 ): Promise<T> {
-  const response = await fetch(HTTP_RPC_URL, {
+  const response = await fetch(getHttpRpcUrl(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -47,11 +49,13 @@ async function httpRpcRequest<T = unknown>(
 
 /**
  * Type-safe wrapper for Tauri invoke commands
+ * Uses dynamic import to avoid loading @tauri-apps/api in non-Tauri contexts
  */
 export async function invokeCommand<T>(
   command: string,
   args?: Record<string, unknown>
 ): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core')
   return invoke<T>(command, args)
 }
 
@@ -152,6 +156,11 @@ export interface RpcErrorEvent {
 }
 
 /**
+ * Unlisten function type
+ */
+type UnlistenFn = () => void
+
+/**
  * Subscribe to sidecar status events
  */
 export async function onSidecarStatus(
@@ -161,6 +170,7 @@ export async function onSidecarStatus(
     // In E2E tests, return a no-op unlisten function
     return () => {}
   }
+  const { listen } = await import('@tauri-apps/api/event')
   return listen<SidecarStatus>('sidecar-status', (event) => {
     callback(event.payload)
   })
@@ -176,6 +186,7 @@ export async function onRpcError(
     // In E2E tests, return a no-op unlisten function
     return () => {}
   }
+  const { listen } = await import('@tauri-apps/api/event')
   return listen<RpcErrorEvent['payload']>('rpc-error', (event) => {
     callback(event.payload)
   })
