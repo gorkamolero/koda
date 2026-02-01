@@ -11,13 +11,14 @@ import { Folder } from 'lucide-react'
 
 interface FileTreeProps {
   onFileOpen: (entry: FlattenedEntry) => void
+  onExpand?: (entry: FlattenedEntry) => void
 }
 
 /**
  * Virtualized file tree component
  * Uses @tanstack/react-virtual for 60fps scrolling performance
  */
-export function FileTree({ onFileOpen }: FileTreeProps) {
+export function FileTree({ onFileOpen, onExpand }: FileTreeProps) {
   const flattenedTree = useAtomValue(flattenedTreeAtom)
   const setSelectedPath = useSetAtom(selectedPathAtom)
   const selectedPath = useAtomValue(selectedPathAtom)
@@ -91,7 +92,7 @@ export function FileTree({ onFileOpen }: FileTreeProps) {
       data-virtualized="true"
       role="tree"
       tabIndex={0}
-      className="h-full overflow-auto focus:outline-none"
+      className="h-full overflow-auto focus:outline-none pt-2"
       onKeyDown={handleKeyDown}
     >
       <div
@@ -122,6 +123,7 @@ export function FileTree({ onFileOpen }: FileTreeProps) {
                 entry={entry}
                 onSelect={handleSelect}
                 onOpen={onFileOpen}
+                onExpand={onExpand}
               />
               {/* Render folder children indicator for collapsed state */}
               {entry.type === 'directory' && entry.isExpanded && entry.children && (

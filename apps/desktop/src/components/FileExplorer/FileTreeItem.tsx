@@ -13,6 +13,7 @@ interface FileTreeItemProps {
   entry: FlattenedEntry
   onSelect: (entry: FlattenedEntry) => void
   onOpen: (entry: FlattenedEntry) => void
+  onExpand?: (entry: FlattenedEntry) => void
 }
 
 /**
@@ -22,6 +23,7 @@ export const FileTreeItem = memo(function FileTreeItem({
   entry,
   onSelect,
   onOpen,
+  onExpand,
 }: FileTreeItemProps) {
   const toggleExpanded = useSetAtom(toggleExpandedAtom)
   const selectedPath = useAtomValue(selectedPathAtom)
@@ -34,36 +36,52 @@ export const FileTreeItem = memo(function FileTreeItem({
 
   const handleClick = useCallback(() => {
     onSelect(entry)
-    if (!isDirectory) {
+    if (isDirectory) {
+      // Clicking folder name also toggles expansion
+      if (!entry.isExpanded && onExpand) {
+        onExpand(entry)
+      }
+      toggleExpanded(entry.path)
+    } else {
       onOpen(entry)
     }
-  }, [entry, isDirectory, onSelect, onOpen])
+  }, [entry, isDirectory, onSelect, onOpen, onExpand, toggleExpanded])
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
       if (isDirectory) {
+        // If expanding (not collapsing) and no children loaded yet, trigger load
+        if (!entry.isExpanded && onExpand) {
+          onExpand(entry)
+        }
         toggleExpanded(entry.path)
       }
     },
-    [isDirectory, entry.path, toggleExpanded]
+    [isDirectory, entry, toggleExpanded, onExpand]
   )
 
   const handleKeyDown = useCallback(
     (e: ReactKeyboardEvent) => {
       if (e.key === 'Enter') {
         if (isDirectory) {
+          if (!entry.isExpanded && onExpand) {
+            onExpand(entry)
+          }
           toggleExpanded(entry.path)
         } else {
           onOpen(entry)
         }
       } else if (e.key === 'ArrowRight' && isDirectory && !entry.isExpanded) {
+        if (onExpand) {
+          onExpand(entry)
+        }
         toggleExpanded(entry.path)
       } else if (e.key === 'ArrowLeft' && isDirectory && entry.isExpanded) {
         toggleExpanded(entry.path)
       }
     },
-    [entry, isDirectory, toggleExpanded, onOpen]
+    [entry, isDirectory, toggleExpanded, onOpen, onExpand]
   )
 
   return (

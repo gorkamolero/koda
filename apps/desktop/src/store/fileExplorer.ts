@@ -229,6 +229,40 @@ export const toggleExpandedAtom = atom(null, (get, set, path: string) => {
 })
 
 /**
+ * Helper: recursively update tree to set children on a directory
+ */
+function updateTreeChildren(
+  entries: FileEntry[],
+  targetPath: string,
+  children: FileEntry[]
+): FileEntry[] {
+  return entries.map((entry) => {
+    if (entry.path === targetPath) {
+      return { ...entry, children }
+    }
+    if (entry.children) {
+      return {
+        ...entry,
+        children: updateTreeChildren(entry.children, targetPath, children),
+      }
+    }
+    return entry
+  })
+}
+
+/**
+ * Action: set directory children (for lazy loading)
+ */
+export const setDirectoryChildrenAtom = atom(
+  null,
+  (get, set, { path, children }: { path: string; children: FileEntry[] }) => {
+    const tree = get(fileTreeAtom)
+    const updatedTree = updateTreeChildren(tree, path, children)
+    set(fileTreeAtom, updatedTree)
+  }
+)
+
+/**
  * Action: open file in editor
  */
 export const openFileAtom = atom(

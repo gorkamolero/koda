@@ -5,6 +5,7 @@ import {
   fileTreeAtom,
   rootPathAtom,
   openFileAtom,
+  setDirectoryChildrenAtom,
   type FileEntry,
   type FlattenedEntry,
 } from '@/store/fileExplorer'
@@ -25,6 +26,7 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
   const [, setFileTree] = useAtom(fileTreeAtom)
   const setRootPath = useSetAtom(rootPathAtom)
   const openFile = useSetAtom(openFileAtom)
+  const setDirectoryChildren = useSetAtom(setDirectoryChildrenAtom)
   const { readDirectory, readFile, isLoading, error } = useFileSystem()
 
   // Load root directory on mount
@@ -90,6 +92,24 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
     [handleQuickOpenSelectAsync]
   )
 
+  // Handle directory expand - lazy load children
+  const handleExpandAsync = useCallback(
+    async (entry: FlattenedEntry) => {
+      if (entry.type === 'directory' && !entry.children) {
+        const children = await readDirectory(entry.path)
+        setDirectoryChildren({ path: entry.path, children })
+      }
+    },
+    [readDirectory, setDirectoryChildren]
+  )
+
+  const handleExpand = useCallback(
+    (entry: FlattenedEntry) => {
+      void handleExpandAsync(entry)
+    },
+    [handleExpandAsync]
+  )
+
   return (
     <div data-testid="file-explorer" className="h-full flex flex-col bg-surface-sidebar">
       {/* Header */}
@@ -138,7 +158,7 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
       {/* File tree */}
       {!isLoading && (
         <div className="flex-1 overflow-hidden fade-mask-y">
-          <FileTree onFileOpen={handleFileOpen} />
+          <FileTree onFileOpen={handleFileOpen} onExpand={handleExpand} />
         </div>
       )}
 
