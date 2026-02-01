@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
-import { useWorkspaces, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
-import type { Workspace } from '@/lib/rpc'
+import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
+import type { Worktree } from '@/lib/rpc'
 
 type CreateMode = 'repo' | 'branch' | 'join' | 'standalone'
 
 export function WorkspaceList() {
   const navigate = useNavigate()
-  const { data: workspaces, isLoading: loadingWorkspaces, error: workspacesError } = useWorkspaces()
+  const { data: workspaces, isLoading: loadingWorkspaces, error: workspacesError } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
@@ -59,7 +59,7 @@ export function WorkspaceList() {
     }
   }
 
-  const handleWorkspaceClick = (workspace: Workspace) => {
+  const handleWorkspaceClick = (workspace: Worktree) => {
     void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
   }
 
@@ -440,7 +440,7 @@ export function WorkspaceList() {
               onClick={() => { handleWorkspaceClick(workspace); }}
               className="text-left p-4 border border-border rounded-lg hover:border-primary hover:bg-accent/50 transition-colors"
             >
-              <h3 className="font-medium text-primary">{workspace.directoryName}</h3>
+              <h3 className="font-medium text-primary">{workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'}</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 {workspace.branch || 'no branch'}
               </p>

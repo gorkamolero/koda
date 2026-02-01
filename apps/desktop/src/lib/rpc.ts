@@ -62,6 +62,7 @@ export const RPC_METHODS = {
   WORKTREE_DELETE: 'worktree.delete',
   WORKTREE_GET: 'worktree.get',
   WORKTREE_LIST: 'worktree.list',
+  WORKTREE_LIST_ALL: 'worktree.listAll',
   WORKTREE_LIST_BY_WORKSPACE: 'worktree.listByWorkspace',
   WORKTREE_ADD_TO_WORKSPACE: 'worktree.addToWorkspace',
   WORKTREE_REMOVE_FROM_WORKSPACE: 'worktree.removeFromWorkspace',

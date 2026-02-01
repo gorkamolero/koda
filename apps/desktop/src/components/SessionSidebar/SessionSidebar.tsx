@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import type { Session, Workspace } from '@/lib/rpc'
+import type { Session, Worktree } from '@/lib/rpc'
 import { SessionButton } from './SessionButton'
 import { NewSessionPicker } from './NewSessionPicker'
 import {
@@ -16,7 +16,7 @@ import {
 // ============================================================================
 
 export interface SessionSidebarProps {
-  workspace: Workspace | null | undefined
+  workspace: Worktree | null | undefined
   sessions: Session[]
   activeSessionId?: string
   isLoading?: boolean
@@ -28,22 +28,26 @@ export interface SessionSidebarProps {
 // Session Group Component
 // ============================================================================
 
+interface SessionGroupProps {
+  title: string
+  sessions: Session[]
+  activeSessionId?: string
+  onSessionSelect: (sessionId: string) => void
+  defaultExpanded?: boolean
+}
+
 function SessionGroup({
   title,
   sessions,
   activeSessionId,
   onSessionSelect,
   defaultExpanded = true,
-}: {
-  title: string
-  sessions: Session[]
-  activeSessionId?: string
-  onSessionSelect: (sessionId: string) => void
-  defaultExpanded?: boolean
-}) {
+}: SessionGroupProps): React.ReactElement | null {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
   if (sessions.length === 0) return null
+
+  const ChevronIcon = isExpanded ? ChevronDown : ChevronRight
 
   return (
     <div className="mb-2">
@@ -51,13 +55,9 @@ function SessionGroup({
         onClick={() => { setIsExpanded(!isExpanded) }}
         className="flex items-center gap-1.5 w-full px-2 py-1 text-xs font-medium text-text-faint uppercase tracking-wider hover:text-text-muted transition-colors"
       >
-        {isExpanded ? (
-          <ChevronDown className="w-3 h-3" />
-        ) : (
-          <ChevronRight className="w-3 h-3" />
-        )}
+        <ChevronIcon className="w-3 h-3" />
         <span>{title}</span>
-        <span className="text-text-dim">({String(sessions.length)})</span>
+        <span className="text-text-dim">({sessions.length})</span>
       </button>
 
       {isExpanded && (
@@ -77,6 +77,19 @@ function SessionGroup({
 }
 
 // ============================================================================
+// Session Status Categories
+// ============================================================================
+
+const ACTIVE_STATUSES = ['running', 'paused', 'compacting'] as const
+const COMPLETED_STATUSES = ['completed', 'cancelled', 'error'] as const
+
+function categorizeSession(status: Session['status']): 'active' | 'idle' | 'completed' {
+  if (ACTIVE_STATUSES.includes(status as typeof ACTIVE_STATUSES[number])) return 'active'
+  if (COMPLETED_STATUSES.includes(status as typeof COMPLETED_STATUSES[number])) return 'completed'
+  return 'idle'
+}
+
+// ============================================================================
 // SessionSidebar Component
 // ============================================================================
 
@@ -87,20 +100,25 @@ export function SessionSidebar({
   isLoading,
   onSessionSelect,
   onNewSession,
-}: SessionSidebarProps) {
+}: SessionSidebarProps): React.ReactElement {
   const [showNewSessionPicker, setShowNewSessionPicker] = useState(false)
 
-  // Categorize sessions
-  const activeSessions = sessions.filter(
-    (s) => s.status === 'running' || s.status === 'paused' || s.status === 'compacting'
-  )
-  const idleSessions = sessions.filter((s) => s.status === 'idle')
-  const completedSessions = sessions.filter(
-    (s) => s.status === 'completed' || s.status === 'cancelled' || s.status === 'error'
-  )
+  const { activeSessions, idleSessions, completedSessions } = useMemo(() => {
+    const active: Session[] = []
+    const idle: Session[] = []
+    const completed: Session[] = []
 
-  // Get workspace display name
-  const workspaceName = workspace?.branch ?? workspace?.directoryName ?? 'Workspace'
+    for (const session of sessions) {
+      const category = categorizeSession(session.status)
+      if (category === 'active') active.push(session)
+      else if (category === 'idle') idle.push(session)
+      else completed.push(session)
+    }
+
+    return { activeSessions: active, idleSessions: idle, completedSessions: completed }
+  }, [sessions])
+
+  const workspaceName = workspace?.branch ?? workspace?.worktreePath?.split('/').pop() ?? 'Workspace'
 
   return (
     <div className="flex flex-col h-full bg-surface-base">

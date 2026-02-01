@@ -1,36 +1,43 @@
-import { useState } from 'react'
-import { ChevronDown, GitBranch, ExternalLink, MessageSquare, Terminal, FileText, CheckCircle2, Eye, Share2, Check } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import {
+  ChevronDown,
+  GitBranch,
+  ExternalLink,
+  MessageSquare,
+  Terminal,
+  FileText,
+  CheckCircle2,
+  Eye,
+  Share2,
+  Check,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useWorkspaceDiffStats } from '@/hooks/useRpc'
 import { PresenceAvatars } from '@/components/PresenceAvatars'
-import type { Workspace } from '@/lib/rpc'
+import type { Worktree } from '@/lib/rpc'
+
+type Tab = 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review'
 
 interface TopBarProps {
-  workspace: Workspace | undefined
-  activeTab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review'
-  onTabChange: (tab: 'chat' | 'diff' | 'files' | 'terminal' | 'spec' | 'scratchpad' | 'checks' | 'review') => void
+  workspace: Worktree | undefined
+  activeTab: Tab
+  onTabChange: (tab: Tab) => void
 }
 
 /**
  * Conductor-style top bar with branch selector, tabs, and actions.
- *
- * Layout:
- * [Branch dropdown] [origin/main] [workspace badge] [Open ▼]  |  [All files] [Changed N] [Checks] [Review]  |  [Create PR]
  */
-export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
-  const { data: diffStats } = useWorkspaceDiffStats(workspace?.id ?? '')
+export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps): React.ReactElement {
   const [copied, setCopied] = useState(false)
 
-  const changedFilesCount = diffStats?.filesChanged ?? 0
   const branch = workspace?.branch ?? 'main'
-  const workspaceName = workspace?.directoryName ?? 'Workspace'
+  const workspaceName = workspace?.worktreePath?.split('/').pop() ?? workspace?.branch ?? 'Workspace'
 
-  const handleShare = async () => {
+  const handleShare = useCallback(async (): Promise<void> => {
     if (!workspace?.id) return
     await navigator.clipboard.writeText(workspace.id)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    setTimeout(() => { setCopied(false) }, 2000)
+  }, [workspace?.id])
 
   return (
     <div className="flex items-center justify-between h-10 px-3 border-b border-border bg-background">
@@ -65,7 +72,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Chat tab with icon */}
         <TabButton
           active={activeTab === 'chat'}
-          onClick={() => onTabChange('chat')}
+          onClick={() => { onTabChange('chat') }}
           icon={<MessageSquare className="h-3.5 w-3.5" />}
           testId="tab-chat"
         >
@@ -75,7 +82,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Code tabs */}
         <TabButton
           active={activeTab === 'files'}
-          onClick={() => onTabChange('files')}
+          onClick={() => { onTabChange('files') }}
           testId="tab-files"
         >
           All files
@@ -83,8 +90,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
 
         <TabButton
           active={activeTab === 'diff'}
-          onClick={() => onTabChange('diff')}
-          badge={changedFilesCount > 0 ? changedFilesCount : undefined}
+          onClick={() => { onTabChange('diff') }}
           testId="tab-diff"
         >
           Changes
@@ -93,7 +99,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Checks tab */}
         <TabButton
           active={activeTab === 'checks'}
-          onClick={() => onTabChange('checks')}
+          onClick={() => { onTabChange('checks') }}
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
           testId="tab-checks"
         >
@@ -103,7 +109,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Review tab */}
         <TabButton
           active={activeTab === 'review'}
-          onClick={() => onTabChange('review')}
+          onClick={() => { onTabChange('review') }}
           icon={<Eye className="h-3.5 w-3.5" />}
           testId="tab-review"
         >
@@ -113,7 +119,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Terminal tab with icon */}
         <TabButton
           active={activeTab === 'terminal'}
-          onClick={() => onTabChange('terminal')}
+          onClick={() => { onTabChange('terminal') }}
           icon={<Terminal className="h-3.5 w-3.5" />}
           testId="tab-terminal"
         >
@@ -123,7 +129,7 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
         {/* Scratchpad tab */}
         <TabButton
           active={activeTab === 'scratchpad'}
-          onClick={() => onTabChange('scratchpad')}
+          onClick={() => { onTabChange('scratchpad') }}
           icon={<FileText className="h-3.5 w-3.5" />}
           testId="tab-scratchpad"
         >
@@ -167,13 +173,12 @@ export function TopBar({ workspace, activeTab, onTabChange }: TopBarProps) {
 interface TabButtonProps {
   active: boolean
   onClick: () => void
-  badge?: number
   icon?: React.ReactNode
   children: React.ReactNode
   testId?: string
 }
 
-function TabButton({ active, onClick, badge, icon, children, testId }: TabButtonProps) {
+function TabButton({ active, onClick, icon, children, testId }: TabButtonProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
@@ -188,16 +193,6 @@ function TabButton({ active, onClick, badge, icon, children, testId }: TabButton
     >
       {icon}
       {children}
-      {badge !== undefined && (
-        <span className={cn(
-          'px-1.5 py-0.5 text-[10px] font-semibold rounded-full',
-          active
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground'
-        )}>
-          {badge}
-        </span>
-      )}
     </button>
   )
 }

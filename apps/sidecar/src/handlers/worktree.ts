@@ -45,6 +45,10 @@ export const ListWorktreesSchema = z.object({
   includeArchived: z.boolean().optional().default(false),
 });
 
+export const ListAllWorktreesSchema = z.object({
+  includeArchived: z.boolean().optional().default(false),
+});
+
 export const ListWorktreesByWorkspaceSchema = z.object({
   workspaceId: z.string().uuid(),
   includeArchived: z.boolean().optional().default(false),
@@ -65,6 +69,7 @@ export type CreateWorktreeInput = z.input<typeof CreateWorktreeSchema>;
 export type DeleteWorktreeInput = z.input<typeof DeleteWorktreeSchema>;
 export type GetWorktreeInput = z.input<typeof GetWorktreeSchema>;
 export type ListWorktreesInput = z.input<typeof ListWorktreesSchema>;
+export type ListAllWorktreesInput = z.input<typeof ListAllWorktreesSchema>;
 export type ListWorktreesByWorkspaceInput = z.input<typeof ListWorktreesByWorkspaceSchema>;
 export type AddWorktreeToWorkspaceInput = z.input<typeof AddWorktreeToWorkspaceSchema>;
 export type RemoveWorktreeFromWorkspaceInput = z.input<typeof RemoveWorktreeFromWorkspaceSchema>;
@@ -459,6 +464,25 @@ export async function listWorktrees(
       eq(worktrees.repoId, input.repoId),
       eq(worktrees.state, 'active')
     ),
+  });
+}
+
+/**
+ * List all worktrees (active and archived)
+ */
+export async function listAllWorktrees(
+  input: ListAllWorktreesInput = {},
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree[]> {
+  const database = db ?? getDb();
+  const includeArchived = input.includeArchived ?? false;
+
+  if (includeArchived) {
+    return database.query.worktrees.findMany();
+  }
+
+  return database.query.worktrees.findMany({
+    where: eq(worktrees.state, 'active'),
   });
 }
 

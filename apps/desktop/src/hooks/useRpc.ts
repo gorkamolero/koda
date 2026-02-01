@@ -287,6 +287,29 @@ export function useWorktrees(repoId: string) {
 }
 
 /**
+ * List all worktrees across all repos
+ */
+export function useAllWorktrees(includeArchived = false) {
+  return useQuery({
+    queryKey: ['worktrees', 'all', includeArchived],
+    queryFn: () => rpcRequest<Worktree[]>(RPC_METHODS.WORKTREE_LIST_ALL, { includeArchived }),
+    retry: false,
+  })
+}
+
+/**
+ * Get a single worktree by ID
+ */
+export function useWorktree(worktreeId: string) {
+  return useQuery({
+    queryKey: ['worktree', worktreeId],
+    queryFn: () => rpcRequest<Worktree>(RPC_METHODS.WORKTREE_GET, { worktreeId }),
+    enabled: !!worktreeId,
+    retry: false,
+  })
+}
+
+/**
  * Delete a worktree
  */
 export function useDeleteWorktree() {

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
-import { useRepo, useWorkspaces } from '@/hooks/useRpc'
+import { useRepo, useWorktrees } from '@/hooks/useRpc'
 import { cn } from '@/lib/utils'
-import type { Workspace, WorkspaceStatus } from '@/lib/rpc'
+import { WorktreeStatusBadge } from '@/components/WorktreeStatusBadge'
+import type { Worktree } from '@/lib/rpc'
 import {
   ChevronLeft,
   Plus,
@@ -10,42 +11,18 @@ import {
   ExternalLink,
   GitBranch,
   Loader2,
-  Check,
-  AlertCircle,
   Archive,
   Settings,
 } from 'lucide-react'
 
 // ============================================================================
-// Status Badge
-// ============================================================================
-
-function StatusBadge({ status }: { status?: WorkspaceStatus | null }) {
-  const config: Record<string, { icon: React.ReactNode; color: string }> = {
-    done: { icon: <Check className="w-3 h-3" />, color: 'text-green-500 bg-green-500/10' },
-    blocked: { icon: <AlertCircle className="w-3 h-3" />, color: 'text-orange-500 bg-orange-500/10' },
-    'needs-review': { icon: <AlertCircle className="w-3 h-3" />, color: 'text-yellow-500 bg-yellow-500/10' },
-    'in-progress': { icon: null, color: 'text-blue-500 bg-blue-500/10' },
-  }
-
-  const cfg = status ? config[status] : null
-  if (!cfg) return null
-
-  return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', cfg.color)}>
-      {cfg.icon}
-      {status}
-    </span>
-  )
-}
-
-// ============================================================================
 // Workspace Row
 // ============================================================================
 
-function WorkspaceRow({ workspace }: { workspace: Workspace }) {
+function WorkspaceRow({ workspace }: { workspace: Worktree }) {
   const status = workspace.manualStatus ?? workspace.derivedStatus
   const isArchived = workspace.state === 'archived'
+  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
 
   return (
     <Link
@@ -64,16 +41,16 @@ function WorkspaceRow({ workspace }: { workspace: Workspace }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-text-primary truncate">
-            {workspace.branch ?? workspace.directoryName}
+            {displayName}
           </span>
           {isArchived && (
             <Archive className="w-3.5 h-3.5 text-text-dim" />
           )}
         </div>
-        <span className="text-xs text-text-faint">{workspace.directoryName}</span>
+        <span className="text-xs text-text-faint">{workspace.worktreePath?.split('/').pop() ?? workspace.branch}</span>
       </div>
 
-      <StatusBadge status={status} />
+      <WorktreeStatusBadge status={status} />
 
       {workspace.updatedAt && (
         <span className="text-xs text-text-faint flex-shrink-0">
@@ -91,20 +68,18 @@ function WorkspaceRow({ workspace }: { workspace: Workspace }) {
 export function RepositoryPage() {
   const { repoId } = useParams({ from: '/repository/$repoId' })
   const { data: repo, isLoading: loadingRepo } = useRepo(repoId)
-  const { data: allWorkspaces, isLoading: loadingWorkspaces } = useWorkspaces()
+  const { data: repoWorktrees, isLoading: loadingWorktrees } = useWorktrees(repoId)
   const [showArchived, setShowArchived] = useState(false)
 
   // Filter workspaces for this repo
   const { activeWorkspaces, archivedWorkspaces } = useMemo(() => {
-    if (!allWorkspaces) return { activeWorkspaces: [], archivedWorkspaces: [] }
+    if (!repoWorktrees) return { activeWorkspaces: [], archivedWorkspaces: [] }
 
-    const repoWorkspaces = allWorkspaces.filter((ws) => ws.repositoryId === repoId)
-
-    const active = repoWorkspaces.filter((ws) => ws.state !== 'archived')
-    const archived = repoWorkspaces.filter((ws) => ws.state === 'archived')
+    const active = repoWorktrees.filter((ws) => ws.state !== 'archived')
+    const archived = repoWorktrees.filter((ws) => ws.state === 'archived')
 
     // Sort by updatedAt
-    const sortByUpdated = (a: Workspace, b: Workspace) => {
+    const sortByUpdated = (a: Worktree, b: Worktree) => {
       const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
       const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
       return bTime - aTime
@@ -114,9 +89,9 @@ export function RepositoryPage() {
     archived.sort(sortByUpdated)
 
     return { activeWorkspaces: active, archivedWorkspaces: archived }
-  }, [allWorkspaces, repoId])
+  }, [repoWorktrees])
 
-  const isLoading = loadingRepo || loadingWorkspaces
+  const isLoading = loadingRepo || loadingWorktrees
   const repoName = repo?.name ?? repo?.rootPath.split('/').pop() ?? 'Repository'
 
   return (

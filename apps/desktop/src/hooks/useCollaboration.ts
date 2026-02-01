@@ -177,7 +177,7 @@ export function useSessionSync(): SessionSyncResult {
       const sessions = storage.get('sessions')
       const sessionData: SessionData = {
         id: session.id,
-        workspaceId: session.workspaceId ?? null,
+        worktreeId: session.worktreeId ?? null,
         agentType: session.agentType ?? null,
         model: session.model ?? null,
         status: session.status ?? 'idle',

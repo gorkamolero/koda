@@ -1,24 +1,29 @@
 import { atom } from 'jotai'
-import type { Workspace, Session, WorkspaceStatus } from '@/lib/rpc'
+import type { Worktree, Session, WorktreeStatus } from '@/lib/rpc'
 
 /**
- * Workspace Store - Conductor-style state management
+ * Worktree Store - Conductor-style state management
  *
- * Manages workspaces, sessions, and their relationships.
- * Uses Jotai atoms for reactive state updates.
+ * NOTE: This store manages "worktrees" which are git worktrees tied to repos.
+ * The naming uses "workspace" in some places for backwards compatibility with
+ * the UI, but the underlying data is worktrees.
+ *
+ * In the new model:
+ * - Workspace = pure container (just name/description)
+ * - Worktree = git worktree (has branch, repoId, workspaceIds[])
  */
 
 // =============================================================================
-// Core Workspace State
+// Core Worktree State (UI calls these "workspaces" for now)
 // =============================================================================
 
 /**
- * All workspaces, keyed by ID for O(1) lookups
+ * All worktrees, keyed by ID for O(1) lookups
  */
-export const workspacesMapAtom = atom<Map<string, Workspace>>(new Map())
+export const workspacesMapAtom = atom<Map<string, Worktree>>(new Map())
 
 /**
- * All workspaces as array (derived, for iteration)
+ * All worktrees as array (derived, for iteration)
  */
 export const workspacesAtom = atom((get) => {
   const map = get(workspacesMapAtom)
@@ -26,12 +31,12 @@ export const workspacesAtom = atom((get) => {
 })
 
 /**
- * Currently active workspace ID
+ * Currently active worktree ID
  */
 export const activeWorkspaceIdAtom = atom<string | null>(null)
 
 /**
- * Currently active workspace (derived)
+ * Currently active worktree (derived)
  */
 export const activeWorkspaceAtom = atom((get) => {
   const id = get(activeWorkspaceIdAtom)
@@ -41,7 +46,7 @@ export const activeWorkspaceAtom = atom((get) => {
 })
 
 /**
- * Set the active workspace
+ * Set the active worktree
  */
 export const setActiveWorkspaceAtom = atom(
   null,
@@ -55,14 +60,14 @@ export const setActiveWorkspaceAtom = atom(
 // =============================================================================
 
 /**
- * Sessions keyed by workspace ID -> session ID -> Session
+ * Sessions keyed by worktree ID -> session ID -> Session
  */
 export const workspaceSessionsMapAtom = atom<Map<string, Map<string, Session>>>(
   new Map()
 )
 
 /**
- * Get sessions for a specific workspace
+ * Get sessions for a specific worktree
  */
 export const getWorkspaceSessionsAtom = atom((get) => {
   return (workspaceId: string): Session[] => {
@@ -79,7 +84,7 @@ export const getWorkspaceSessionsAtom = atom((get) => {
 export const activeSessionIdAtom = atom<string | null>(null)
 
 /**
- * Active session for the current workspace (derived)
+ * Active session for the current worktree (derived)
  */
 export const activeSessionAtom = atom((get) => {
   const workspaceId = get(activeWorkspaceIdAtom)
@@ -104,25 +109,25 @@ export const setActiveSessionAtom = atom(
 )
 
 // =============================================================================
-// Workspace Status (Conductor-style)
+// Worktree Status (Conductor-style)
 // =============================================================================
 
 /**
- * Get effective status for a workspace
+ * Get effective status for a worktree
  * Manual status overrides derived status if set
  */
 export const getWorkspaceStatusAtom = atom((get) => {
-  return (workspaceId: string): WorkspaceStatus => {
+  return (workspaceId: string): WorktreeStatus => {
     const map = get(workspacesMapAtom)
-    const workspace = map.get(workspaceId)
-    if (!workspace) return 'in-progress'
+    const worktree = map.get(workspaceId)
+    if (!worktree) return 'in-progress'
 
     // Manual status takes precedence
-    if (workspace.manualStatus) {
-      return workspace.manualStatus
+    if (worktree.manualStatus) {
+      return worktree.manualStatus
     }
 
-    return workspace.derivedStatus ?? 'in-progress'
+    return worktree.derivedStatus ?? 'in-progress'
   }
 })
 
@@ -131,12 +136,12 @@ export const getWorkspaceStatusAtom = atom((get) => {
 // =============================================================================
 
 /**
- * IDs of pinned workspaces, sorted by pin time (most recent first)
+ * IDs of pinned worktrees, sorted by pin time (most recent first)
  */
 export const pinnedWorkspaceIdsAtom = atom((get) => {
-  const workspaces = get(workspacesAtom)
+  const worktrees = get(workspacesAtom)
 
-  return workspaces
+  return worktrees
     .filter((w) => w.pinnedAt != null)
     .sort((a, b) => {
       const aTime = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0
@@ -147,17 +152,17 @@ export const pinnedWorkspaceIdsAtom = atom((get) => {
 })
 
 /**
- * Pinned workspaces (derived)
+ * Pinned worktrees (derived)
  */
 export const pinnedWorkspacesAtom = atom((get) => {
   const ids = get(pinnedWorkspaceIdsAtom)
   const map = get(workspacesMapAtom)
 
-  return ids.map((id) => map.get(id)).filter((w): w is Workspace => w != null)
+  return ids.map((id) => map.get(id)).filter((w): w is Worktree => w != null)
 })
 
 /**
- * Check if a workspace is pinned
+ * Check if a worktree is pinned
  */
 export const isWorkspacePinnedAtom = atom((get) => {
   return (workspaceId: string): boolean => {
@@ -171,86 +176,86 @@ export const isWorkspacePinnedAtom = atom((get) => {
 // =============================================================================
 
 /**
- * Active (non-archived) workspaces
+ * Active (non-archived) worktrees
  */
 export const activeWorkspacesAtom = atom((get) => {
-  const workspaces = get(workspacesAtom)
-  return workspaces.filter((w) => w.state !== 'archived')
+  const worktrees = get(workspacesAtom)
+  return worktrees.filter((w) => w.state !== 'archived')
 })
 
 /**
- * Archived workspaces
+ * Archived worktrees
  */
 export const archivedWorkspacesAtom = atom((get) => {
-  const workspaces = get(workspacesAtom)
-  return workspaces.filter((w) => w.state === 'archived')
+  const worktrees = get(workspacesAtom)
+  return worktrees.filter((w) => w.state === 'archived')
 })
 
 /**
- * Workspaces grouped by repository ID
+ * Worktrees grouped by repository ID
  */
 export const workspacesByRepoAtom = atom((get) => {
-  const workspaces = get(activeWorkspacesAtom)
-  const grouped = new Map<string, Workspace[]>()
+  const worktrees = get(activeWorkspacesAtom)
+  const grouped = new Map<string, Worktree[]>()
 
-  for (const workspace of workspaces) {
-    const repoId = workspace.repositoryId ?? 'unknown'
+  for (const worktree of worktrees) {
+    const repoId = worktree.repoId ?? 'unknown'
     const existing = grouped.get(repoId) ?? []
-    grouped.set(repoId, [...existing, workspace])
+    grouped.set(repoId, [...existing, worktree])
   }
 
   return grouped
 })
 
 /**
- * Workspaces with unread messages
+ * Worktrees with unread messages
  */
 export const unreadWorkspacesAtom = atom((get) => {
-  const workspaces = get(activeWorkspacesAtom)
-  return workspaces.filter((w) => (w.unread ?? 0) > 0)
+  const worktrees = get(activeWorkspacesAtom)
+  return worktrees.filter((w) => (w.unread ?? 0) > 0)
 })
 
 /**
- * Total unread count across all workspaces
+ * Total unread count across all worktrees
  */
 export const totalUnreadCountAtom = atom((get) => {
-  const workspaces = get(activeWorkspacesAtom)
-  return workspaces.reduce((sum, w) => sum + (w.unread ?? 0), 0)
+  const worktrees = get(activeWorkspacesAtom)
+  return worktrees.reduce((sum, w) => sum + (w.unread ?? 0), 0)
 })
 
 // =============================================================================
-// Actions - Update Workspaces
+// Actions - Update Worktrees
 // =============================================================================
 
 /**
- * Set all workspaces (replace entire state)
+ * Set all worktrees (replace entire state)
  */
-export const setWorkspacesAtom = atom(null, (_get, set, workspaces: Workspace[]) => {
-  const map = new Map<string, Workspace>()
-  for (const w of workspaces) {
+export const setWorkspacesAtom = atom(null, (_get, set, worktrees: Worktree[]) => {
+  const map = new Map<string, Worktree>()
+  for (const w of worktrees) {
     map.set(w.id, w)
   }
   set(workspacesMapAtom, map)
 })
 
 /**
- * Add or update a single workspace
+ * Add or update a single worktree
  */
-export const upsertWorkspaceAtom = atom(null, (get, set, workspace: Workspace) => {
+export const upsertWorkspaceAtom = atom(null, (get, set, worktree: Worktree) => {
   const map = new Map(get(workspacesMapAtom))
-  map.set(workspace.id, workspace)
+  map.set(worktree.id, worktree)
   set(workspacesMapAtom, map)
 })
 
 /**
- * Remove a workspace
+ * Remove a worktree
  */
 export const removeWorkspaceAtom = atom(null, (get, set, workspaceId: string) => {
   const map = new Map(get(workspacesMapAtom))
   map.delete(workspaceId)
   set(workspacesMapAtom, map)
 
-  // Clear active if it was the removed workspace
+  // Clear active if it was the removed worktree
   const activeId = get(activeWorkspaceIdAtom)
   if (activeId === workspaceId) {
     set(activeWorkspaceIdAtom, null)
@@ -258,11 +263,11 @@ export const removeWorkspaceAtom = atom(null, (get, set, workspaceId: string) =>
 })
 
 /**
- * Update workspace fields (partial update)
+ * Update worktree fields (partial update)
  */
 export const updateWorkspaceAtom = atom(
   null,
-  (get, set, { id, update }: { id: string; update: Partial<Workspace> }) => {
+  (get, set, { id, update }: { id: string; update: Partial<Worktree> }) => {
     const map = get(workspacesMapAtom)
     const existing = map.get(id)
     if (!existing) return
@@ -275,7 +280,7 @@ export const updateWorkspaceAtom = atom(
 )
 
 /**
- * Mark workspace unread count
+ * Mark worktree unread count
  */
 export const setWorkspaceUnreadAtom = atom(
   null,
@@ -285,7 +290,7 @@ export const setWorkspaceUnreadAtom = atom(
 )
 
 /**
- * Clear unread for a workspace
+ * Clear unread for a worktree
  */
 export const clearWorkspaceUnreadAtom = atom(null, (_get, set, workspaceId: string) => {
   set(updateWorkspaceAtom, { id: workspaceId, update: { unread: 0 } })
@@ -296,7 +301,7 @@ export const clearWorkspaceUnreadAtom = atom(null, (_get, set, workspaceId: stri
 // =============================================================================
 
 /**
- * Set sessions for a workspace
+ * Set sessions for a worktree
  */
 export const setWorkspaceSessionsAtom = atom(
   null,
@@ -384,3 +389,10 @@ export const removeSessionAtom = atom(
     }
   }
 )
+
+// =============================================================================
+// Type aliases for backwards compatibility
+// =============================================================================
+
+/** @deprecated Use Worktree instead */
+export type Workspace = Worktree

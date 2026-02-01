@@ -1,15 +1,14 @@
 import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useWorkspaces, useRepos } from '@/hooks/useRpc'
+import { useAllWorktrees, useRepos } from '@/hooks/useRpc'
 import { cn } from '@/lib/utils'
-import type { Workspace, WorkspaceStatus } from '@/lib/rpc'
+import { WorktreeStatusBadge } from '@/components/WorktreeStatusBadge'
+import type { Worktree, WorktreeStatus } from '@/lib/rpc'
 import {
   Search,
   Filter,
   Loader2,
   Archive,
-  Check,
-  AlertCircle,
   ChevronLeft,
   FolderPlus,
 } from 'lucide-react'
@@ -18,7 +17,7 @@ import {
 // Status Filter Options
 // ============================================================================
 
-type StatusFilter = 'all' | 'active' | 'archived' | WorkspaceStatus
+type StatusFilter = 'all' | 'active' | 'archived' | WorktreeStatus
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -31,35 +30,13 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 ]
 
 // ============================================================================
-// Status Badge
-// ============================================================================
-
-function StatusBadge({ status }: { status?: WorkspaceStatus | null }) {
-  const config = {
-    done: { icon: <Check className="w-3 h-3" />, color: 'text-green-500 bg-green-500/10' },
-    blocked: { icon: <AlertCircle className="w-3 h-3" />, color: 'text-orange-500 bg-orange-500/10' },
-    'needs-review': { icon: <AlertCircle className="w-3 h-3" />, color: 'text-yellow-500 bg-yellow-500/10' },
-    'in-progress': { icon: null, color: 'text-blue-500 bg-blue-500/10' },
-  }
-
-  const cfg = status ? config[status] : null
-  if (!cfg) return null
-
-  return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', cfg.color)}>
-      {cfg.icon}
-      {status}
-    </span>
-  )
-}
-
-// ============================================================================
 // Workspace Card
 // ============================================================================
 
-function WorkspaceCard({ workspace }: { workspace: Workspace }) {
+function WorkspaceCard({ workspace }: { workspace: Worktree }) {
   const status = workspace.manualStatus ?? workspace.derivedStatus
   const isArchived = workspace.state === 'archived'
+  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
 
   return (
     <Link
@@ -77,17 +54,17 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-text-primary truncate">
-              {workspace.branch ?? workspace.directoryName}
+              {displayName}
             </h3>
             {isArchived && (
               <Archive className="w-3.5 h-3.5 text-text-dim flex-shrink-0" />
             )}
           </div>
           <p className="text-xs text-text-faint mt-0.5 truncate">
-            {workspace.directoryName}
+            {workspace.worktreePath?.split('/').pop() ?? workspace.branch}
           </p>
         </div>
-        <StatusBadge status={status} />
+        <WorktreeStatusBadge status={status} />
       </div>
 
       {workspace.updatedAt && (
@@ -104,7 +81,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
 // ============================================================================
 
 export function AllWorkspacesPage() {
-  const { data: workspaces, isLoading: loadingWorkspaces } = useWorkspaces()
+  const { data: workspaces, isLoading: loadingWorkspaces } = useAllWorktrees(true)
   const { data: repos } = useRepos()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
@@ -129,8 +106,8 @@ export function AllWorkspacesPage() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         const matchesBranch = ws.branch?.toLowerCase().includes(query)
-        const matchesDir = ws.directoryName.toLowerCase().includes(query)
-        if (!matchesBranch && !matchesDir) return false
+        const matchesPath = ws.worktreePath?.toLowerCase().includes(query)
+        if (!matchesBranch && !matchesPath) return false
       }
 
       // Status filter
@@ -146,10 +123,10 @@ export function AllWorkspacesPage() {
 
   // Group by repo
   const groupedWorkspaces = useMemo(() => {
-    const groups = new Map<string, Workspace[]>()
+    const groups = new Map<string, Worktree[]>()
 
     for (const ws of filteredWorkspaces) {
-      const repoId = ws.repositoryId ?? 'unknown'
+      const repoId = ws.repoId ?? 'unknown'
       if (!groups.has(repoId)) {
         groups.set(repoId, [])
       }
