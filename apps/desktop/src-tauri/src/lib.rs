@@ -3,6 +3,7 @@
 
 pub mod commands;
 pub mod ipc;
+mod notification_listener;
 
 use commands::SidecarState;
 use std::path::PathBuf;
@@ -120,7 +121,7 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Register sidecar state with the PID
-    let state = SidecarState::new(socket_path);
+    let state = SidecarState::new(socket_path.clone());
     {
         // Set the PID in the state - we need to do this via a runtime
         let pid_clone = pid;
@@ -133,6 +134,10 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     app.manage(state);
+
+    // Spawn persistent notification listener for real-time streaming
+    let app_handle = app.handle().clone();
+    notification_listener::spawn_listener(socket_path, app_handle);
 
     Ok(())
 }

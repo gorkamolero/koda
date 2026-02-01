@@ -11,19 +11,30 @@ import {
   exitPlanModeAtom,
   type MessageMention,
 } from '@/store/chat'
-import { rpcRequest } from '@/lib/tauri'
+import { rpcRequest, isTauriContext } from '@/lib/tauri'
 import {
   RPC_METHODS,
   type ClaudeStartParams,
   type ClaudeStartResult,
-  type ClaudeSessionInfo,
-  type StoredMessage,
-  type ClaudeGetMessagesParams,
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { PlanModeIndicator } from './PlanModeIndicator'
 import { useNotifications } from '@/hooks/useNotifications'
+
+// Notification payload types
+interface MessageNotificationPayload {
+  sessionId: string
+  event: {
+    type: string
+    message?: { content?: Array<{ type: string; text?: string }> }
+    result?: string
+    is_error?: boolean
+    tool?: string
+    [key: string]: unknown
+  }
+  timestamp: number
+}
 
 interface AgentChatProps {
   worktreeId: string
@@ -46,10 +57,8 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
   const exitPlanMode = useSetAtom(exitPlanModeAtom)
   const { showToast } = useNotifications()
   
-  // Track active session for polling
+  // Track active session
   const activeSessionRef = useRef<string | null>(null)
-  const messageIndexRef = useRef(0)
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const currentMessageIdRef = useRef<string | null>(null)
   const accumulatedTextRef = useRef('')
 
@@ -58,140 +67,106 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
     setCurrentWorkspaceId(worktreeId)
     return () => {
       setCurrentWorkspaceId(null)
-      // Clean up polling on unmount
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current)
-      }
     }
   }, [worktreeId, setCurrentWorkspaceId])
 
-  // Poll for messages from active session
-  const pollMessages = useCallback(async () => {
-    if (!activeSessionRef.current) return
+  // Process a streaming event (shared by notification listener)
+  const processEvent = useCallback((event: MessageNotificationPayload['event'], sessionId: string) => {
+    // Ignore events from other sessions
+    if (activeSessionRef.current !== sessionId) return
 
-    try {
-      const messages = await rpcRequest<StoredMessage[]>(
-        RPC_METHODS.CLAUDE_GET_MESSAGES,
-        {
-          sessionId: activeSessionRef.current,
-          fromIndex: messageIndexRef.current,
-        } satisfies ClaudeGetMessagesParams
-      )
-
-      for (const msg of messages) {
-        messageIndexRef.current = msg.index + 1
-
-        // Process the event based on Claude stream-json format
-        const event = msg.event
-
-        // Handle assistant messages (streaming text content)
-        if (event.type === 'assistant') {
-          // SDK format: message.content is an array of content blocks
-          const message = event.message as { content?: Array<{ type: string; text?: string }> } | undefined
-          if (message?.content) {
-            for (const block of message.content) {
-              if (block.type === 'text' && block.text) {
-                accumulatedTextRef.current += block.text
-              }
-            }
-
-            if (currentMessageIdRef.current && accumulatedTextRef.current) {
-              updateMessage({
-                id: currentMessageIdRef.current,
-                update: {
-                  content: accumulatedTextRef.current,
-                  status: 'streaming',
-                },
-              })
-            }
-          }
-        } else if (event.type === 'result') {
-          // Session complete - result contains final text if not already accumulated
-          const resultText = (event as { result?: string }).result
-          const isError = (event as { is_error?: boolean }).is_error
-
-          if (isError && resultText) {
-            showToast({
-              type: 'error',
-              title: 'Agent Error',
-              message: resultText ?? 'Unknown error',
-            })
-          }
-
-          if (currentMessageIdRef.current) {
-            // Use accumulated text if available, otherwise use result
-            const finalContent = accumulatedTextRef.current || resultText || 'Done'
-            updateMessage({
-              id: currentMessageIdRef.current,
-              update: {
-                content: finalContent,
-                status: isError ? 'error' : 'complete',
-              },
-            })
-          }
-          
-          // Stop polling
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-          activeSessionRef.current = null
-          setIsStreaming(false)
-        } else if (event.type === 'tool_use') {
-          // Tool call - append to accumulated text as indicator
-          const toolName = (event as { tool?: string }).tool ?? 'tool'
-          if (currentMessageIdRef.current) {
-            updateMessage({
-              id: currentMessageIdRef.current,
-              update: {
-                content: accumulatedTextRef.current || `Using ${toolName}...`,
-                status: 'streaming',
-              },
-            })
-          }
-        } else if (event.type === 'tool_result') {
-          // Tool result - just update status indicator
-          if (currentMessageIdRef.current && !accumulatedTextRef.current) {
-            updateMessage({
-              id: currentMessageIdRef.current,
-              update: {
-                content: 'Processing...',
-                status: 'streaming',
-              },
-            })
+    // Handle assistant messages (streaming text content)
+    if (event.type === 'assistant') {
+      const message = event.message
+      if (message?.content) {
+        for (const block of message.content) {
+          if (block.type === 'text' && block.text) {
+            accumulatedTextRef.current += block.text
           }
         }
-      }
 
-      // Also check session status
-      if (activeSessionRef.current) {
-        const session = await rpcRequest<ClaudeSessionInfo | null>(
-          RPC_METHODS.CLAUDE_GET_SESSION,
-          { sessionId: activeSessionRef.current }
-        )
-        
-        if (session && (session.status === 'completed' || session.status === 'error' || session.status === 'cancelled')) {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current)
-            pollingRef.current = null
-          }
-          activeSessionRef.current = null
-          setIsStreaming(false)
-          
-          if (currentMessageIdRef.current) {
-            updateMessage({
-              id: currentMessageIdRef.current,
-              update: {
-                status: session.status === 'completed' ? 'complete' : 'error',
-              },
-            })
-          }
+        if (currentMessageIdRef.current && accumulatedTextRef.current) {
+          updateMessage({
+            id: currentMessageIdRef.current,
+            update: {
+              content: accumulatedTextRef.current,
+              status: 'streaming',
+            },
+          })
         }
       }
-    } catch (error) {
-      console.error('Failed to poll messages:', error)
+    } else if (event.type === 'result') {
+      // Session complete
+      const resultText = event.result
+      const isError = event.is_error
+
+      if (isError && resultText) {
+        showToast({
+          type: 'error',
+          title: 'Agent Error',
+          message: resultText ?? 'Unknown error',
+        })
+      }
+
+      if (currentMessageIdRef.current) {
+        const finalContent = accumulatedTextRef.current || resultText || 'Done'
+        updateMessage({
+          id: currentMessageIdRef.current,
+          update: {
+            content: finalContent,
+            status: isError ? 'error' : 'complete',
+          },
+        })
+      }
+
+      activeSessionRef.current = null
+      setIsStreaming(false)
+    } else if (event.type === 'tool_use') {
+      const toolName = event.tool ?? 'tool'
+      if (currentMessageIdRef.current) {
+        updateMessage({
+          id: currentMessageIdRef.current,
+          update: {
+            content: accumulatedTextRef.current || `Using ${toolName}...`,
+            status: 'streaming',
+          },
+        })
+      }
+    } else if (event.type === 'tool_result') {
+      if (currentMessageIdRef.current && !accumulatedTextRef.current) {
+        updateMessage({
+          id: currentMessageIdRef.current,
+          update: {
+            content: 'Processing...',
+            status: 'streaming',
+          },
+        })
+      }
     }
   }, [updateMessage, setIsStreaming, showToast])
+
+  // Listen for streaming notifications from Tauri (real-time)
+  useEffect(() => {
+    if (!isTauriContext()) return
+
+    let unlisten: (() => void) | undefined
+
+    const setupListener = async () => {
+      const { listen } = await import('@tauri-apps/api/event')
+
+      // Listen for message notifications
+      unlisten = await listen<MessageNotificationPayload>('sidecar-notification:message', (event) => {
+        const { sessionId, event: streamEvent } = event.payload
+        processEvent(streamEvent, sessionId)
+      })
+    }
+
+    void setupListener()
+
+    return () => {
+      unlisten?.()
+    }
+  }, [processEvent])
 
   const handleSendMessage = useCallback(
     async (content: string, mentions?: MessageMention[]) => {
@@ -207,7 +182,6 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
       // Call sidecar to start Claude session
       setIsStreaming(true)
       accumulatedTextRef.current = ''
-      messageIndexRef.current = 0
 
       try {
         // Create placeholder for assistant response with known ID for later updates
@@ -221,7 +195,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
           model: selectedModel,
         })
 
-        // Start Claude session
+        // Start Claude session - notifications will stream via Tauri events
         const result = await rpcRequest<ClaudeStartResult>(
           RPC_METHODS.CLAUDE_START,
           {
@@ -231,11 +205,6 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
         )
 
         activeSessionRef.current = result.sessionId
-
-        // Start polling for messages
-        pollingRef.current = setInterval(() => {
-          void pollMessages()
-        }, 300)
 
       } catch (error) {
         console.error('Failed to start Claude session:', error)
@@ -248,7 +217,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
         })
       }
     },
-    [selectedModel, worktreeId, setIsStreaming, addMessage, pollMessages]
+    [selectedModel, worktreeId, setIsStreaming, addMessage]
   )
 
   return (

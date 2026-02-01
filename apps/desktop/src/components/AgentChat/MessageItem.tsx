@@ -217,10 +217,12 @@ export const MessageItem = memo(function MessageItem({
         className="pb-3 max-w-6xl mx-auto scroll-mt-24"
       >
         <div className="flex flex-col gap-1 w-full px-7 py-2">
-          <div className="flex justify-end">
+          <div className="flex justify-end pb-6">
             <div className="relative min-w-0 max-w-full">
-              <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-accent/50 text-foreground">
-                <MessageResponse>{message.content}</MessageResponse>
+              <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-highlight text-highlight-foreground">
+                <div className="text-sm break-words whitespace-pre-wrap">
+                  {message.content}
+                </div>
               </div>
             </div>
           </div>
@@ -229,7 +231,7 @@ export const MessageItem = memo(function MessageItem({
     )
   }
 
-  // Assistant messages - left-aligned, no avatar, clean
+  // Assistant messages - left-aligned, Conductor-style prose
   return (
     <div
       data-testid={`message-${message.id}`}
@@ -237,49 +239,61 @@ export const MessageItem = memo(function MessageItem({
       data-message-role="assistant"
       className="pb-3 max-w-6xl mx-auto scroll-mt-24"
     >
-      <div className="flex flex-col gap-1 w-full px-7 py-2">
-        {/* Tool call summary if present */}
+      <div className="flex flex-col gap-1 w-full border max-w-full px-7 py-2 !border-transparent">
+        {/* Tool call summary row */}
         {hasContentBlocks && message.contentBlocks && (
           <ToolCallSummary
             contentBlocks={message.contentBlocks}
-            className="mb-2"
+            className="w-full flex items-center text-muted-foreground hover:text-foreground mb-1"
           />
         )}
 
-        {/* Main content */}
-        <div className={cn("min-w-0", isError && "border-l-2 border-destructive pl-3")}>
-          {hasContentBlocks && message.contentBlocks ? (
-            <div className="space-y-3">
-              {message.contentBlocks.map((block, idx) => (
-                <div key={`${block.type}-${String(idx)}`}>
-                  {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
-                </div>
-              ))}
+        {/* Main content - Conductor prose styling */}
+        <div className="flex justify-start relative">
+          <div className={cn(
+            "flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words",
+            isError && "border-l-2 border-destructive pl-3"
+          )}>
+            <div className="my-1" data-searchable="true">
+              <div className="prose prose-sm prose-invert antialiased select-text text-pretty prose-headings:text-balance">
+                {hasContentBlocks && message.contentBlocks ? (
+                  <div className="space-y-3">
+                    {message.contentBlocks.map((block, idx) => (
+                      <div key={`${block.type}-${String(idx)}`}>
+                        {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {isStreaming && !message.content ? (
+                      <Shimmer duration={1.5}>Thinking...</Shimmer>
+                    ) : isStreaming ? (
+                      <MessageResponse>{message.content}</MessageResponse>
+                    ) : (
+                      <MessageResponse>{message.content}</MessageResponse>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          ) : (
-            <>
-              {isStreaming ? (
-                <Shimmer duration={1.5}>{message.content || 'Thinking...'}</Shimmer>
-              ) : (
-                <MessageResponse>{message.content}</MessageResponse>
-              )}
-            </>
-          )}
 
-          {/* Error indicator */}
-          {isError && !hasContentBlocks && (
-            <div className="mt-2 text-xs text-destructive">
-              Failed to generate response
-            </div>
-          )}
+            {/* Error indicator */}
+            {isError && !hasContentBlocks && (
+              <div className="mt-2 text-xs text-destructive">
+                Failed to generate response
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Working indicator during streaming */}
+        {/* Metadata row with working indicator during streaming */}
         {isStreaming && (
-          <WorkingIndicator
-            startTime={message.startTime ?? message.timestamp}
-            className="mt-2"
-          />
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+            <WorkingIndicator
+              startTime={message.startTime ?? message.timestamp}
+            />
+          </div>
         )}
       </div>
     </div>

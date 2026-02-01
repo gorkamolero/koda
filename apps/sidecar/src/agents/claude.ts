@@ -756,9 +756,14 @@ export class ClaudeHandler extends EventEmitter {
   }
 
   /**
-   * Emit event based on type
+   * Emit event based on type - both locally and to frontend via notifications
    */
-  private emitEvent(_sessionId: string, event: ClaudeStreamEvent): void {
+  private emitEvent(sessionId: string, event: ClaudeStreamEvent): void {
+    // Push to frontend via notification system (real-time streaming)
+    const notificationEmitter = getNotificationEmitter()
+    notificationEmitter.emitMessage(sessionId, event)
+
+    // Also emit locally for any internal listeners
     switch (event.type) {
       case 'tool_use':
         this.emit('tool_use', event)

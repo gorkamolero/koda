@@ -50,12 +50,15 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   }, [startTime])
 
   const formatElapsed = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000)
-    if (seconds < 60) return `${String(seconds)}s`
+    const totalSeconds = ms / 1000
+    if (totalSeconds < 60) {
+      // Show one decimal place for sub-minute durations
+      return `${totalSeconds.toFixed(1)}s`
+    }
 
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${String(minutes)}m ${String(remainingSeconds)}s`
+    const minutes = Math.floor(totalSeconds / 60)
+    const remainingSeconds = Math.floor(totalSeconds % 60)
+    return `${String(minutes)}m, ${String(remainingSeconds)}s`
   }
 
   return (
@@ -122,7 +125,15 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
     }
   }, [startTime])
 
-  const seconds = Math.floor(elapsed / 1000)
+  const formatElapsed = (ms: number): string => {
+    const totalSeconds = ms / 1000
+    if (totalSeconds < 60) {
+      return `${totalSeconds.toFixed(1)}s`
+    }
+    const minutes = Math.floor(totalSeconds / 60)
+    const remainingSeconds = Math.floor(totalSeconds % 60)
+    return `${String(minutes)}m, ${String(remainingSeconds)}s`
+  }
 
   return (
     <span className={cn('inline-flex items-center gap-1.5 font-mono text-xs', className)}>
@@ -144,7 +155,7 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
         ))}
       </span>
       <span className="text-text-muted">{label}</span>
-      <span className="text-text-dim tabular-nums">{String(seconds)}s</span>
+      <span className="text-text-dim tabular-nums">{formatElapsed(elapsed)}</span>
     </span>
   )
 })

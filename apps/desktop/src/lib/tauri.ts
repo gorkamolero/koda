@@ -4,7 +4,7 @@ import type { SidecarStatus, JsonRpcError } from '@/lib/rpc'
  * Check if we're running in Tauri context
  * In E2E tests (Playwright), we run in regular Chromium and Tauri APIs aren't available
  */
-function isTauriContext(): boolean {
+export function isTauriContext(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window
 }
 
