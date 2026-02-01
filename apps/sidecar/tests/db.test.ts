@@ -60,8 +60,10 @@ describe('Database Schema', () => {
         'settings',
         'users',
         'visual_snapshots',
+        'workspace_repos',
         'workspace_shares',
         'workspaces',
+        'worktrees',
       ]);
     });
 
@@ -76,35 +78,58 @@ describe('Database Schema', () => {
       expect(columnNames).toContain('created_at');
     });
 
-    it('should create workspaces table with correct columns', () => {
+    it('should create workspaces table as container', () => {
       const columns = sqlite.pragma(`table_info(workspaces)`);
       const columnNames = columns.map((c: any) => c.name);
 
+      // Workspaces are now simple containers
       expect(columnNames).toContain('id');
-      expect(columnNames).toContain('repository_id');
+      expect(columnNames).toContain('name');
+      expect(columnNames).toContain('description');
       expect(columnNames).toContain('owner_user_id');
-      expect(columnNames).toContain('directory_name');
+      expect(columnNames).toContain('created_at');
+      expect(columnNames).toContain('updated_at');
+
+      // These should NOT be on workspaces anymore (they're on worktrees)
+      expect(columnNames).not.toContain('branch');
+      expect(columnNames).not.toContain('directory_name');
+      expect(columnNames).not.toContain('repository_id');
+    });
+
+    it('should create worktrees table with git worktree fields', () => {
+      const columns = sqlite.pragma(`table_info(worktrees)`);
+      const columnNames = columns.map((c: any) => c.name);
+
+      expect(columnNames).toContain('id');
+      expect(columnNames).toContain('repo_id');
       expect(columnNames).toContain('branch');
-      expect(columnNames).toContain('workspace_type');
+      expect(columnNames).toContain('worktree_path');
+      expect(columnNames).toContain('workspace_ids');
+      expect(columnNames).toContain('worktree_type');
       expect(columnNames).toContain('state');
       expect(columnNames).toContain('spec_content');
       expect(columnNames).toContain('fix_plan_content');
       expect(columnNames).toContain('ralph_enabled');
+      expect(columnNames).toContain('derived_status');
+      expect(columnNames).toContain('active_session_id');
       expect(columnNames).toContain('created_at');
       expect(columnNames).toContain('updated_at');
     });
 
-    it('should create sessions table with forking support', () => {
+    it('should create sessions table with worktree reference', () => {
       const columns = sqlite.pragma(`table_info(sessions)`);
       const columnNames = columns.map((c: any) => c.name);
 
       expect(columnNames).toContain('id');
-      expect(columnNames).toContain('workspace_id');
+      expect(columnNames).toContain('worktree_id');
       expect(columnNames).toContain('agent_type');
       expect(columnNames).toContain('model');
       expect(columnNames).toContain('status');
       expect(columnNames).toContain('context_token_count');
       expect(columnNames).toContain('forked_from_session_id');
+
+      // Should NOT have workspace_id anymore
+      expect(columnNames).not.toContain('workspace_id');
     });
 
     it('should create git_identities table for multi-account support', () => {
@@ -130,12 +155,22 @@ describe('Database Schema', () => {
       expect(columnNames).toContain('permission');
     });
 
-    it('should create visual_snapshots table', () => {
-      const columns = sqlite.pragma(`table_info(visual_snapshots)`);
+    it('should create workspace_repos table for linking', () => {
+      const columns = sqlite.pragma(`table_info(workspace_repos)`);
       const columnNames = columns.map((c: any) => c.name);
 
       expect(columnNames).toContain('id');
       expect(columnNames).toContain('workspace_id');
+      expect(columnNames).toContain('repo_id');
+      expect(columnNames).toContain('created_at');
+    });
+
+    it('should create visual_snapshots table with worktree reference', () => {
+      const columns = sqlite.pragma(`table_info(visual_snapshots)`);
+      const columnNames = columns.map((c: any) => c.name);
+
+      expect(columnNames).toContain('id');
+      expect(columnNames).toContain('worktree_id');
       expect(columnNames).toContain('session_id');
       expect(columnNames).toContain('turn_id');
       expect(columnNames).toContain('snapshot_type');
@@ -143,24 +178,24 @@ describe('Database Schema', () => {
       expect(columnNames).toContain('url');
     });
 
-    it('should create git_checkpoints table', () => {
+    it('should create git_checkpoints table with worktree reference', () => {
       const columns = sqlite.pragma(`table_info(git_checkpoints)`);
       const columnNames = columns.map((c: any) => c.name);
 
       expect(columnNames).toContain('id');
-      expect(columnNames).toContain('workspace_id');
+      expect(columnNames).toContain('worktree_id');
       expect(columnNames).toContain('turn_id');
       expect(columnNames).toContain('head_oid');
       expect(columnNames).toContain('index_tree');
       expect(columnNames).toContain('worktree_tree');
     });
 
-    it('should create diff_comments table for PR-style reviews', () => {
+    it('should create diff_comments table with worktree reference', () => {
       const columns = sqlite.pragma(`table_info(diff_comments)`);
       const columnNames = columns.map((c: any) => c.name);
 
       expect(columnNames).toContain('id');
-      expect(columnNames).toContain('workspace_id');
+      expect(columnNames).toContain('worktree_id');
       expect(columnNames).toContain('user_id');
       expect(columnNames).toContain('file_path');
       expect(columnNames).toContain('line_number');
@@ -173,17 +208,22 @@ describe('Database Schema', () => {
     it('should have foreign keys on workspaces table', () => {
       const fks = sqlite.pragma(`foreign_key_list(workspaces)`);
 
+      // Workspaces now only reference users (owner)
+      expect(fks.some((fk: any) => fk.table === 'users')).toBe(true);
+    });
+
+    it('should have foreign keys on worktrees table', () => {
+      const fks = sqlite.pragma(`foreign_key_list(worktrees)`);
+
       expect(fks.length).toBeGreaterThan(0);
       expect(fks.some((fk: any) => fk.table === 'repos')).toBe(true);
-      expect(fks.some((fk: any) => fk.table === 'users')).toBe(true);
     });
 
     it('should have foreign keys on sessions table', () => {
       const fks = sqlite.pragma(`foreign_key_list(sessions)`);
 
       expect(fks.length).toBeGreaterThan(0);
-      expect(fks.some((fk: any) => fk.table === 'workspaces')).toBe(true);
-      // Note: Self-reference for forking is not enforced at DB level to avoid circular dependency issues
+      expect(fks.some((fk: any) => fk.table === 'worktrees')).toBe(true);
     });
 
     it('should have foreign keys on workspace_shares table', () => {
@@ -192,6 +232,14 @@ describe('Database Schema', () => {
       expect(fks.length).toBe(2);
       expect(fks.some((fk: any) => fk.table === 'workspaces')).toBe(true);
       expect(fks.some((fk: any) => fk.table === 'users')).toBe(true);
+    });
+
+    it('should have foreign keys on workspace_repos table', () => {
+      const fks = sqlite.pragma(`foreign_key_list(workspace_repos)`);
+
+      expect(fks.length).toBe(2);
+      expect(fks.some((fk: any) => fk.table === 'workspaces')).toBe(true);
+      expect(fks.some((fk: any) => fk.table === 'repos')).toBe(true);
     });
   });
 
@@ -245,9 +293,8 @@ describe('Database Schema', () => {
       expect(identities[0].isDefault).toBe(true);
     });
 
-    it('should create workspace with all collaboration fields', () => {
+    it('should create workspace as container', () => {
       const userId = 'user-3';
-      const repoId = 'repo-1';
 
       db.insert(schema.users).values({
         id: userId,
@@ -255,24 +302,11 @@ describe('Database Schema', () => {
         name: 'Workspace Owner',
       }).run();
 
-      db.insert(schema.repos).values({
-        id: repoId,
-        name: 'test-repo',
-        remoteUrl: 'https://github.com/test/repo.git',
-        rootPath: '/path/to/repo',
-      }).run();
-
       const newWorkspace: schema.NewWorkspace = {
         id: 'ws-1',
-        repositoryId: repoId,
+        name: 'My Project',
+        description: 'A container for my project worktrees',
         ownerUserId: userId,
-        directoryName: 'feature-branch',
-        branch: 'feature/new-feature',
-        workspaceType: 'spec-driven',
-        state: 'active',
-        specContent: '# Feature Spec\n\nBuild a new feature...',
-        fixPlanContent: '- [ ] Task 1\n- [ ] Task 2',
-        ralphEnabled: true,
       };
 
       db.insert(schema.workspaces).values(newWorkspace).run();
@@ -284,30 +318,67 @@ describe('Database Schema', () => {
         .all();
 
       expect(workspaces).toHaveLength(1);
-      expect(workspaces[0].workspaceType).toBe('spec-driven');
-      expect(workspaces[0].ralphEnabled).toBe(true);
-      expect(workspaces[0].specContent).toContain('Feature Spec');
+      expect(workspaces[0].name).toBe('My Project');
+      expect(workspaces[0].description).toBe('A container for my project worktrees');
+    });
+
+    it('should create worktree with git state', () => {
+      const repoId = 'repo-1';
+
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'test-repo',
+        remoteUrl: 'https://github.com/test/repo.git',
+        rootPath: '/path/to/repo',
+      }).run();
+
+      const newWorktree: schema.NewWorktree = {
+        id: 'wt-1',
+        repoId: repoId,
+        branch: 'feature/new-feature',
+        worktreePath: '/path/to/worktrees/feature-new-feature',
+        worktreeType: 'standard',
+        state: 'active',
+        specContent: '# Feature Spec\n\nBuild a new feature...',
+        fixPlanContent: '- [ ] Task 1\n- [ ] Task 2',
+        ralphEnabled: true,
+      };
+
+      db.insert(schema.worktrees).values(newWorktree).run();
+
+      const worktrees = db
+        .select()
+        .from(schema.worktrees)
+        .where(eq(schema.worktrees.id, 'wt-1'))
+        .all();
+
+      expect(worktrees).toHaveLength(1);
+      expect(worktrees[0].branch).toBe('feature/new-feature');
+      expect(worktrees[0].ralphEnabled).toBe(true);
+      expect(worktrees[0].specContent).toContain('Feature Spec');
     });
 
     it('should support conversation forking', () => {
-      const workspaceId = 'ws-2';
-      const userId = 'user-4';
+      const repoId = 'repo-2';
+      const worktreeId = 'wt-2';
 
-      db.insert(schema.users).values({
-        id: userId,
-        name: 'Forking User',
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'fork-repo',
+        remoteUrl: 'https://github.com/test/fork.git',
+        rootPath: '/path/to/fork',
       }).run();
 
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'fork-test',
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'fork-test',
       }).run();
 
       // Create original session
       db.insert(schema.sessions).values({
         id: 'session-1',
-        workspaceId,
+        worktreeId,
         agentType: 'claude',
         model: 'claude-sonnet-4-5',
         status: 'idle',
@@ -316,7 +387,7 @@ describe('Database Schema', () => {
       // Create forked session
       db.insert(schema.sessions).values({
         id: 'session-2',
-        workspaceId,
+        worktreeId,
         agentType: 'kimi',
         model: 'kimi-k1.5',
         status: 'idle',
@@ -346,8 +417,8 @@ describe('Database Schema', () => {
 
       db.insert(schema.workspaces).values({
         id: workspaceId,
+        name: 'Shared Workspace',
         ownerUserId: ownerId,
-        directoryName: 'shared-workspace',
       }).run();
 
       db.insert(schema.workspaceShares).values({
@@ -367,27 +438,66 @@ describe('Database Schema', () => {
       expect(shares[0].permission).toBe('control');
     });
 
-    it('should create visual snapshots for before/after UI', () => {
-      const workspaceId = 'ws-4';
-      const sessionId = 'session-3';
-      const userId = 'user-7';
+    it('should link workspaces to repos', () => {
+      const workspaceId = 'ws-link-1';
+      const repoId = 'repo-link-1';
+      const userId = 'user-link-1';
 
-      db.insert(schema.users).values({ id: userId, name: 'User' }).run();
+      db.insert(schema.users).values({ id: userId, name: 'Linker' }).run();
       db.insert(schema.workspaces).values({
         id: workspaceId,
+        name: 'Linked Workspace',
         ownerUserId: userId,
-        directoryName: 'visual-test',
+      }).run();
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'linked-repo',
+        remoteUrl: 'https://github.com/test/linked.git',
+        rootPath: '/path/to/linked',
+      }).run();
+
+      db.insert(schema.workspaceRepos).values({
+        id: 'wr-1',
+        workspaceId,
+        repoId,
+      }).run();
+
+      const links = db
+        .select()
+        .from(schema.workspaceRepos)
+        .where(eq(schema.workspaceRepos.workspaceId, workspaceId))
+        .all();
+
+      expect(links).toHaveLength(1);
+      expect(links[0].repoId).toBe(repoId);
+    });
+
+    it('should create visual snapshots for before/after UI', () => {
+      const repoId = 'repo-visual';
+      const worktreeId = 'wt-visual';
+      const sessionId = 'session-visual';
+
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'visual-repo',
+        remoteUrl: 'https://github.com/test/visual.git',
+        rootPath: '/path/to/visual',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'visual-test',
       }).run();
       db.insert(schema.sessions).values({
         id: sessionId,
-        workspaceId,
+        worktreeId,
         agentType: 'claude',
       }).run();
 
       db.insert(schema.visualSnapshots).values([
         {
           id: 'snap-1',
-          workspaceId,
+          worktreeId,
           sessionId,
           turnId: 'turn-1',
           snapshotType: 'before',
@@ -396,7 +506,7 @@ describe('Database Schema', () => {
         },
         {
           id: 'snap-2',
-          workspaceId,
+          worktreeId,
           sessionId,
           turnId: 'turn-1',
           snapshotType: 'after',
@@ -417,19 +527,24 @@ describe('Database Schema', () => {
     });
 
     it('should create git checkpoints for time-travel', () => {
-      const workspaceId = 'ws-5';
-      const userId = 'user-8';
+      const repoId = 'repo-checkpoint';
+      const worktreeId = 'wt-checkpoint';
 
-      db.insert(schema.users).values({ id: userId, name: 'User' }).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'checkpoint-test',
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'checkpoint-repo',
+        remoteUrl: 'https://github.com/test/checkpoint.git',
+        rootPath: '/path/to/checkpoint',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'checkpoint-test',
       }).run();
 
       db.insert(schema.gitCheckpoints).values({
         id: 'checkpoint-1',
-        workspaceId,
+        worktreeId,
         turnId: 'turn-1',
         headOid: 'abc123',
         indexTree: 'def456',
@@ -439,7 +554,7 @@ describe('Database Schema', () => {
       const checkpoints = db
         .select()
         .from(schema.gitCheckpoints)
-        .where(eq(schema.gitCheckpoints.workspaceId, workspaceId))
+        .where(eq(schema.gitCheckpoints.worktreeId, worktreeId))
         .all();
 
       expect(checkpoints).toHaveLength(1);
@@ -447,114 +562,42 @@ describe('Database Schema', () => {
     });
 
     it('should create diff comments for PR-style reviews', () => {
-      const workspaceId = 'ws-6';
-      const userId = 'user-9';
+      const repoId = 'repo-comment';
+      const worktreeId = 'wt-comment';
+      const userId = 'user-comment';
 
       db.insert(schema.users).values({ id: userId, name: 'Reviewer' }).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'review-test',
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'comment-repo',
+        remoteUrl: 'https://github.com/test/comment.git',
+        rootPath: '/path/to/comment',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'comment-test',
       }).run();
 
       db.insert(schema.diffComments).values({
         id: 'comment-1',
-        workspaceId,
+        worktreeId,
         userId,
-        filePath: 'src/app.ts',
+        filePath: 'src/index.ts',
         lineNumber: 42,
-        body: 'This needs refactoring',
+        body: 'Consider using a const here',
         resolved: false,
       }).run();
 
       const comments = db
         .select()
         .from(schema.diffComments)
-        .where(eq(schema.diffComments.workspaceId, workspaceId))
+        .where(eq(schema.diffComments.worktreeId, worktreeId))
         .all();
 
       expect(comments).toHaveLength(1);
-      expect(comments[0].filePath).toBe('src/app.ts');
-      expect(comments[0].lineNumber).toBe(42);
+      expect(comments[0].body).toBe('Consider using a const here');
       expect(comments[0].resolved).toBe(false);
-    });
-  });
-
-  describe('Default Values', () => {
-    it('should set default workspace type to standard', () => {
-      const userId = 'user-10';
-
-      db.insert(schema.users).values({ id: userId, name: 'User' }).run();
-      db.insert(schema.workspaces).values({
-        id: 'ws-default',
-        ownerUserId: userId,
-        directoryName: 'default-test',
-      }).run();
-
-      const workspace = db
-        .select()
-        .from(schema.workspaces)
-        .where(eq(schema.workspaces.id, 'ws-default'))
-        .get();
-
-      expect(workspace?.workspaceType).toBe('standard');
-      expect(workspace?.state).toBe('active');
-      expect(workspace?.ralphEnabled).toBe(false);
-    });
-
-    it('should set default session status to idle', () => {
-      const userId = 'user-11';
-      const workspaceId = 'ws-11';
-
-      db.insert(schema.users).values({ id: userId, name: 'User' }).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'session-test',
-      }).run();
-      db.insert(schema.sessions).values({
-        id: 'session-default',
-        workspaceId,
-        agentType: 'claude',
-      }).run();
-
-      const session = db
-        .select()
-        .from(schema.sessions)
-        .where(eq(schema.sessions.id, 'session-default'))
-        .get();
-
-      expect(session?.status).toBe('idle');
-      expect(session?.contextTokenCount).toBe(0);
-    });
-
-    it('should set default permission to view for workspace shares', () => {
-      const ownerId = 'user-12';
-      const sharedWithId = 'user-13';
-      const workspaceId = 'ws-12';
-
-      db.insert(schema.users).values([
-        { id: ownerId, name: 'Owner' },
-        { id: sharedWithId, name: 'Viewer' },
-      ]).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: ownerId,
-        directoryName: 'share-test',
-      }).run();
-      db.insert(schema.workspaceShares).values({
-        id: 'share-default',
-        workspaceId,
-        sharedWithUserId: sharedWithId,
-      }).run();
-
-      const share = db
-        .select()
-        .from(schema.workspaceShares)
-        .where(eq(schema.workspaceShares.id, 'share-default'))
-        .get();
-
-      expect(share?.permission).toBe('view');
     });
   });
 });

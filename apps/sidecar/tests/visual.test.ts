@@ -205,24 +205,29 @@ describe('Visual Diff Engine', () => {
 
   describe('VisualDiffService', () => {
     let service: InstanceType<typeof VisualDiffService>;
-    let testWorkspaceId: string;
+    let testWorktreeId: string;
     let testSessionId: string;
 
     beforeAll(() => {
-      // Create test workspace and session
-      testWorkspaceId = `ws-visual-${Date.now()}`;
+      // Create test repo, worktree and session (new schema)
+      testWorktreeId = `wt-visual-${Date.now()}`;
       testSessionId = `session-visual-${Date.now()}`;
-      const userId = `user-visual-${Date.now()}`;
+      const repoId = `repo-visual-${Date.now()}`;
 
-      db.insert(schema.users).values({ id: userId, name: 'Visual Test User' }).run();
-      db.insert(schema.workspaces).values({
-        id: testWorkspaceId,
-        ownerUserId: userId,
-        directoryName: 'visual-service-test',
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'visual-repo',
+        remoteUrl: 'https://github.com/test/visual.git',
+        rootPath: '/tmp/visual-repo',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: testWorktreeId,
+        repoId: repoId,
+        branch: 'visual-service-test',
       }).run();
       db.insert(schema.sessions).values({
         id: testSessionId,
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         agentType: 'claude',
       }).run();
     });
@@ -242,7 +247,7 @@ describe('Visual Diff Engine', () => {
       const turnId = `turn-${Date.now()}`;
 
       const result = await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -273,7 +278,7 @@ describe('Visual Diff Engine', () => {
 
       // First capture before
       await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -281,7 +286,7 @@ describe('Visual Diff Engine', () => {
 
       // Then capture after
       const result = await service.captureAfterState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -308,14 +313,14 @@ describe('Visual Diff Engine', () => {
 
       // Capture both states
       await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
       });
 
       await service.captureAfterState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -335,7 +340,7 @@ describe('Visual Diff Engine', () => {
       const turnId = `turn-list-${Date.now()}`;
 
       await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -351,7 +356,7 @@ describe('Visual Diff Engine', () => {
       const turnId = `turn-selector-${Date.now()}`;
 
       const result = await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -366,7 +371,7 @@ describe('Visual Diff Engine', () => {
 
       // Only capture after (no before)
       await service.captureAfterState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -383,7 +388,7 @@ describe('Visual Diff Engine', () => {
 
       // Only capture before (no after)
       await service.captureBeforeState({
-        workspaceId: testWorkspaceId,
+        worktreeId: testWorktreeId,
         sessionId: testSessionId,
         turnId,
         url: 'http://localhost:3000',
@@ -398,19 +403,25 @@ describe('Visual Diff Engine', () => {
 
   describe('Database Integration', () => {
     it('should store visual snapshots with all required fields', () => {
-      const workspaceId = `ws-db-${Date.now()}`;
+      const worktreeId = `wt-db-${Date.now()}`;
       const sessionId = `session-db-${Date.now()}`;
-      const userId = `user-db-${Date.now()}`;
+      const repoId = `repo-db-${Date.now()}`;
 
-      db.insert(schema.users).values({ id: userId, name: 'DB Test User' }).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'db-test',
+      // Create repo and worktree (new schema)
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'test-repo',
+        remoteUrl: 'https://github.com/test/repo.git',
+        rootPath: '/tmp/test-repo',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'db-test',
       }).run();
       db.insert(schema.sessions).values({
         id: sessionId,
-        workspaceId,
+        worktreeId,
         agentType: 'claude',
       }).run();
 
@@ -418,7 +429,7 @@ describe('Visual Diff Engine', () => {
 
       db.insert(schema.visualSnapshots).values({
         id: snapshotId,
-        workspaceId,
+        worktreeId,
         sessionId,
         turnId: 'turn-1',
         snapshotType: 'before',
@@ -433,7 +444,7 @@ describe('Visual Diff Engine', () => {
         .get();
 
       expect(stored).toBeDefined();
-      expect(stored?.workspaceId).toBe(workspaceId);
+      expect(stored?.worktreeId).toBe(worktreeId);
       expect(stored?.sessionId).toBe(sessionId);
       expect(stored?.turnId).toBe('turn-1');
       expect(stored?.snapshotType).toBe('before');
@@ -441,20 +452,26 @@ describe('Visual Diff Engine', () => {
     });
 
     it('should query snapshots by turn_id', () => {
-      const workspaceId = `ws-query-${Date.now()}`;
+      const worktreeId = `wt-query-${Date.now()}`;
       const sessionId = `session-query-${Date.now()}`;
-      const userId = `user-query-${Date.now()}`;
+      const repoId = `repo-query-${Date.now()}`;
       const turnId = `turn-query-${Date.now()}`;
 
-      db.insert(schema.users).values({ id: userId, name: 'Query Test User' }).run();
-      db.insert(schema.workspaces).values({
-        id: workspaceId,
-        ownerUserId: userId,
-        directoryName: 'query-test',
+      // Create repo and worktree (new schema)
+      db.insert(schema.repos).values({
+        id: repoId,
+        name: 'query-repo',
+        remoteUrl: 'https://github.com/test/query.git',
+        rootPath: '/tmp/query-repo',
+      }).run();
+      db.insert(schema.worktrees).values({
+        id: worktreeId,
+        repoId: repoId,
+        branch: 'query-test',
       }).run();
       db.insert(schema.sessions).values({
         id: sessionId,
-        workspaceId,
+        worktreeId,
         agentType: 'claude',
       }).run();
 
@@ -462,7 +479,7 @@ describe('Visual Diff Engine', () => {
       db.insert(schema.visualSnapshots).values([
         {
           id: `snap-before-${Date.now()}`,
-          workspaceId,
+          worktreeId,
           sessionId,
           turnId,
           snapshotType: 'before',
@@ -471,7 +488,7 @@ describe('Visual Diff Engine', () => {
         },
         {
           id: `snap-after-${Date.now() + 1}`,
-          workspaceId,
+          worktreeId,
           sessionId,
           turnId,
           snapshotType: 'after',

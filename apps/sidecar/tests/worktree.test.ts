@@ -111,19 +111,19 @@ describe('Worktree Manager', () => {
     });
 
     it('should validate DeleteWorktreeSchema', () => {
-      const validInput = { workspaceId: randomUUID() };
+      const validInput = { worktreeId: randomUUID() };
       const result = DeleteWorktreeSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
 
     it('should reject DeleteWorktreeSchema with invalid UUID', () => {
-      const invalidInput = { workspaceId: 'not-a-uuid' };
+      const invalidInput = { worktreeId: 'not-a-uuid' };
       const result = DeleteWorktreeSchema.safeParse(invalidInput);
       expect(result.success).toBe(false);
     });
 
     it('should validate GetWorktreeSchema', () => {
-      const validInput = { workspaceId: randomUUID() };
+      const validInput = { worktreeId: randomUUID() };
       const result = GetWorktreeSchema.safeParse(validInput);
       expect(result.success).toBe(true);
     });
@@ -138,7 +138,7 @@ describe('Worktree Manager', () => {
       // Verify workspace was created in database
       expect(workspace.id).toBeDefined();
       expect(workspace.branch).toBe(branch);
-      expect(workspace.repositoryId).toBe(testRepoId);
+      expect(workspace.repoId).toBe(testRepoId);
 
       // Verify worktree directory was created
       const worktreePath = path.join(testRepoPath, '.worktrees', 'feature-test-worktree');
@@ -168,13 +168,13 @@ describe('Worktree Manager', () => {
     it('should sanitize branch name for directory', async () => {
       const branch = 'feature/complex/branch-name_with.dots';
 
-      const workspace = await createWorktree({ repoId: testRepoId, branch }, db);
+      const worktree = await createWorktree({ repoId: testRepoId, branch }, db);
 
-      // Directory name should be sanitized
-      expect(workspace.directoryName).toBe('feature-complex-branch-name_with.dots');
+      // Worktree path should use sanitized branch name
+      expect(worktree.worktreePath).toContain('feature-complex-branch-name_with.dots');
 
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'feature-complex-branch-name_with.dots');
-      expect(fs.existsSync(worktreePath)).toBe(true);
+      const expectedPath = path.join(testRepoPath, '.worktrees', 'feature-complex-branch-name_with.dots');
+      expect(fs.existsSync(expectedPath)).toBe(true);
     });
 
     it('should throw error if repo does not exist', async () => {
@@ -189,10 +189,10 @@ describe('Worktree Manager', () => {
       expect(workspace.state).toBe('active');
     });
 
-    it('should store worktree path in directoryName', async () => {
-      const workspace = await createWorktree({ repoId: testRepoId, branch: 'path-test' }, db);
+    it('should store worktree path', async () => {
+      const worktree = await createWorktree({ repoId: testRepoId, branch: 'path-test' }, db);
 
-      expect(workspace.directoryName).toBe('path-test');
+      expect(worktree.worktreePath).toContain('path-test');
     });
   });
 
@@ -204,7 +204,7 @@ describe('Worktree Manager', () => {
       expect(fs.existsSync(worktreePath)).toBe(true);
 
       // Delete the worktree
-      const result = await deleteWorktree({ workspaceId: workspace.id }, db);
+      const result = await deleteWorktree({ worktreeId: workspace.id }, db);
 
       // Verify soft delete (state changed to archived)
       expect(result.state).toBe('archived');
@@ -216,24 +216,24 @@ describe('Worktree Manager', () => {
     it('should delete branch along with worktree when deleteRemoteBranch is true', async () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'delete-with-branch' }, db);
 
-      await deleteWorktree({ workspaceId: workspace.id, deleteBranch: true }, db);
+      await deleteWorktree({ worktreeId: workspace.id, deleteBranch: true }, db);
 
       const branches = execSync('git branch', { cwd: testRepoPath }).toString();
       expect(branches).not.toContain('delete-with-branch');
     });
 
     it('should throw error if workspace does not exist', async () => {
-      await expect(deleteWorktree({ workspaceId: randomUUID() }, db)).rejects.toThrow('Workspace not found');
+      await expect(deleteWorktree({ worktreeId: randomUUID() }, db)).rejects.toThrow('Worktree not found');
     });
 
     it('should handle already archived workspace gracefully', async () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'archived-test' }, db);
 
       // Delete once
-      await deleteWorktree({ workspaceId: workspace.id }, db);
+      await deleteWorktree({ worktreeId: workspace.id }, db);
 
       // Delete again - should not throw
-      const result = await deleteWorktree({ workspaceId: workspace.id }, db);
+      const result = await deleteWorktree({ worktreeId: workspace.id }, db);
       expect(result.state).toBe('archived');
     });
   });
@@ -242,15 +242,15 @@ describe('Worktree Manager', () => {
     it('should return worktree with repository info', async () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'get-test' }, db);
 
-      const result = await getWorktree({ workspaceId: workspace.id }, db);
+      const result = await getWorktree({ worktreeId: workspace.id }, db);
 
       expect(result.id).toBe(workspace.id);
       expect(result.branch).toBe('get-test');
-      expect(result.repositoryId).toBe(testRepoId);
+      expect(result.repoId).toBe(testRepoId);
     });
 
     it('should throw error if workspace does not exist', async () => {
-      await expect(getWorktree({ workspaceId: randomUUID() }, db)).rejects.toThrow('Workspace not found');
+      await expect(getWorktree({ worktreeId: randomUUID() }, db)).rejects.toThrow('Worktree not found');
     });
   });
 
@@ -270,7 +270,7 @@ describe('Worktree Manager', () => {
 
     it('should not include archived worktrees by default', async () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'to-archive' }, db);
-      await deleteWorktree({ workspaceId: workspace.id }, db);
+      await deleteWorktree({ worktreeId: workspace.id }, db);
 
       const worktrees = await listWorktrees({ repoId: testRepoId }, db);
 
@@ -279,7 +279,7 @@ describe('Worktree Manager', () => {
 
     it('should include archived worktrees when includeArchived is true', async () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'include-archived' }, db);
-      await deleteWorktree({ workspaceId: workspace.id }, db);
+      await deleteWorktree({ worktreeId: workspace.id }, db);
 
       const worktrees = await listWorktrees({ repoId: testRepoId, includeArchived: true }, db);
 
@@ -357,7 +357,7 @@ describe('Worktree Manager', () => {
       );
 
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'teardown-test' }, db);
-      await deleteWorktree({ workspaceId: workspace.id }, db);
+      await deleteWorktree({ worktreeId: workspace.id }, db);
 
       // Verify teardown script ran (marker created in main repo since worktree is deleted)
       expect(fs.existsSync(path.join(testRepoPath, 'teardown-marker.txt'))).toBe(true);
@@ -403,15 +403,15 @@ describe('Worktree Manager', () => {
       fs.writeFileSync(
         path.join(kodaDir, 'config.json'),
         JSON.stringify({
-          setup: ['echo "$KODA_WORKSPACE_ID" > workspace-id.txt'],
+          setup: ['echo "$KODA_WORKTREE_ID" > worktree-id.txt'],
         })
       );
 
-      const workspace = await createWorktree({ repoId: testRepoId, branch: 'env-test' }, db);
+      const worktree = await createWorktree({ repoId: testRepoId, branch: 'env-test' }, db);
 
       const worktreePath = path.join(testRepoPath, '.worktrees', 'env-test');
-      const content = fs.readFileSync(path.join(worktreePath, 'workspace-id.txt'), 'utf-8').trim();
-      expect(content).toBe(workspace.id);
+      const content = fs.readFileSync(path.join(worktreePath, 'worktree-id.txt'), 'utf-8').trim();
+      expect(content).toBe(worktree.id);
     });
   });
 
@@ -504,10 +504,10 @@ describe('Worktree Manager', () => {
     it('should handle special characters in branch names', async () => {
       const branch = 'feature/TICKET-123_description';
 
-      const workspace = await createWorktree({ repoId: testRepoId, branch }, db);
+      const worktree = await createWorktree({ repoId: testRepoId, branch }, db);
 
-      expect(workspace.branch).toBe(branch);
-      expect(workspace.directoryName).toBe('feature-TICKET-123_description');
+      expect(worktree.branch).toBe(branch);
+      expect(worktree.worktreePath).toContain('feature-TICKET-123_description');
     });
   });
 });
