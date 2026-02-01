@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as KodaDemoRouteImport } from './routes/koda-demo'
 import { Route as AllWorkspacesRouteImport } from './routes/all-workspaces'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIdRouteImport } from './routes/workspace/$id'
@@ -18,6 +19,11 @@ import { Route as RepositoryRepoIdRouteImport } from './routes/repository/$repoI
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KodaDemoRoute = KodaDemoRouteImport.update({
+  id: '/koda-demo',
+  path: '/koda-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AllWorkspacesRoute = AllWorkspacesRouteImport.update({
@@ -44,6 +50,7 @@ const RepositoryRepoIdRoute = RepositoryRepoIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/all-workspaces': typeof AllWorkspacesRoute
+  '/koda-demo': typeof KodaDemoRoute
   '/settings': typeof SettingsRoute
   '/repository/$repoId': typeof RepositoryRepoIdRoute
   '/workspace/$id': typeof WorkspaceIdRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/all-workspaces': typeof AllWorkspacesRoute
+  '/koda-demo': typeof KodaDemoRoute
   '/settings': typeof SettingsRoute
   '/repository/$repoId': typeof RepositoryRepoIdRoute
   '/workspace/$id': typeof WorkspaceIdRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/all-workspaces': typeof AllWorkspacesRoute
+  '/koda-demo': typeof KodaDemoRoute
   '/settings': typeof SettingsRoute
   '/repository/$repoId': typeof RepositoryRepoIdRoute
   '/workspace/$id': typeof WorkspaceIdRoute
@@ -68,6 +77,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/all-workspaces'
+    | '/koda-demo'
     | '/settings'
     | '/repository/$repoId'
     | '/workspace/$id'
@@ -75,6 +85,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/all-workspaces'
+    | '/koda-demo'
     | '/settings'
     | '/repository/$repoId'
     | '/workspace/$id'
@@ -82,6 +93,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/all-workspaces'
+    | '/koda-demo'
     | '/settings'
     | '/repository/$repoId'
     | '/workspace/$id'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllWorkspacesRoute: typeof AllWorkspacesRoute
+  KodaDemoRoute: typeof KodaDemoRoute
   SettingsRoute: typeof SettingsRoute
   RepositoryRepoIdRoute: typeof RepositoryRepoIdRoute
   WorkspaceIdRoute: typeof WorkspaceIdRoute
@@ -102,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/koda-demo': {
+      id: '/koda-demo'
+      path: '/koda-demo'
+      fullPath: '/koda-demo'
+      preLoaderRoute: typeof KodaDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/all-workspaces': {
@@ -138,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllWorkspacesRoute: AllWorkspacesRoute,
+  KodaDemoRoute: KodaDemoRoute,
   SettingsRoute: SettingsRoute,
   RepositoryRepoIdRoute: RepositoryRepoIdRoute,
   WorkspaceIdRoute: WorkspaceIdRoute,
