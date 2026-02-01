@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue } from 'jotai'
 import { messagesAtom } from '@/store/chat'
 import { MessageItem } from './MessageItem'
+import { ScrollMinimap } from './ScrollMinimap'
 import { MessageCircle } from 'lucide-react'
 
 /**
@@ -60,41 +61,46 @@ export function MessageList() {
   }
 
   return (
-    <div
-      ref={parentRef}
-      data-testid="message-list"
-      data-virtualized="true"
-      className="h-full overflow-auto bg-surface-messages fade-mask-y"
-      onScroll={handleScroll}
-    >
+    <div className="relative h-full">
       <div
-        style={{
-          height: `${String(virtualizer.getTotalSize())}px`,
-          width: '100%',
-          position: 'relative',
-        }}
+        ref={parentRef}
+        data-testid="message-list"
+        data-virtualized="true"
+        className="h-full overflow-auto bg-surface-messages fade-mask-y"
+        onScroll={handleScroll}
       >
-        {virtualItems.map((virtualItem) => {
-          const message = messages[virtualItem.index]
-          if (!message) return null
-          return (
-            <div
-              key={virtualItem.key}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${String(virtualItem.start)}px)`,
-              }}
-            >
-              <MessageItem message={message} />
-            </div>
-          )
-        })}
+        <div
+          style={{
+            height: `${String(virtualizer.getTotalSize())}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualItems.map((virtualItem) => {
+            const message = messages[virtualItem.index]
+            if (!message) return null
+            return (
+              <div
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${String(virtualItem.start)}px)`,
+                }}
+              >
+                <MessageItem message={message} />
+              </div>
+            )
+          })}
+        </div>
       </div>
+
+      {/* Scroll minimap */}
+      <ScrollMinimap containerRef={parentRef} />
     </div>
   )
 }

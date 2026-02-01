@@ -1,8 +1,25 @@
-import { ChevronDown, GitBranch, FolderOpen, MessageSquare, FileText, Plus, ChevronLeft } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
+import {
+  ChevronDown,
+  GitBranch,
+  MessageSquare,
+  FileText,
+  Plus,
+  ChevronLeft,
+  Terminal,
+  Folder,
+  Code2,
+  Check,
+  Copy,
+  Pencil,
+  History,
+  Share2,
+} from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { useClickOutside } from '@/hooks/useClickOutside'
+import { ConversationHistoryDialog } from '@/components/ConversationHistory'
 import { cn } from '@/lib/utils'
 import type { Worktree } from '@/lib/rpc'
-import { invoke } from '@tauri-apps/api/core'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 
@@ -19,8 +36,8 @@ interface TopBarProps {
 /**
  * Conductor-style top bar with TWO header rows:
  *
- * Row 1 (workspace-header): [Workspace name] [branch] [origin] [Open in Finder]
- * Row 2 (session-tabs): [Scratchpad] [+ New] [Session tabs...]
+ * Row 1 (workspace-header): [Workspace name] [branch] [origin] [Open dropdown]
+ * Row 2 (session-tabs): [Scratchpad] [+ New] [Session tabs...] [History] [Share]
  */
 export function TopBar({
   workspace,
@@ -31,15 +48,65 @@ export function TopBar({
   onSessionChange,
   onNewSession,
 }: TopBarProps): React.ReactElement {
+  const [copied, setCopied] = useState(false)
+  const [branchCopied, setBranchCopied] = useState(false)
+  const [isEditingBranch, setIsEditingBranch] = useState(false)
+  const [editedBranch, setEditedBranch] = useState('')
+  const [openDropdownVisible, setOpenDropdownVisible] = useState(false)
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+  const openDropdownRef = useRef<HTMLDivElement>(null)
+
+  useClickOutside(openDropdownRef, {
+    onClickOutside: () => { setOpenDropdownVisible(false) },
+    onEscape: () => { setOpenDropdownVisible(false) },
+    enabled: openDropdownVisible,
+  })
+
   const branch = workspace?.branch ?? 'main'
   const workspaceName = workspace?.worktreePath?.split('/').pop() ?? workspace?.branch ?? 'Workspace'
-  const rootPath = workspace?.worktreePath ?? ''
+  const workspacePath = workspace?.worktreePath ?? ''
 
-  const handleOpenInFinder = (): void => {
-    if (rootPath) {
-      void invoke('plugin:opener|reveal_item_in_dir', { path: rootPath })
-    }
-  }
+  const handleCopyBranch = useCallback(async (): Promise<void> => {
+    await navigator.clipboard.writeText(branch)
+    setBranchCopied(true)
+    setTimeout(() => { setBranchCopied(false) }, 2000)
+  }, [branch])
+
+  const handleEditBranch = useCallback(() => {
+    setEditedBranch(branch)
+    setIsEditingBranch(true)
+  }, [branch])
+
+  const handleSaveBranch = useCallback(() => {
+    // TODO: Implement branch rename via RPC
+    setIsEditingBranch(false)
+  }, [])
+
+  const handleShare = useCallback(async (): Promise<void> => {
+    if (!workspace?.id) return
+    await navigator.clipboard.writeText(workspace.id)
+    setCopied(true)
+    setTimeout(() => { setCopied(false) }, 2000)
+  }, [workspace?.id])
+
+  const handleOpenInTerminal = useCallback(() => {
+    if (!workspacePath) return
+    window.open(`terminal://${workspacePath}`, '_blank')
+    setOpenDropdownVisible(false)
+  }, [workspacePath])
+
+  const handleOpenInFinder = useCallback(() => {
+    if (!workspacePath) return
+    window.open(`file://${workspacePath}`, '_blank')
+    setOpenDropdownVisible(false)
+  }, [workspacePath])
+
+  const handleOpenInIDE = useCallback((ide: 'vscode' | 'cursor') => {
+    if (!workspacePath) return
+    const protocol = ide === 'cursor' ? 'cursor' : 'vscode'
+    window.open(`${protocol}://file${workspacePath}`, '_blank')
+    setOpenDropdownVisible(false)
+  }, [workspacePath])
 
   return (
     <div className="flex flex-col border-b border-border">
@@ -56,12 +123,56 @@ export function TopBar({
             <span>{workspaceName}</span>
           </Link>
 
-          {/* Branch selector */}
-          <button className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded hover:bg-accent transition-colors">
-            <GitBranch className="h-3 w-3 text-muted-foreground" />
-            <span className="text-muted-foreground">{branch}</span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-          </button>
+          {/* Branch selector with edit/copy on hover */}
+          <div className="flex items-center group">
+            {isEditingBranch ? (
+              <div className="flex items-center gap-1">
+                <GitBranch className="h-3 w-3 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={editedBranch}
+                  onChange={(e) => { setEditedBranch(e.target.value) }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveBranch()
+                    if (e.key === 'Escape') setIsEditingBranch(false)
+                  }}
+                  onBlur={() => { setIsEditingBranch(false) }}
+                  autoFocus
+                  className="px-1 py-0.5 text-xs bg-background border border-border rounded w-[140px] focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            ) : (
+              <>
+                <button className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded hover:bg-accent transition-colors">
+                  <GitBranch className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-muted-foreground truncate max-w-[120px]">{branch}</span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
+
+                {/* Hover actions for branch */}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={handleEditBranch}
+                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                    title="Rename branch"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => void handleCopyBranch()}
+                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                    title={branchCopied ? 'Copied!' : 'Copy branch name'}
+                  >
+                    {branchCopied ? (
+                      <Check className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Origin indicator */}
           <span className="text-xs text-muted-foreground/60">
@@ -69,16 +180,52 @@ export function TopBar({
           </span>
         </div>
 
-        {/* Right: Open in Finder */}
-        <button
-          onClick={handleOpenInFinder}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
-          title="Open in Finder"
-        >
-          <FolderOpen className="h-3.5 w-3.5" />
-          <span>Open</span>
-          <ChevronDown className="h-3 w-3" />
-        </button>
+        {/* Right: Open dropdown */}
+        <div ref={openDropdownRef} className="relative">
+          <button
+            onClick={() => { setOpenDropdownVisible(!openDropdownVisible) }}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+            title="Open workspace in..."
+          >
+            <Folder className="h-3.5 w-3.5" />
+            <span>Open</span>
+            <ChevronDown className={cn("h-3 w-3 transition-transform", openDropdownVisible && "rotate-180")} />
+          </button>
+
+          {openDropdownVisible && (
+            <div className="absolute top-full right-0 mt-1 z-50 w-48 py-1 bg-popover border border-border rounded-md shadow-lg">
+              <button
+                onClick={handleOpenInTerminal}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
+              >
+                <Terminal className="h-4 w-4" />
+                <span>Open in Terminal</span>
+              </button>
+              <button
+                onClick={handleOpenInFinder}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
+              >
+                <Folder className="h-4 w-4" />
+                <span>Open in Finder</span>
+              </button>
+              <div className="h-px bg-border my-1" />
+              <button
+                onClick={() => { handleOpenInIDE('vscode') }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
+              >
+                <Code2 className="h-4 w-4" />
+                <span>Open in VS Code</span>
+              </button>
+              <button
+                onClick={() => { handleOpenInIDE('cursor') }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
+              >
+                <Code2 className="h-4 w-4" />
+                <span>Open in Cursor</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Row 2: Session tabs */}
@@ -134,7 +281,44 @@ export function TopBar({
             Chat
           </TabButton>
         )}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* History button */}
+        <button
+          onClick={() => { setHistoryDialogOpen(true) }}
+          title="Conversation history"
+          className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <History className="h-4 w-4" />
+        </button>
+
+        {/* Share button */}
+        <button
+          onClick={() => void handleShare()}
+          title={copied ? 'Copied!' : 'Copy workspace ID to share'}
+          className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md hover:bg-accent transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3 w-3 text-green-500" />
+              <span className="text-green-500">Copied</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="h-3 w-3" />
+              <span>Share</span>
+            </>
+          )}
+        </button>
       </div>
+
+      {/* Conversation history dialog */}
+      <ConversationHistoryDialog
+        isOpen={historyDialogOpen}
+        onClose={() => { setHistoryDialogOpen(false) }}
+      />
     </div>
   )
 }
