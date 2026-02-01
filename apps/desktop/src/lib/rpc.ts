@@ -50,6 +50,11 @@ export const RPC_METHODS = {
   WORKSPACE_CREATE: 'workspace.create',
   WORKSPACE_GET: 'workspace.get',
   WORKSPACE_GET_DIFF_STATS: 'workspace.getDiffStats',
+  WORKSPACE_CREATE_STANDALONE: 'workspace.createStandalone',
+  // Workspace Repos (multi-repo support)
+  WORKSPACE_REPO_ATTACH: 'workspaceRepo.attach',
+  WORKSPACE_REPO_DETACH: 'workspaceRepo.detach',
+  WORKSPACE_REPO_LIST: 'workspaceRepo.list',
   // Worktrees
   WORKTREE_CREATE: 'worktree.create',
   WORKTREE_DELETE: 'worktree.delete',
@@ -207,6 +212,49 @@ export interface GetWorkspaceParams {
 export interface ListWorkspacesParams {
   limit?: number
   offset?: number
+}
+
+/**
+ * Create standalone workspace (no repo attached)
+ */
+export interface CreateStandaloneWorkspaceParams {
+  name: string
+  description?: string
+}
+
+/**
+ * Workspace repo types - for multi-repo workspaces
+ * Each repo attached to a workspace gets its own worktree.
+ * Repos are horizontal - no hierarchy.
+ */
+export interface WorkspaceRepo {
+  id: string
+  workspaceId: string
+  repoId: string
+  worktreePath?: string | null
+  branch?: string | null
+  createdAt: string
+  // Joined repo details
+  repoName?: string | null
+  repoRootPath?: string | null
+  repoRemoteUrl?: string | null
+  repoDefaultBranch?: string | null
+}
+
+export interface AttachRepoParams {
+  workspaceId: string
+  repoId: string
+  worktreePath?: string
+  branch?: string
+}
+
+export interface DetachRepoParams {
+  workspaceId: string
+  repoId: string
+}
+
+export interface ListWorkspaceReposParams {
+  workspaceId: string
 }
 
 /**

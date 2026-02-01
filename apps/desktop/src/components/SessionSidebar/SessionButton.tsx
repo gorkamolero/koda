@@ -8,6 +8,7 @@ import {
   Pause,
   Archive,
   Sparkles,
+  Globe,
 } from 'lucide-react'
 
 // ============================================================================
@@ -121,9 +122,19 @@ export interface SessionButtonProps {
   session: Session
   isActive: boolean
   onClick: () => void
+  /** Whether this session is hosted on a remote machine */
+  isRemote?: boolean
+  /** Short identifier for the remote machine (e.g., first 6 chars of machineId) */
+  remoteMachineId?: string
 }
 
-export function SessionButton({ session, isActive, onClick }: SessionButtonProps) {
+export function SessionButton({
+  session,
+  isActive,
+  onClick,
+  isRemote = false,
+  remoteMachineId,
+}: SessionButtonProps) {
   const { icon, colorClass } = getStatusConfig(session.status)
   const timeAgo = formatTimeAgo(session.updatedAt ?? session.createdAt)
   const contextPercent = session.contextUsedPercent
@@ -145,7 +156,8 @@ export function SessionButton({ session, isActive, onClick }: SessionButtonProps
       className={cn(
         'group flex items-start gap-2.5 w-full px-3 py-2.5 rounded-md transition-colors text-left',
         'hover:bg-surface-hover',
-        isActive && 'bg-surface-active'
+        isActive && 'bg-surface-active',
+        isRemote && 'opacity-80 border border-dashed border-border'
       )}
     >
       {/* Status icon */}
@@ -157,11 +169,22 @@ export function SessionButton({ session, isActive, onClick }: SessionButtonProps
       <div className="flex-1 min-w-0">
         {/* Title row */}
         <div className="flex items-center justify-between gap-2">
-          <span className="text-text-primary text-sm font-medium truncate">
-            {displayTitle}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-text-primary text-sm font-medium truncate">
+              {displayTitle}
+            </span>
+            {isRemote && (
+              <span
+                className="flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 flex-shrink-0"
+                title={`Remote session on ${remoteMachineId ?? 'another machine'}`}
+              >
+                <Globe className="w-2.5 h-2.5" />
+                {remoteMachineId?.slice(0, 6) ?? 'remote'}
+              </span>
+            )}
+          </div>
           {unreadCount > 0 && (
-            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
               {String(unreadCount)}
             </span>
           )}

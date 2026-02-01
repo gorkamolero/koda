@@ -22,6 +22,10 @@ import {
   type CheckpointDiff,
   type DiffStats,
   type Session,
+  type WorkspaceRepo,
+  type AttachRepoParams,
+  type DetachRepoParams,
+  type CreateStandaloneWorkspaceParams,
 } from '@/lib/rpc'
 
 /**
@@ -304,6 +308,70 @@ export function useDeleteWorktree() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
       void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+    },
+  })
+}
+
+// ============================================================================
+// Workspace Repo Hooks (Multi-repo support)
+// ============================================================================
+
+/**
+ * Create a standalone workspace (no repo attached)
+ * Useful for cloud-first workspaces or when repo will be attached later
+ */
+export function useCreateStandaloneWorkspace() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: CreateStandaloneWorkspaceParams) =>
+      rpcRequest<Workspace>(RPC_METHODS.WORKSPACE_CREATE_STANDALONE, params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+    },
+  })
+}
+
+/**
+ * List repos attached to a workspace
+ */
+export function useWorkspaceRepos(workspaceId: string) {
+  return useQuery({
+    queryKey: ['workspace-repos', workspaceId],
+    queryFn: () => rpcRequest<WorkspaceRepo[]>(RPC_METHODS.WORKSPACE_REPO_LIST, { workspaceId }),
+    enabled: !!workspaceId,
+    retry: false,
+  })
+}
+
+/**
+ * Attach a repo to a workspace
+ */
+export function useAttachRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: AttachRepoParams) =>
+      rpcRequest<WorkspaceRepo>(RPC_METHODS.WORKSPACE_REPO_ATTACH, params),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace-repos', variables.workspaceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+    },
+  })
+}
+
+/**
+ * Detach a repo from a workspace
+ */
+export function useDetachRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: DetachRepoParams) =>
+      rpcRequest<{ success: boolean }>(RPC_METHODS.WORKSPACE_REPO_DETACH, params),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['workspace-repos', variables.workspaceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
     },
   })
 }
