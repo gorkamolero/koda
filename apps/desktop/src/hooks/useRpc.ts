@@ -267,9 +267,11 @@ export function useCreateWorktree() {
   return useMutation({
     mutationFn: (params: CreateWorktreeParams) =>
       rpcRequest<Worktree>(RPC_METHODS.WORKTREE_CREATE, params),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
-      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] }) // includes ['worktrees', 'all', ...]
+      void queryClient.invalidateQueries({ queryKey: ['repos'] }) // update repo workspace counts
+      void queryClient.invalidateQueries({ queryKey: ['repo', variables.repoId] })
     },
   })
 }
@@ -341,6 +343,7 @@ export function useCreateStandaloneWorkspace() {
       rpcRequest<Workspace>(RPC_METHODS.WORKSPACE_CREATE_STANDALONE, params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] }) // Sidebar uses worktrees
     },
   })
 }

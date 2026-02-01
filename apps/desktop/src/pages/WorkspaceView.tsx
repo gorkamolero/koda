@@ -19,6 +19,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorktree, useSessions } from '@/hooks/useRpc'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
+import { FolderPlus, Loader2 } from 'lucide-react'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 
@@ -47,7 +48,7 @@ export function WorkspaceView() {
   const workspaceType = useAtomValue(workspaceTypeAtom)
 
   // Fetch worktree data to get the real path
-  const { data: worktree } = useWorktree(id)
+  const { data: worktree, isLoading: isLoadingWorktree } = useWorktree(id)
 
   // Fetch sessions for this workspace
   const { data: sessions } = useSessions(id)
@@ -110,6 +111,7 @@ export function WorkspaceView() {
 
   // Get real workspace path from worktree
   const rootPath = worktree?.worktreePath ?? ''
+  const hasRepo = Boolean(worktree?.repoId)
 
   // Build tabs based on workspace type
   const getTabs = (): { id: Tab; label: string }[] => {
@@ -182,7 +184,41 @@ export function WorkspaceView() {
 
         {/* Content area - fills remaining space */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          {activeTab === 'chat' && (
+          {/* Loading state */}
+          {isLoadingWorktree && (
+            <div className="h-full flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+            </div>
+          )}
+
+          {/* No repo connected - show indicator */}
+          {!isLoadingWorktree && !hasRepo && activeTab === 'chat' && (
+            <div className="h-full flex flex-col items-center justify-center px-8">
+              <div className="max-w-md text-center">
+                <FolderPlus className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
+                  No repository connected
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Connect a git repository to enable agent features like file editing, code review, and version control.
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  onClick={() => {
+                    // TODO: Open repo connect dialog
+                    console.log('Connect repo clicked')
+                  }}
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  Connect Repository
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Normal content when repo is connected */}
+          {!isLoadingWorktree && hasRepo && activeTab === 'chat' && (
             <AgentChat worktreeId={id} sessionId={activeSessionId} />
           )}
 
