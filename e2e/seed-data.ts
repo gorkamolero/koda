@@ -20,7 +20,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // HTTP port for RPC (sidecar runs HTTP server in dev mode)
-const HTTP_PORT = process.env.KODA_HTTP_PORT || '3847'
+// Tests use 3848, dev uses 3847
+const HTTP_PORT = process.env.KODA_HTTP_PORT || '3848'
 
 // Socket path - matches what the app uses
 function getSocketPath(): string {

@@ -8,12 +8,20 @@ const TEST_DB_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.db')
 // Test socket path - separate from user's real socket
 const TEST_SOCKET_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.sock')
 
+// Test ports - different from dev server (1420/3847) so tests can run while dev app is open
+const TEST_VITE_PORT = 1421
+const TEST_HTTP_RPC_PORT = 3848
+
 /**
  * E2E Test Configuration
  *
  * These tests run against the REAL app - no mocks.
  * Uses a SEPARATE test database and socket that gets wiped before/after test runs.
- * The user's real database is never touched.
+ * The user's real database is NEVER touched.
+ *
+ * IMPORTANT: Tests ALWAYS start their own isolated app instance on port 1421.
+ * There is no "skip webserver" mode - this ensures database isolation is enforced.
+ * Tests can run while the main dev app is open on port 1420.
  *
  * @see https://playwright.dev/docs/test-configuration
  */
@@ -43,8 +51,8 @@ export default defineConfig({
   },
 
   use: {
-    // Base URL for the app
-    baseURL: 'http://localhost:1420',
+    // Base URL for the app (uses test port, not dev port)
+    baseURL: `http://localhost:${TEST_VITE_PORT}`,
 
     // Collect trace on first retry
     trace: 'on-first-retry',
@@ -72,24 +80,25 @@ export default defineConfig({
   ],
 
   // Start desktop dev server before running tests
-  // The test environment variables are passed to ensure isolation
-  // Set SKIP_WEBSERVER=1 to skip starting servers (when testing against existing app)
-  webServer: process.env.SKIP_WEBSERVER
-    ? undefined
-    : {
-        command: 'pnpm --filter desktop tauri dev',
-        url: 'http://localhost:1420',
-        reuseExistingServer: false, // Always start fresh for test isolation
-        timeout: 120000, // 2 minutes for Tauri to build and start
-        stdout: 'pipe',
-        stderr: 'pipe',
-        // Pass test environment variables to the sidecar
-        env: {
-          ...process.env,
-          KODA_TEST_DB: TEST_DB_PATH,
-          KODA_SOCKET: TEST_SOCKET_PATH,
-          KODA_HTTP_PORT: '3847', // HTTP RPC port for browser-based E2E tests
-          NODE_ENV: 'test',
-        },
-      },
+  // Uses different ports (1421/3848) than dev server (1420/3847)
+  // NOTE: There is no "skip webserver" mode - tests MUST use isolated database
+  webServer: {
+    command: 'pnpm --filter desktop tauri dev',
+    url: `http://localhost:${TEST_VITE_PORT}`,
+    reuseExistingServer: false, // Always start fresh for test isolation
+    timeout: 120000, // 2 minutes for Tauri to build and start
+    stdout: 'pipe',
+    stderr: 'pipe',
+    // Pass test environment variables to the sidecar
+    env: {
+      ...process.env,
+      KODA_TEST_DB: TEST_DB_PATH,
+      KODA_SOCKET: TEST_SOCKET_PATH,
+      KODA_HTTP_PORT: String(TEST_HTTP_RPC_PORT),
+      VITE_PORT: String(TEST_VITE_PORT),
+      // Override Tauri's devUrl to match the test port
+      TAURI_DEV_URL: `http://localhost:${TEST_VITE_PORT}`,
+      NODE_ENV: 'test',
+    },
+  },
 })

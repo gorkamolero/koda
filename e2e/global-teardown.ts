@@ -4,6 +4,7 @@ import * as os from 'node:os'
 
 // Test database path (same as in playwright.config.ts and global-setup.ts)
 const TEST_DB_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.db')
+const TEST_SOCKET_PATH = path.join(os.tmpdir(), 'koda-e2e-test', 'koda-test.sock')
 
 /**
  * Global teardown for E2E tests
@@ -16,11 +17,12 @@ export default async function globalTeardown() {
   console.log('\nE2E Test Teardown: Cleaning up test database...')
 
   try {
-    // Delete the test database and associated files
+    // Delete the test database, socket, and associated files
     const filesToDelete = [
       TEST_DB_PATH,
       TEST_DB_PATH + '-wal',
       TEST_DB_PATH + '-shm',
+      TEST_SOCKET_PATH,
     ]
 
     for (const file of filesToDelete) {
