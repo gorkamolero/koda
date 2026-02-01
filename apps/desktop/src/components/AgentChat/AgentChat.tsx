@@ -9,6 +9,7 @@ import {
   generateMessageId,
   planModeAtom,
   exitPlanModeAtom,
+  type MessageMention,
 } from '@/store/chat'
 import { rpcRequest } from '@/lib/tauri'
 import {
@@ -189,13 +190,14 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
   }, [updateMessage, setIsStreaming, showToast])
 
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, mentions?: MessageMention[]) => {
       // Add user message
       addMessage({
         role: 'user',
         content,
         status: 'complete',
         model: selectedModel,
+        mentions,
       })
 
       // Call sidecar to start Claude session
