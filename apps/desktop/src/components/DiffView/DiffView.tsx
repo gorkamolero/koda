@@ -1,329 +1,211 @@
-import { useEffect, useCallback, useMemo } from 'react'
-import { useSetAtom, useAtomValue } from 'jotai'
+import { useEffect, useRef } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { cn } from '@/lib/utils'
-import {
-  diffFilesAtom,
-  diffModeAtom,
-  selectedFileIdAtom,
-  activeTabAtom,
-  activeCommentInputAtom,
-  isLoadingAtom,
-  type DiffFile,
-} from '@/store/diff'
-import { useCheckpoints, useCheckpointDiff, useWorktree } from '@/hooks/useRpc'
-import { parseUnifiedDiff, getExtension, extensionToLanguage } from '@/lib/diffParser'
-import { FileTree } from './FileTree'
-import { DiffEditor } from './DiffEditor'
-import { InlineComments } from './InlineComments'
-import { VisualComparison } from './VisualComparison'
-import { Loader2, AlertCircle, FileText } from 'lucide-react'
+import { useWorktreeDiff } from '@/hooks/useRpc'
+import { Undo2, ChevronDown, SquareDot, Plus, Minus } from 'lucide-react'
+import type { FileDiff } from '@/lib/rpc'
 
 interface DiffViewProps {
-  /** Workspace ID for loading diff data */
+  /** Worktree ID for loading diff data */
   workspaceId: string
 }
 
 /**
- * Main diff view component
- * Displays file tree, Monaco diff editor, and visual comparison
+ * Get status icon and color for file status
  */
-export function DiffView({ workspaceId }: DiffViewProps) {
-  const setFiles = useSetAtom(diffFilesAtom)
-  const selectedFileId = useAtomValue(selectedFileIdAtom)
-  const setSelectedFileId = useSetAtom(selectedFileIdAtom)
-  const diffMode = useAtomValue(diffModeAtom)
-  const setDiffMode = useSetAtom(diffModeAtom)
-  const activeTab = useAtomValue(activeTabAtom)
-  const setActiveTab = useSetAtom(activeTabAtom)
-  const setActiveCommentInput = useSetAtom(activeCommentInputAtom)
-  const setIsLoading = useSetAtom(isLoadingAtom)
-  const isLoading = useAtomValue(isLoadingAtom)
+function getStatusStyle(status: FileDiff['status']) {
+  switch (status) {
+    case 'added':
+      return { icon: Plus, color: 'text-[--git-green]' }
+    case 'deleted':
+      return { icon: Minus, color: 'text-[--git-red]' }
+    case 'modified':
+      return { icon: SquareDot, color: 'text-[--git-yellow]' }
+    case 'renamed':
+      return { icon: SquareDot, color: 'text-[--git-blue]' }
+    default:
+      return { icon: SquareDot, color: 'text-[--git-yellow]' }
+  }
+}
 
-  // Fetch worktree data (workspaceId is actually a worktree ID in the new model)
-  const { data: worktree } = useWorktree(workspaceId)
+/**
+ * Split file path into directory and filename
+ */
+function splitPath(path: string): { directory: string; filename: string } {
+  const lastSlash = path.lastIndexOf('/')
+  if (lastSlash === -1) {
+    return { directory: '', filename: path }
+  }
+  return {
+    directory: path.slice(0, lastSlash + 1),
+    filename: path.slice(lastSlash + 1),
+  }
+}
 
-  // Fetch checkpoints for this worktree
-  const { data: checkpoints, isLoading: loadingCheckpoints } = useCheckpoints(workspaceId)
-
-  // Get the two most recent checkpoints for diffing
-  const [checkpoint1Id, checkpoint2Id] = useMemo(() => {
-    if (!checkpoints || checkpoints.length < 2) return [null, null]
-    // Sort by creation time descending
-    const sorted = [...checkpoints].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
-    // Compare second most recent to most recent (to show what changed)
-    return [sorted[1]?.id ?? null, sorted[0]?.id ?? null]
-  }, [checkpoints])
-
-  // Get the worktree path
-  const repoPath = worktree?.worktreePath ?? ''
-
-  // Fetch the diff between checkpoints
-  const {
-    data: diffData,
-    isLoading: loadingDiff,
-    error: diffError,
-  } = useCheckpointDiff(
-    checkpoint1Id ?? '',
-    checkpoint2Id ?? '',
-    repoPath
-  )
-
-  // Convert checkpoint diff to DiffFile format
-  useEffect(() => {
-    if (loadingCheckpoints || loadingDiff) {
-      setIsLoading(true)
-      return
-    }
-
-    setIsLoading(false)
-
-    if (!diffData || !diffData.files.length) {
-      setFiles([])
-      return
-    }
-
-    // Convert FileDiff[] to DiffFile[]
-    const diffFiles: DiffFile[] = diffData.files.map((file, index) => {
-      const { originalContent, modifiedContent } = parseUnifiedDiff(file.diff)
-      const ext = getExtension(file.path)
-      const filename = file.path.split('/').pop() ?? file.path
-
-      return {
-        id: `file_${String(index)}`,
-        path: file.path,
-        filename,
-        status: file.status,
-        additions: file.additions ?? 0,
-        deletions: file.deletions ?? 0,
-        originalContent,
-        modifiedContent,
-        language: extensionToLanguage(ext),
-      }
-    })
-
-    setFiles(diffFiles)
-
-    // Auto-select first file if none selected
-    if (!selectedFileId && diffFiles.length > 0 && diffFiles[0]) {
-      setSelectedFileId(diffFiles[0].id)
-    }
-  }, [
-    diffData,
-    loadingCheckpoints,
-    loadingDiff,
-    setFiles,
-    setIsLoading,
-    selectedFileId,
-    setSelectedFileId,
-  ])
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle shortcuts when typing in input
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
-        return
-      }
-
-      switch (e.key) {
-        case 'c': {
-          // Open comment input if a file is selected
-          if (selectedFileId) {
-            setActiveCommentInput({
-              fileId: selectedFileId,
-              lineNumber: 1,
-              side: 'modified',
-            })
-          }
-          break
-        }
-        case 's': {
-          // Toggle split/unified mode
-          e.preventDefault()
-          setDiffMode(diffMode === 'split' ? 'unified' : 'split')
-          break
-        }
-        case 'v': {
-          // Toggle visual comparison
-          e.preventDefault()
-          setActiveTab(activeTab === 'code' ? 'visual' : 'code')
-          break
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [
-    selectedFileId,
-    diffMode,
-    activeTab,
-    setActiveCommentInput,
-    setDiffMode,
-    setActiveTab,
-  ])
-
-  const handleLineClick = useCallback(
-    (lineNumber: number, side: 'original' | 'modified') => {
-      if (selectedFileId) {
-        setActiveCommentInput({
-          fileId: selectedFileId,
-          lineNumber,
-          side,
-        })
-      }
-    },
-    [selectedFileId, setActiveCommentInput]
-  )
-
-  // Show empty state when no checkpoints
-  const hasNoCheckpoints = !loadingCheckpoints && (!checkpoints || checkpoints.length < 2)
+/**
+ * File row component
+ */
+function FileRow({ file }: { file: FileDiff }) {
+  const { directory, filename } = splitPath(file.path)
+  const { icon: StatusIcon, color: statusColor } = getStatusStyle(file.status)
 
   return (
-    <div className="h-full flex bg-surface-messages" data-testid="diff-view-container">
-      {/* File tree sidebar */}
-      <div className="w-72 border-r border-border-subtle flex-shrink-0">
-        <FileTree />
+    <div
+      className="group flex items-center py-1 px-3 mx-2 gap-1.5 hover:bg-accent has-[button:hover]:bg-transparent rounded-md cursor-pointer text-sm relative"
+      data-state="closed"
+    >
+      {/* File path */}
+      <div className="flex-1 min-w-0 overflow-hidden flex items-center gap-2">
+        <div className="truncate">
+          <span className="font-sans flex items-baseline min-w-0">
+            {directory && (
+              <span className="truncate min-w-0 text-muted-foreground">
+                {directory}
+              </span>
+            )}
+            <span className="truncate min-w-0">{filename}</span>
+          </span>
+        </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle bg-surface-topbar">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 bg-surface-control rounded-lg p-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('code')
-              }}
-              className={cn(
-                'px-3 py-1.5 text-sm rounded-md transition-colors',
-                activeTab === 'code'
-                  ? 'bg-surface-active text-text-strong'
-                  : 'text-text-muted hover:text-text-primary'
+      {/* Actions grid - overlapping visible/hover states */}
+      <div
+        className="grid min-w-10 shrink-0 items-center"
+        style={{ gridTemplateAreas: '"content"' }}
+      >
+        {/* Hover actions */}
+        <div
+          className="flex items-center justify-end h-full invisible group-hover:visible"
+          style={{
+            gridRowStart: 'content',
+            gridColumnStart: 'content',
+            gridRowEnd: 'content',
+            gridColumnEnd: 'content',
+          }}
+        >
+          <button
+            className="inline-flex px-2 items-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-none disabled:pointer-events-none disabled:opacity-50 text-foreground/90 hover:bg-sidebar-accent hover:text-accent-foreground font-450 h-6 w-6 text-xs justify-center rounded-sm"
+            data-state="closed"
+            title="Undo changes"
+          >
+            <Undo2 className="size-3" aria-hidden="true" />
+          </button>
+          <button
+            className="inline-flex items-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-none disabled:pointer-events-none disabled:opacity-50 text-foreground/90 hover:bg-sidebar-accent hover:text-accent-foreground h-6 w-6 text-xs justify-center rounded-sm gap-1 font-mono font-medium max-w-32 px-1.5"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            data-state="closed"
+          >
+            <ChevronDown className="size-3" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Default state - stats */}
+        <div
+          className="flex items-center justify-end gap-2 px-1.5 h-full visible group-hover:invisible"
+          style={{
+            gridRowStart: 'content',
+            gridColumnStart: 'content',
+            gridRowEnd: 'content',
+            gridColumnEnd: 'content',
+          }}
+        >
+          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-[10px] font-mono font-medium flex-shrink-0">
+              {(file.additions ?? 0) > 0 && (
+                <span className="text-[--git-green]">+{file.additions}</span>
               )}
-            >
-              Code
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('visual')
-              }}
-              className={cn(
-                'px-3 py-1.5 text-sm rounded-md transition-colors',
-                activeTab === 'visual'
-                  ? 'bg-surface-active text-text-strong'
-                  : 'text-text-muted hover:text-text-primary'
+              {(file.deletions ?? 0) > 0 && (
+                <span className="text-[--git-red]">-{file.deletions}</span>
               )}
-              data-testid="diff-visual-tab"
-            >
-              Visual
-            </button>
+            </div>
+            <StatusIcon
+              className={cn('size-3 flex-shrink-0', statusColor)}
+              aria-hidden="true"
+            />
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          {/* Mode toggle (only for code tab) */}
-          {activeTab === 'code' && (
+/**
+ * Main diff view component - Conductor-style flat file list
+ *
+ * Shows git diff of worktree against its merge base (target branch)
+ */
+export function DiffView({ workspaceId }: DiffViewProps) {
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  // Fetch worktree diff
+  const { data: diffData, isLoading } = useWorktreeDiff(workspaceId)
+  const files = diffData?.files ?? []
+
+  const virtualizer = useVirtualizer({
+    count: files.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 32,
+    overscan: 5,
+  })
+
+  // Reset scroll when files change
+  useEffect(() => {
+    if (parentRef.current) {
+      parentRef.current.scrollTop = 0
+    }
+  }, [workspaceId])
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        Loading...
+      </div>
+    )
+  }
+
+  if (files.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        No changes
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={parentRef}
+      className="flex-1 min-h-0 overflow-auto pt-2"
+      data-testid="diff-view-container"
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const file = files[virtualItem.index]
+          if (!file) return null
+
+          return (
             <div
-              className="flex items-center gap-1 bg-surface-control rounded-lg p-0.5"
-              data-testid="diff-mode-toggle"
+              key={virtualItem.key}
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                height: `${virtualItem.size}px`,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setDiffMode('split')
-                }}
-                className={cn(
-                  'px-3 py-1 text-xs font-medium rounded transition-colors',
-                  diffMode === 'split'
-                    ? 'bg-surface-active text-text-strong'
-                    : 'text-text-muted hover:text-text-primary'
-                )}
-                data-testid="diff-mode-split"
-                data-active={diffMode === 'split'}
-              >
-                Split
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDiffMode('unified')
-                }}
-                className={cn(
-                  'px-3 py-1 text-xs font-medium rounded transition-colors',
-                  diffMode === 'unified'
-                    ? 'bg-surface-active text-text-strong'
-                    : 'text-text-muted hover:text-text-primary'
-                )}
-                data-testid="diff-mode-unified"
-                data-active={diffMode === 'unified'}
-              >
-                Unified
-              </button>
+              <FileRow file={file} />
             </div>
-          )}
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 relative overflow-hidden">
-          {/* Loading state */}
-          {isLoading && (
-            <div className="h-full flex items-center justify-center">
-              <div className="flex items-center gap-2 text-text-muted">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-sm">Loading diff...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Error state */}
-          {diffError && !isLoading && (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-status-error/50" />
-                <p className="text-sm text-text-muted">Failed to load diff</p>
-                <p className="text-xs mt-1 text-status-error">
-                  {diffError instanceof Error ? diffError.message : 'Unknown error'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* No checkpoints state */}
-          {hasNoCheckpoints && !isLoading && !diffError && (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <FileText className="w-16 h-16 mx-auto mb-4 text-text-dim" />
-                <p className="text-sm text-text-muted">No changes to show yet</p>
-                <p className="text-xs mt-1 text-text-faint">
-                  Agent changes will appear here after the first turn
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Main content */}
-          {!isLoading && !diffError && !hasNoCheckpoints && (
-            <>
-              {activeTab === 'code' ? (
-                <>
-                  <DiffEditor onLineClick={handleLineClick} />
-                  <InlineComments />
-                </>
-              ) : (
-                <VisualComparison />
-              )}
-            </>
-          )}
-        </div>
+          )
+        })}
       </div>
     </div>
   )
