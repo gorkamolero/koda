@@ -257,7 +257,5 @@ CREATE TABLE `git_checkpoints` (
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	FOREIGN KEY (`worktree_id`) REFERENCES `worktrees`(`id`) ON UPDATE no action ON DELETE no action
 );
---> statement-breakpoint
-
 -- Step 8: Update workspace_shares (stays referencing workspaces - containers)
 -- No change needed - workspace_shares already references workspaces correctly
