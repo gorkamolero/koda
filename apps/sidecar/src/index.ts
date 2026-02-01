@@ -119,6 +119,25 @@ import {
   GetCheckpointsByWorktreeSchema,
 } from './checkpoint/index.js';
 
+// Import PTY handlers
+import {
+  createPty,
+  writePty,
+  resizePty,
+  closePty,
+  getPty,
+  listPtySessions,
+  setOnDataCallback,
+  setOnExitCallback,
+  cleanupAllSessions,
+  CreatePtySchema,
+  WritePtySchema,
+  ResizePtySchema,
+  ClosePtySchema,
+  GetPtySchema,
+} from './handlers/pty.js';
+import { getNotificationEmitter } from './rpc/notifications.js';
+
 /**
  * Get the Unix socket path based on platform
  */
@@ -217,6 +236,14 @@ function registerMethods() {
   router.register('checkpoint.get', rpcGetCheckpoint, GetCheckpointSchema);
   router.register('checkpoint.list', rpcGetCheckpointsByWorktree, GetCheckpointsByWorktreeSchema);
 
+  // PTY (terminal) management
+  router.register('pty.create', createPty, CreatePtySchema);
+  router.register('pty.write', writePty, WritePtySchema);
+  router.register('pty.resize', resizePty, ResizePtySchema);
+  router.register('pty.close', closePty, ClosePtySchema);
+  router.register('pty.get', getPty, GetPtySchema);
+  router.register('pty.list', listPtySessions);
+
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);
 }
@@ -251,6 +278,15 @@ async function main() {
 
     // Register RPC methods
     registerMethods();
+
+    // Set up PTY callbacks to stream data to connected clients
+    const notificationEmitter = getNotificationEmitter();
+    setOnDataCallback((sessionId, data) => {
+      notificationEmitter.emitPtyData(sessionId, data);
+    });
+    setOnExitCallback((sessionId, exitCode) => {
+      notificationEmitter.emitPtyExit(sessionId, exitCode);
+    });
 
     // Start Unix socket server
     const socketPath = getSocketPath();
@@ -295,6 +331,7 @@ async function main() {
     // Graceful shutdown
     const shutdown = async () => {
       console.log('\nShutting down...');
+      cleanupAllSessions(); // Close all PTY sessions
       if (httpServer) {
         await httpServer.stop();
       }

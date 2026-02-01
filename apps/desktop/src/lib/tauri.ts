@@ -13,8 +13,10 @@ function isTauriContext(): boolean {
 /**
  * HTTP RPC port for E2E testing
  * When running in browser context without Tauri, we use HTTP to reach the sidecar
+ * Port is configurable via VITE_HTTP_RPC_PORT env var for test isolation
  */
-const HTTP_RPC_URL = 'http://localhost:3847/rpc'
+const HTTP_RPC_PORT = import.meta.env.VITE_HTTP_RPC_PORT || '3847'
+const HTTP_RPC_URL = `http://localhost:${HTTP_RPC_PORT}/rpc`
 
 /**
  * Send RPC request via HTTP (for E2E testing)

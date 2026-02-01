@@ -391,6 +391,7 @@ export function WorkspaceList() {
           {workspaces.map((workspace) => (
             <button
               key={workspace.id}
+              data-testid="workspace-card"
               onClick={() => { handleWorkspaceClick(workspace); }}
               className="text-left p-4 border border-border-subtle rounded-lg hover:border-border-accent hover:bg-surface-hover transition-colors"
             >
