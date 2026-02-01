@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import { getDb } from '../db/index.js';
-import { workspaces, repos, type Workspace } from '../db/schema.js';
+import { worktrees, repos, type Worktree } from '../db/schema.js';
 
 /**
  * Koda config schema (from .koda/config.json)
@@ -27,16 +27,17 @@ export const CreateWorktreeSchema = z.object({
   repoId: z.string().min(1),
   branch: z.string().min(1),
   fromBranch: z.string().optional(), // Base branch to create from (defaults to repo's defaultBranch)
+  workspaceId: z.string().uuid().optional(), // Optional workspace to add this worktree to
 });
 
 export const DeleteWorktreeSchema = z.object({
-  workspaceId: z.string().uuid(),
+  worktreeId: z.string().uuid(),
   deleteBranch: z.boolean().optional().default(false),
   force: z.boolean().optional().default(false),
 });
 
 export const GetWorktreeSchema = z.object({
-  workspaceId: z.string().uuid(),
+  worktreeId: z.string().uuid(),
 });
 
 export const ListWorktreesSchema = z.object({
@@ -44,18 +45,35 @@ export const ListWorktreesSchema = z.object({
   includeArchived: z.boolean().optional().default(false),
 });
 
+export const ListWorktreesByWorkspaceSchema = z.object({
+  workspaceId: z.string().uuid(),
+  includeArchived: z.boolean().optional().default(false),
+});
+
+export const AddWorktreeToWorkspaceSchema = z.object({
+  worktreeId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+});
+
+export const RemoveWorktreeFromWorkspaceSchema = z.object({
+  worktreeId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+});
+
 // Use z.input for handler function signatures (allows optional fields before defaults)
 export type CreateWorktreeInput = z.input<typeof CreateWorktreeSchema>;
 export type DeleteWorktreeInput = z.input<typeof DeleteWorktreeSchema>;
 export type GetWorktreeInput = z.input<typeof GetWorktreeSchema>;
 export type ListWorktreesInput = z.input<typeof ListWorktreesSchema>;
+export type ListWorktreesByWorkspaceInput = z.input<typeof ListWorktreesByWorkspaceSchema>;
+export type AddWorktreeToWorkspaceInput = z.input<typeof AddWorktreeToWorkspaceSchema>;
+export type RemoveWorktreeFromWorkspaceInput = z.input<typeof RemoveWorktreeFromWorkspaceSchema>;
 
 /**
- * Extended workspace type with setup error info
+ * Extended worktree type with setup error info
  */
-export interface WorktreeResult extends Workspace {
+export interface WorktreeResult extends Worktree {
   setupError?: string;
-  worktreePath?: string;
 }
 
 /**
@@ -165,7 +183,7 @@ export async function runTeardownScripts(
 }
 
 /**
- * Create a git worktree and workspace record
+ * Create a git worktree and worktree record
  */
 export async function createWorktree(
   input: CreateWorktreeInput,
@@ -236,15 +254,17 @@ export async function createWorktree(
     throw new Error(`Failed to create worktree: ${message}`);
   }
 
-  // Create workspace record
-  const workspaceId = randomUUID();
-  const workspace: WorktreeResult = {
-    id: workspaceId,
-    repositoryId: input.repoId,
-    ownerUserId: null,
-    directoryName,
+  // Create worktree record
+  const worktreeId = randomUUID();
+  const workspaceIds = input.workspaceId ? [input.workspaceId] : [];
+
+  const worktree: WorktreeResult = {
+    id: worktreeId,
+    repoId: input.repoId,
     branch: input.branch,
-    workspaceType: 'standard',
+    worktreePath,
+    workspaceIds: JSON.stringify(workspaceIds),
+    worktreeType: 'standard',
     state: 'active',
     specContent: null,
     fixPlanContent: null,
@@ -254,31 +274,30 @@ export async function createWorktree(
     manualStatus: null,
     pinnedAt: null,
     notes: null,
-    linkedWorkspaceIds: null,
+    linkedWorktreeIds: null,
     unread: 0,
     activeSessionId: null,
     bigTerminalMode: false,
     intendedTargetBranch: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    worktreePath,
   };
 
-  await database.insert(workspaces).values({
-    id: workspace.id,
-    repositoryId: workspace.repositoryId,
-    ownerUserId: workspace.ownerUserId,
-    directoryName: workspace.directoryName,
-    branch: workspace.branch,
-    workspaceType: workspace.workspaceType,
-    state: workspace.state,
+  await database.insert(worktrees).values({
+    id: worktree.id,
+    repoId: worktree.repoId,
+    branch: worktree.branch,
+    worktreePath: worktree.worktreePath,
+    workspaceIds: worktree.workspaceIds,
+    worktreeType: worktree.worktreeType,
+    state: worktree.state,
   });
 
   // Read and run setup scripts
   const config = await readKodaConfig(repoPath);
   if (config?.setup && config.setup.length > 0) {
     const setupEnv: Record<string, string> = {
-      KODA_WORKSPACE_ID: workspaceId,
+      KODA_WORKTREE_ID: worktreeId,
       KODA_BRANCH: input.branch,
       KODA_REPO_PATH: repoPath,
       KODA_WORKTREE_PATH: worktreePath,
@@ -287,63 +306,63 @@ export async function createWorktree(
 
     const result = await runSetupScripts(config.setup, worktreePath, setupEnv);
     if (!result.success) {
-      workspace.setupError = result.error;
+      worktree.setupError = result.error;
     }
   }
 
-  return workspace;
+  return worktree;
 }
 
 /**
- * Delete a git worktree and soft delete workspace
+ * Delete a git worktree and soft delete worktree record
  */
 export async function deleteWorktree(
   input: DeleteWorktreeInput,
   db?: ReturnType<typeof getDb>
-): Promise<Workspace> {
+): Promise<Worktree> {
   const database = db ?? getDb();
   // Apply defaults for optional fields
   const deleteBranch = input.deleteBranch ?? false;
   const force = input.force ?? false;
 
-  // Get workspace
-  const workspace = await database.query.workspaces.findFirst({
-    where: eq(workspaces.id, input.workspaceId),
+  // Get worktree
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
   });
 
-  if (!workspace) {
-    throw new Error(`Workspace not found: ${input.workspaceId}`);
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
   }
 
   // If already archived, just return
-  if (workspace.state === 'archived') {
-    return workspace;
+  if (worktree.state === 'archived') {
+    return worktree;
   }
 
   // Get repository
   const repo = await database.query.repos.findFirst({
-    where: eq(repos.id, workspace.repositoryId!),
+    where: eq(repos.id, worktree.repoId),
   });
 
   if (!repo?.rootPath) {
     // Repository not found or has no path - just mark as archived
     await database
-      .update(workspaces)
+      .update(worktrees)
       .set({ state: 'archived', updatedAt: new Date().toISOString() })
-      .where(eq(workspaces.id, input.workspaceId));
+      .where(eq(worktrees.id, input.worktreeId));
 
-    return { ...workspace, state: 'archived' };
+    return { ...worktree, state: 'archived' };
   }
 
   const repoPath = repo.rootPath;
-  const worktreePath = path.join(repoPath, '.worktrees', workspace.directoryName!);
+  const worktreePath = worktree.worktreePath ?? path.join(repoPath, '.worktrees', sanitizeBranchName(worktree.branch ?? ''));
 
   // Read and run teardown scripts BEFORE removing worktree
   const config = await readKodaConfig(repoPath);
   if (config?.teardown && config.teardown.length > 0) {
     const teardownEnv: Record<string, string> = {
-      KODA_WORKSPACE_ID: workspace.id,
-      KODA_BRANCH: workspace.branch ?? '',
+      KODA_WORKTREE_ID: worktree.id,
+      KODA_BRANCH: worktree.branch ?? '',
       KODA_REPO_PATH: repoPath,
       KODA_WORKTREE_PATH: worktreePath,
       ...(config.env ?? {}),
@@ -362,7 +381,7 @@ export async function deleteWorktree(
         cwd: repoPath,
         stdio: 'pipe',
       });
-    } catch (err) {
+    } catch {
       // If standard remove fails, try force remove
       try {
         execSync(`git worktree remove "${worktreePath}" --force`, {
@@ -378,9 +397,9 @@ export async function deleteWorktree(
   }
 
   // Delete branch if requested
-  if (deleteBranch && workspace.branch) {
+  if (deleteBranch && worktree.branch) {
     try {
-      execSync(`git branch -D "${workspace.branch}"`, {
+      execSync(`git branch -D "${worktree.branch}"`, {
         cwd: repoPath,
         stdio: 'pipe',
       });
@@ -389,33 +408,33 @@ export async function deleteWorktree(
     }
   }
 
-  // Soft delete workspace (set state to archived)
+  // Soft delete worktree (set state to archived)
   await database
-    .update(workspaces)
+    .update(worktrees)
     .set({ state: 'archived', updatedAt: new Date().toISOString() })
-    .where(eq(workspaces.id, input.workspaceId));
+    .where(eq(worktrees.id, input.worktreeId));
 
-  return { ...workspace, state: 'archived' };
+  return { ...worktree, state: 'archived' };
 }
 
 /**
- * Get a worktree by workspace ID
+ * Get a worktree by ID
  */
 export async function getWorktree(
   input: GetWorktreeInput,
   db?: ReturnType<typeof getDb>
-): Promise<Workspace> {
+): Promise<Worktree> {
   const database = db ?? getDb();
 
-  const workspace = await database.query.workspaces.findFirst({
-    where: eq(workspaces.id, input.workspaceId),
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
   });
 
-  if (!workspace) {
-    throw new Error(`Workspace not found: ${input.workspaceId}`);
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
   }
 
-  return workspace;
+  return worktree;
 }
 
 /**
@@ -424,21 +443,133 @@ export async function getWorktree(
 export async function listWorktrees(
   input: ListWorktreesInput,
   db?: ReturnType<typeof getDb>
-): Promise<Workspace[]> {
+): Promise<Worktree[]> {
   const database = db ?? getDb();
   // Apply default for optional field
   const includeArchived = input.includeArchived ?? false;
 
   if (includeArchived) {
-    return database.query.workspaces.findMany({
-      where: eq(workspaces.repositoryId, input.repoId),
+    return database.query.worktrees.findMany({
+      where: eq(worktrees.repoId, input.repoId),
     });
   }
 
-  return database.query.workspaces.findMany({
+  return database.query.worktrees.findMany({
     where: and(
-      eq(workspaces.repositoryId, input.repoId),
-      eq(workspaces.state, 'active')
+      eq(worktrees.repoId, input.repoId),
+      eq(worktrees.state, 'active')
     ),
   });
+}
+
+/**
+ * List worktrees for a workspace
+ */
+export async function listWorktreesByWorkspace(
+  input: ListWorktreesByWorkspaceInput,
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree[]> {
+  const database = db ?? getDb();
+  const includeArchived = input.includeArchived ?? false;
+
+  // Get all worktrees and filter by workspace_ids JSON array
+  const allWorktrees = await database.query.worktrees.findMany();
+
+  return allWorktrees.filter(wt => {
+    // Filter by archived state if needed
+    if (!includeArchived && wt.state === 'archived') {
+      return false;
+    }
+
+    // Check if workspace is in the workspaceIds array
+    if (!wt.workspaceIds) return false;
+    try {
+      const ids = JSON.parse(wt.workspaceIds) as string[];
+      return ids.includes(input.workspaceId);
+    } catch {
+      return false;
+    }
+  });
+}
+
+/**
+ * Add a worktree to a workspace
+ */
+export async function addWorktreeToWorkspace(
+  input: AddWorktreeToWorkspaceInput,
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree> {
+  const database = db ?? getDb();
+
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
+  });
+
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
+  }
+
+  // Parse current workspace_ids
+  let workspaceIds: string[] = [];
+  if (worktree.workspaceIds) {
+    try {
+      workspaceIds = JSON.parse(worktree.workspaceIds) as string[];
+    } catch {
+      workspaceIds = [];
+    }
+  }
+
+  // Add workspace if not already present
+  if (!workspaceIds.includes(input.workspaceId)) {
+    workspaceIds.push(input.workspaceId);
+    await database
+      .update(worktrees)
+      .set({
+        workspaceIds: JSON.stringify(workspaceIds),
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(worktrees.id, input.worktreeId));
+  }
+
+  return { ...worktree, workspaceIds: JSON.stringify(workspaceIds) };
+}
+
+/**
+ * Remove a worktree from a workspace
+ */
+export async function removeWorktreeFromWorkspace(
+  input: RemoveWorktreeFromWorkspaceInput,
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree> {
+  const database = db ?? getDb();
+
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
+  });
+
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
+  }
+
+  // Parse current workspace_ids
+  let workspaceIds: string[] = [];
+  if (worktree.workspaceIds) {
+    try {
+      workspaceIds = JSON.parse(worktree.workspaceIds) as string[];
+    } catch {
+      workspaceIds = [];
+    }
+  }
+
+  // Remove workspace
+  const newIds = workspaceIds.filter(id => id !== input.workspaceId);
+  await database
+    .update(worktrees)
+    .set({
+      workspaceIds: JSON.stringify(newIds),
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(worktrees.id, input.worktreeId));
+
+  return { ...worktree, workspaceIds: JSON.stringify(newIds) };
 }

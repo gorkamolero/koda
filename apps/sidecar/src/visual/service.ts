@@ -22,7 +22,7 @@ export interface ServiceOptions {
 }
 
 export interface CaptureStateParams {
-  workspaceId: string;
+  worktreeId: string;
   sessionId: string;
   turnId: string;
   url: string;
@@ -31,7 +31,7 @@ export interface CaptureStateParams {
 
 export interface SnapshotRecord {
   id: string;
-  workspaceId: string | null;
+  worktreeId: string | null;
   sessionId: string | null;
   turnId: string | null;
   snapshotType: string | null;
@@ -90,7 +90,7 @@ export class VisualDiffService {
     params: CaptureStateParams,
     snapshotType: 'before' | 'after'
   ): Promise<SnapshotRecord> {
-    const { workspaceId, sessionId, turnId, url, selector } = params;
+    const { worktreeId, sessionId, turnId, url, selector } = params;
 
     // Capture screenshot
     const screenshot = await this.capture.captureScreenshot(url, selector);
@@ -100,7 +100,7 @@ export class VisualDiffService {
 
     this.db.insert(schema.visualSnapshots).values({
       id,
-      workspaceId,
+      worktreeId,
       sessionId,
       turnId,
       snapshotType,

@@ -25,7 +25,7 @@ function generateId(): string {
 // ============================================================================
 
 export interface CreateSessionInput {
-  workspaceId: string;
+  worktreeId: string;
   agentType: string;
   model: string;
   status?: 'idle' | 'running' | 'paused';
@@ -51,7 +51,7 @@ export function createSession(db: Db, input: CreateSessionInput): Session {
   db.insert(sessions)
     .values({
       id,
-      workspaceId: input.workspaceId,
+      worktreeId: input.worktreeId,
       agentType: input.agentType,
       model: input.model,
       status: input.status ?? 'idle',
@@ -121,13 +121,13 @@ export function deleteSession(db: Db, sessionId: string): boolean {
 }
 
 /**
- * Get all sessions for a workspace
+ * Get all sessions for a worktree
  */
-export function getSessionsByWorkspace(db: Db, workspaceId: string): Session[] {
+export function getSessionsByWorktree(db: Db, worktreeId: string): Session[] {
   return db
     .select()
     .from(sessions)
-    .where(eq(sessions.workspaceId, workspaceId))
+    .where(eq(sessions.worktreeId, worktreeId))
     .orderBy(desc(sessions.createdAt))
     .all();
 }

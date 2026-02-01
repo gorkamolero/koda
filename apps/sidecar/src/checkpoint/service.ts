@@ -21,7 +21,7 @@ import type * as schema from '../db/schema.js';
  * Input for saving a checkpoint
  */
 export interface SaveCheckpointInput {
-  workspaceId: string;
+  worktreeId: string;
   turnId: string;
   repoPath: string;
 }
@@ -91,7 +91,7 @@ export function saveCheckpoint(
   db: DbType,
   input: SaveCheckpointInput
 ): GitCheckpoint {
-  const { workspaceId, turnId, repoPath } = input;
+  const { worktreeId, turnId, repoPath } = input;
 
   // Get current HEAD
   const headOid = git(repoPath, 'rev-parse HEAD');
@@ -109,7 +109,7 @@ export function saveCheckpoint(
 
   const checkpoint: GitCheckpoint = {
     id: randomUUID(),
-    workspaceId,
+    worktreeId,
     turnId,
     headOid,
     indexTree,
@@ -169,13 +169,13 @@ export function getCheckpoint(db: DbType, checkpointId: string): GitCheckpoint |
 }
 
 /**
- * Get all checkpoints for a workspace
+ * Get all checkpoints for a worktree
  */
-export function getCheckpointsByWorkspace(db: DbType, workspaceId: string): GitCheckpoint[] {
+export function getCheckpointsByWorktree(db: DbType, worktreeId: string): GitCheckpoint[] {
   return db
     .select()
     .from(gitCheckpoints)
-    .where(eq(gitCheckpoints.workspaceId, workspaceId))
+    .where(eq(gitCheckpoints.worktreeId, worktreeId))
     .all();
 }
 

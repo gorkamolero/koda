@@ -13,10 +13,12 @@ import {
   createWorkspace,
   getWorkspace,
   listWorkspaces,
-  getDiffStats,
+  getWorkspaceWithContents,
+  updateWorkspace,
+  deleteWorkspace,
   CreateWorkspaceSchema,
   GetWorkspaceSchema,
-  GetDiffStatsSchema,
+  UpdateWorkspaceSchema,
 } from './handlers/workspace.js';
 
 // Import repo handlers
@@ -77,10 +79,16 @@ import {
   deleteWorktree,
   getWorktree,
   listWorktrees,
+  listWorktreesByWorkspace,
+  addWorktreeToWorkspace,
+  removeWorktreeFromWorkspace,
   CreateWorktreeSchema,
   DeleteWorktreeSchema,
   GetWorktreeSchema,
   ListWorktreesSchema,
+  ListWorktreesByWorkspaceSchema,
+  AddWorktreeToWorkspaceSchema,
+  RemoveWorktreeFromWorkspaceSchema,
 } from './handlers/worktree.js';
 
 // Import workspace repo handlers
@@ -101,12 +109,12 @@ import {
   rpcRestoreCheckpoint,
   rpcDiffCheckpoints,
   rpcGetCheckpoint,
-  rpcGetCheckpointsByWorkspace,
+  rpcGetCheckpointsByWorktree,
   SaveCheckpointSchema,
   RestoreCheckpointSchema,
   DiffCheckpointsSchema,
   GetCheckpointSchema,
-  GetCheckpointsByWorkspaceSchema,
+  GetCheckpointsByWorktreeSchema,
 } from './checkpoint/index.js';
 
 /**
@@ -155,11 +163,13 @@ function registerMethods() {
   router.register('repo.list', listRepos);
   router.register('repo.delete', deleteRepo, DeleteRepoSchema);
 
-  // Workspaces
+  // Workspaces (containers)
   router.register('workspace.create', createWorkspace, CreateWorkspaceSchema);
   router.register('workspace.get', getWorkspace, GetWorkspaceSchema);
+  router.register('workspace.getWithContents', getWorkspaceWithContents, GetWorkspaceSchema);
   router.register('workspace.list', listWorkspaces);
-  router.register('workspace.getDiffStats', getDiffStats, GetDiffStatsSchema);
+  router.register('workspace.update', updateWorkspace, UpdateWorkspaceSchema);
+  router.register('workspace.delete', deleteWorkspace, GetWorkspaceSchema);
 
   // Codex agent
   router.register('codex.start', startCodexSession, StartSessionSchema);
@@ -187,6 +197,9 @@ function registerMethods() {
   router.register('worktree.delete', deleteWorktree, DeleteWorktreeSchema);
   router.register('worktree.get', getWorktree, GetWorktreeSchema);
   router.register('worktree.list', listWorktrees, ListWorktreesSchema);
+  router.register('worktree.listByWorkspace', listWorktreesByWorkspace, ListWorktreesByWorkspaceSchema);
+  router.register('worktree.addToWorkspace', addWorktreeToWorkspace, AddWorktreeToWorkspaceSchema);
+  router.register('worktree.removeFromWorkspace', removeWorktreeFromWorkspace, RemoveWorktreeFromWorkspaceSchema);
 
   // Workspace repo management (multi-repo support)
   router.register('workspaceRepo.attach', attachRepo, AttachRepoSchema);
@@ -199,7 +212,7 @@ function registerMethods() {
   router.register('checkpoint.restore', rpcRestoreCheckpoint, RestoreCheckpointSchema);
   router.register('checkpoint.diff', rpcDiffCheckpoints, DiffCheckpointsSchema);
   router.register('checkpoint.get', rpcGetCheckpoint, GetCheckpointSchema);
-  router.register('checkpoint.list', rpcGetCheckpointsByWorkspace, GetCheckpointsByWorkspaceSchema);
+  router.register('checkpoint.list', rpcGetCheckpointsByWorktree, GetCheckpointsByWorktreeSchema);
 
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);

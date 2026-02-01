@@ -11,6 +11,7 @@ import {
 import {
   RPC_METHODS,
   type Workspace,
+  type Worktree,
   type CreateWorkspaceParams,
   type ListWorkspacesParams,
   type SidecarStatus,
@@ -18,9 +19,7 @@ import {
   type Repo,
   type CreateRepoParams,
   type CreateWorktreeParams,
-  type WorktreeResult,
   type CheckpointDiff,
-  type DiffStats,
   type Session,
   type WorkspaceRepo,
   type AttachRepoParams,
@@ -180,18 +179,8 @@ export function useWorkspace(id: string) {
   })
 }
 
-/**
- * Workspace diff stats hook
- */
-export function useWorkspaceDiffStats(workspaceId: string) {
-  return useQuery({
-    queryKey: ['workspace-diff-stats', workspaceId],
-    queryFn: () => rpcRequest<DiffStats>(RPC_METHODS.WORKSPACE_GET_DIFF_STATS, { workspaceId }),
-    enabled: !!workspaceId,
-    retry: false,
-    staleTime: 30000, // Cache for 30 seconds
-  })
-}
+// Note: Workspace diff stats has been removed in the rearchitecture.
+// Diff stats should now be computed per-worktree, not per-workspace.
 
 /**
  * Create workspace mutation
@@ -270,16 +259,17 @@ export function useDeleteRepo() {
 // ============================================================================
 
 /**
- * Create a worktree (creates workspace + git worktree)
+ * Create a worktree (creates worktree record + git worktree)
  */
 export function useCreateWorktree() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (params: CreateWorktreeParams) =>
-      rpcRequest<WorktreeResult>(RPC_METHODS.WORKTREE_CREATE, params),
+      rpcRequest<Worktree>(RPC_METHODS.WORKTREE_CREATE, params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
     },
   })
 }
@@ -290,7 +280,7 @@ export function useCreateWorktree() {
 export function useWorktrees(repoId: string) {
   return useQuery({
     queryKey: ['worktrees', repoId],
-    queryFn: () => rpcRequest<Workspace[]>(RPC_METHODS.WORKTREE_LIST, { repoId }),
+    queryFn: () => rpcRequest<Worktree[]>(RPC_METHODS.WORKTREE_LIST, { repoId }),
     enabled: !!repoId,
     retry: false,
   })
@@ -303,8 +293,8 @@ export function useDeleteWorktree() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (params: { workspaceId: string; deleteBranch?: boolean }) =>
-      rpcRequest<Workspace>(RPC_METHODS.WORKTREE_DELETE, params),
+    mutationFn: (params: { worktreeId: string; deleteBranch?: boolean }) =>
+      rpcRequest<Worktree>(RPC_METHODS.WORKTREE_DELETE, params),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
       void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
@@ -398,17 +388,17 @@ export function useCheckpointDiff(checkpointId1: string, checkpointId2: string, 
 }
 
 /**
- * List checkpoints for a workspace
+ * List checkpoints for a worktree
  */
-export function useCheckpoints(workspaceId: string) {
+export function useCheckpoints(worktreeId: string) {
   return useQuery({
-    queryKey: ['checkpoints', workspaceId],
+    queryKey: ['checkpoints', worktreeId],
     queryFn: () =>
       rpcRequest<{ id: string; turnId: string; createdAt: string }[]>(
         RPC_METHODS.CHECKPOINT_LIST,
-        { workspaceId }
+        { worktreeId }
       ),
-    enabled: !!workspaceId,
+    enabled: !!worktreeId,
     retry: false,
   })
 }
@@ -418,13 +408,13 @@ export function useCheckpoints(workspaceId: string) {
 // ============================================================================
 
 /**
- * List sessions for a workspace
+ * List sessions for a worktree
  */
-export function useSessions(workspaceId: string) {
+export function useSessions(worktreeId: string) {
   return useQuery({
-    queryKey: ['sessions', workspaceId],
-    queryFn: () => rpcRequest<Session[]>(RPC_METHODS.SESSION_LIST, { workspaceId }),
-    enabled: !!workspaceId,
+    queryKey: ['sessions', worktreeId],
+    queryFn: () => rpcRequest<Session[]>(RPC_METHODS.SESSION_LIST, { worktreeId }),
+    enabled: !!worktreeId,
     retry: false,
     refetchInterval: 5000, // Poll every 5 seconds to catch status changes
   })
@@ -437,10 +427,10 @@ export function useCreateSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (params: { workspaceId: string; model?: string; agentType?: string }) =>
+    mutationFn: (params: { worktreeId: string; model?: string; agentType?: string }) =>
       rpcRequest<Session>(RPC_METHODS.SESSION_CREATE, params),
     onSuccess: (_, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions', variables.workspaceId] })
+      void queryClient.invalidateQueries({ queryKey: ['sessions', variables.worktreeId] })
     },
   })
 }
