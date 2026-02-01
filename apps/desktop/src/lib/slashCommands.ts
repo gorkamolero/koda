@@ -128,7 +128,7 @@ export function groupCommandsByCategory(commands: SlashCommand[]): Record<string
     if (!acc[category]) {
       acc[category] = []
     }
-    acc[category]!.push(cmd)
+    acc[category].push(cmd)
     return acc
   }, {})
 }

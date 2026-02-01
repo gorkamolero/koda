@@ -175,7 +175,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
         <div className="flex items-center gap-1">
           {/* Notes tab */}
           <button
-            onClick={() => setActiveTab('notes')}
+            onClick={() => { setActiveTab('notes'); }}
             data-testid="scratchpad-tab-notes"
             data-active={activeTab === 'notes'}
             className={cn(
@@ -191,7 +191,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
 
           {/* History tab */}
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => { setActiveTab('history'); }}
             data-testid="scratchpad-tab-history"
             data-active={activeTab === 'history'}
             className={cn(
@@ -224,7 +224,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
           {/* Notes list (collapsible) */}
           <div className="border-b border-border-subtle">
             <button
-              onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+              onClick={() => { setIsNotesExpanded(!isNotesExpanded); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
             >
               {isNotesExpanded ? (
@@ -246,7 +246,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
                         ? 'bg-surface-active text-text-strong'
                         : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
                     )}
-                    onClick={() => selectNote(note.id)}
+                    onClick={() => { selectNote(note.id); }}
                   >
                     <span className="truncate flex-1">{note.title}</span>
                     {notes.length > 1 && (
@@ -273,7 +273,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
                 height="100%"
                 defaultLanguage="markdown"
                 value={activeNote.content}
-                onChange={(value) => updateNoteContent(value ?? '')}
+                onChange={(value) => { updateNoteContent(value ?? ''); }}
                 onMount={handleEditorMount}
                 theme="vs-dark"
                 options={{

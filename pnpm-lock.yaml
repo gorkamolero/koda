@@ -282,15 +282,9 @@ importers:
 
   apps/sidecar:
     dependencies:
-      '@anthropic-ai/claude-agent-sdk':
-        specifier: ^0.2.23
-        version: 0.2.29(zod@4.3.6)
       '@liveblocks/node':
         specifier: ^3.13.3
         version: 3.13.3(@types/json-schema@7.0.15)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.5.0
-        version: 1.25.3(hono@4.11.7)(zod@4.3.6)
       '@openai/codex-sdk':
         specifier: ^0.92.0
         version: 0.92.0
@@ -319,6 +313,12 @@ importers:
         specifier: ^4.0.0
         version: 4.3.6
     devDependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: ^0.2.29
+        version: 0.2.29(zod@4.3.6)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.25.3
+        version: 1.25.3(hono@4.11.7)(zod@4.3.6)
       '@types/better-sqlite3':
         specifier: ^7.6.8
         version: 7.6.13

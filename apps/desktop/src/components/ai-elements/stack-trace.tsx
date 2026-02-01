@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
@@ -278,7 +278,7 @@ export const StackTraceActions = memo(
     // biome-ignore lint/a11y/useSemanticElements: fieldset doesn't fit this UI pattern
     <div
       className={cn("flex shrink-0 items-center gap-1", className)}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => { e.stopPropagation(); }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.stopPropagation();
@@ -320,7 +320,7 @@ export const StackTraceCopyButton = memo(
         await navigator.clipboard.writeText(raw);
         setIsCopied(true);
         onCopy?.();
-        setTimeout(() => setIsCopied(false), timeout);
+        setTimeout(() => { setIsCopied(false); }, timeout);
       } catch (error) {
         onError?.(error as Error);
       }

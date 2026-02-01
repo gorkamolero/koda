@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useRef } from 'react'
+import { memo, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 // ============================================================================
@@ -11,11 +11,11 @@ interface WorkingIndicatorProps {
 }
 
 // ============================================================================
-// ASCII Spinner Frames (Braille dots animation)
+// KODA Animation Constants
 // ============================================================================
 
-const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-const SPINNER_INTERVAL = 80 // ms per frame
+const KODA_LETTERS = ['K', 'O', 'D', 'A']
+const LETTER_INTERVAL = 150 // ms per letter
 
 // ============================================================================
 // WorkingIndicator Component
@@ -25,16 +25,14 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   startTime,
   className,
 }: WorkingIndicatorProps) {
-  const [frame, setFrame] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
-  const frameRef = useRef(0)
 
-  // Animate spinner
+  // Animate KODA letters
   useEffect(() => {
     const interval = setInterval(() => {
-      frameRef.current = (frameRef.current + 1) % SPINNER_FRAMES.length
-      setFrame(frameRef.current)
-    }, SPINNER_INTERVAL)
+      setActiveIndex(i => (i + 1) % (KODA_LETTERS.length + 1))
+    }, LETTER_INTERVAL)
 
     return () => { clearInterval(interval) }
   }, [])
@@ -68,8 +66,24 @@ export const WorkingIndicator = memo(function WorkingIndicator({
         className
       )}
     >
-      <span className="text-status-success">{SPINNER_FRAMES[frame]}</span>
-      <span>Working...</span>
+      <span className="inline-flex">
+        {KODA_LETTERS.map((letter, i) => (
+          <span
+            key={letter}
+            className={cn(
+              'transition-all duration-100',
+              i === activeIndex
+                ? 'text-text-accent scale-110 font-bold'
+                : i < activeIndex
+                  ? 'text-status-success'
+                  : 'text-text-dim'
+            )}
+          >
+            {letter}
+          </span>
+        ))}
+      </span>
+      <span className="text-text-muted">working</span>
       <span className="tabular-nums text-text-muted">{formatElapsed(elapsed)}</span>
     </div>
   )
@@ -90,20 +104,20 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
   label = 'Working',
   className,
 }: CompactWorkingIndicatorProps) {
-  const [frame, setFrame] = useState(0)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
-    const spinnerInterval = setInterval(() => {
-      setFrame(f => (f + 1) % SPINNER_FRAMES.length)
-    }, SPINNER_INTERVAL)
+    const letterInterval = setInterval(() => {
+      setActiveIndex(i => (i + 1) % (KODA_LETTERS.length + 1))
+    }, LETTER_INTERVAL)
 
     const timeInterval = setInterval(() => {
       setElapsed(Date.now() - startTime)
     }, 100)
 
     return () => {
-      clearInterval(spinnerInterval)
+      clearInterval(letterInterval)
       clearInterval(timeInterval)
     }
   }, [startTime])
@@ -112,7 +126,23 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
 
   return (
     <span className={cn('inline-flex items-center gap-1.5 font-mono text-xs', className)}>
-      <span className="text-status-success">{SPINNER_FRAMES[frame]}</span>
+      <span className="inline-flex">
+        {KODA_LETTERS.map((letter, i) => (
+          <span
+            key={letter}
+            className={cn(
+              'transition-all duration-75',
+              i === activeIndex
+                ? 'text-text-accent font-bold'
+                : i < activeIndex
+                  ? 'text-status-success'
+                  : 'text-text-dim'
+            )}
+          >
+            {letter}
+          </span>
+        ))}
+      </span>
       <span className="text-text-muted">{label}</span>
       <span className="text-text-dim tabular-nums">{String(seconds)}s</span>
     </span>

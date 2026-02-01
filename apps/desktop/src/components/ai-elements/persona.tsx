@@ -169,7 +169,7 @@ const PersonaWithoutModel = memo(
 export const Persona: FC<PersonaProps> = memo(
   ({
     variant = "obsidian",
-    state = "idle",
+    state,
     onLoad,
     onLoadError,
     onReady,

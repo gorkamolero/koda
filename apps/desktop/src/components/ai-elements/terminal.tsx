@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -170,7 +170,7 @@ export const TerminalCopyButton = ({
       await navigator.clipboard.writeText(output);
       setIsCopied(true);
       onCopy?.();
-      setTimeout(() => setIsCopied(false), timeout);
+      setTimeout(() => { setIsCopied(false); }, timeout);
     } catch (error) {
       onError?.(error as Error);
     }

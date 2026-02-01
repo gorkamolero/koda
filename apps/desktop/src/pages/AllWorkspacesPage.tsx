@@ -205,7 +205,7 @@ export function AllWorkspacesPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {loadingWorkspaces ? (
           <div className="flex items-center justify-center py-12">
-            <KodaSpinner style="matrix" />
+            <KodaSpinner style="wave" />
           </div>
         ) : filteredWorkspaces.length === 0 ? (
           <div className="text-center py-12">

@@ -162,7 +162,7 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
               >
                 {/* Check header */}
                 <button
-                  onClick={() => toggleCheck(check.id)}
+                  onClick={() => { toggleCheck(check.id); }}
                   data-testid={`check-button-${check.id}`}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
                 >
@@ -194,7 +194,7 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
                       href={check.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); }}
                       className="p-1 text-text-muted hover:text-text-primary"
                     >
                       <ExternalLink className="w-3 h-3" />

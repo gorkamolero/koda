@@ -113,7 +113,7 @@ export const FileTreeFolder = ({
 
   return (
     <FileTreeFolderContext.Provider value={{ path, name, isExpanded }}>
-      <Collapsible onOpenChange={() => togglePath(path)} open={isExpanded}>
+      <Collapsible onOpenChange={() => { togglePath(path); }} open={isExpanded}>
         <div
           className={cn("", className)}
           role="treeitem"
@@ -248,8 +248,8 @@ export const FileTreeActions = ({
   // biome-ignore lint/a11y/useSemanticElements: fieldset doesn't fit this UI pattern
   <div
     className={cn("ml-auto flex items-center gap-1", className)}
-    onClick={(e) => e.stopPropagation()}
-    onKeyDown={(e) => e.stopPropagation()}
+    onClick={(e) => { e.stopPropagation(); }}
+    onKeyDown={(e) => { e.stopPropagation(); }}
     role="group"
     {...props}
   >

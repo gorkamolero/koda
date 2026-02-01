@@ -227,6 +227,6 @@ export function toCollaborativeSession(
  * Convert CollaborativeSession back to Session-like object
  */
 export function fromCollaborativeSession(collabSession: CollaborativeSession): Session {
-  const { hostMachineId, hostMachineName, createdByUserId, ...session } = collabSession
+  const { hostMachineId: _hostMachineId, hostMachineName: _hostMachineName, createdByUserId: _createdByUserId, ...session } = collabSession
   return session as Session
 }

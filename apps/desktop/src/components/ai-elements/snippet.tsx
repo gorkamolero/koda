@@ -106,7 +106,7 @@ export const SnippetCopyButton = ({
         setIsCopied(true);
         onCopy?.();
         timeoutRef.current = window.setTimeout(
-          () => setIsCopied(false),
+          () => { setIsCopied(false); },
           timeout
         );
       }

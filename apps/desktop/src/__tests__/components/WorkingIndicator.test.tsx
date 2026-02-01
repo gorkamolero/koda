@@ -11,12 +11,23 @@ describe('WorkingIndicator', () => {
     vi.useRealTimers()
   })
 
-  it('should render with spinner', () => {
+  it('should render with KODA branding', () => {
     const startTime = Date.now()
     render(<WorkingIndicator startTime={startTime} />)
 
-    // Should show "Working..." text
-    expect(screen.getByText('Working...')).toBeInTheDocument()
+    // Should show "working" text
+    expect(screen.getByText('working')).toBeInTheDocument()
+  })
+
+  it('should render KODA letters', () => {
+    const startTime = Date.now()
+    render(<WorkingIndicator startTime={startTime} />)
+
+    // Should show K, O, D, A letters
+    expect(screen.getByText('K')).toBeInTheDocument()
+    expect(screen.getByText('O')).toBeInTheDocument()
+    expect(screen.getByText('D')).toBeInTheDocument()
+    expect(screen.getByText('A')).toBeInTheDocument()
   })
 
   it('should show elapsed time', () => {
@@ -50,19 +61,21 @@ describe('WorkingIndicator', () => {
     expect(screen.getByText('3s')).toBeInTheDocument()
   })
 
-  it('should animate spinner frames', () => {
+  it('should animate KODA letters', () => {
     const startTime = Date.now()
-    const { container } = render(<WorkingIndicator startTime={startTime} />)
+    render(<WorkingIndicator startTime={startTime} />)
 
-    const spinner = container.querySelector('.text-status-success')
+    // Get initial state of K letter
+    const kLetter = screen.getByText('K')
+    expect(kLetter).toBeInTheDocument()
 
-    // Advance time to trigger frame change (80ms per frame)
+    // Advance time to trigger animation (150ms per letter)
     act(() => {
-      vi.advanceTimersByTime(160)
+      vi.advanceTimersByTime(300)
     })
 
-    // Spinner element should exist
-    expect(spinner).toBeInTheDocument()
+    // K letter should still exist (animation cycles)
+    expect(screen.getByText('K')).toBeInTheDocument()
   })
 
   it('should apply custom className', () => {
@@ -80,18 +93,6 @@ describe('WorkingIndicator', () => {
 
     expect(container.firstChild).toHaveClass('font-mono')
   })
-
-  it('should use braille spinner characters', () => {
-    const startTime = Date.now()
-    const { container } = render(<WorkingIndicator startTime={startTime} />)
-
-    const spinner = container.querySelector('.text-status-success')
-    const spinnerText = spinner?.textContent ?? ''
-
-    // Should be one of the braille characters
-    const brailleChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-    expect(brailleChars).toContain(spinnerText)
-  })
 })
 
 describe('CompactWorkingIndicator', () => {
@@ -103,11 +104,15 @@ describe('CompactWorkingIndicator', () => {
     vi.useRealTimers()
   })
 
-  it('should render with default label', () => {
+  it('should render KODA letters', () => {
     const startTime = Date.now()
     render(<CompactWorkingIndicator startTime={startTime} />)
 
-    expect(screen.getByText('Working')).toBeInTheDocument()
+    // Should show K, O, D, A letters
+    expect(screen.getByText('K')).toBeInTheDocument()
+    expect(screen.getByText('O')).toBeInTheDocument()
+    expect(screen.getByText('D')).toBeInTheDocument()
+    expect(screen.getByText('A')).toBeInTheDocument()
   })
 
   it('should accept custom label', () => {

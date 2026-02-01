@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -252,7 +252,7 @@ export const SpeechInput = ({
       if (isListening) {
         stopMediaRecorder();
       } else {
-        startMediaRecorder();
+        void startMediaRecorder();
       }
     }
   }, [mode, recognition, isListening, startMediaRecorder, stopMediaRecorder]);

@@ -446,7 +446,7 @@ export const CodeBlockCopyButton = ({
         setIsCopied(true);
         onCopy?.();
         timeoutRef.current = window.setTimeout(
-          () => setIsCopied(false),
+          () => { setIsCopied(false); },
           timeout
         );
       }

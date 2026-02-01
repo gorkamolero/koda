@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,11 +28,7 @@ type ToolUIPartApproval =
       approved: true;
       reason?: string;
     }
-  | {
-      id: string;
-      approved: true;
-      reason?: string;
-    }
+   
   | {
       id: string;
       approved: false;

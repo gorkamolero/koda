@@ -41,14 +41,15 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
 
   // Create initial terminal on mount
   useEffect(() => {
-    createNewTerminal()
+    void createNewTerminal()
+    const unsubscribersMap = ptyDataUnsubscribers.current
 
     // Cleanup all PTY sessions on unmount
     return () => {
-      for (const unsubscribe of ptyDataUnsubscribers.current.values()) {
+      for (const unsubscribe of unsubscribersMap.values()) {
         unsubscribe()
       }
-      ptyDataUnsubscribers.current.clear()
+      unsubscribersMap.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -75,7 +76,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
     }
 
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => { window.removeEventListener('resize', handleResize); }
   }, [tabs, activeTabId])
 
   // Mount active terminal to container
@@ -277,7 +278,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
                   ? 'bg-[#1a1b1e] text-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-[#1a1b1e]/50'
               )}
-              onClick={() => setActiveTabId(tab.id)}
+              onClick={() => { setActiveTabId(tab.id); }}
             >
               {tab.connecting ? (
                 <Loader2 className="h-3 w-3 animate-spin" data-testid="terminal-connecting-spinner" />

@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { useControllableState } from "@radix-ui/react-use-controllable-state";

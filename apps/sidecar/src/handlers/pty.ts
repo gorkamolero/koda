@@ -36,7 +36,7 @@ export const CreatePtySchema = z.object({
   workingDirectory: z.string().optional(),
   cols: z.number().optional(),
   rows: z.number().optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
 })
 
 export const WritePtySchema = z.object({

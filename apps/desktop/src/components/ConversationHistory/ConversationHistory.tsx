@@ -161,7 +161,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
             >
               {/* Turn header */}
               <button
-                onClick={() => toggleTurn(turn.id)}
+                onClick={() => { toggleTurn(turn.id); }}
                 className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-surface-hover/50 transition-colors"
               >
                 {/* Expand icon */}

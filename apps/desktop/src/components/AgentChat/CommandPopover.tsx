@@ -63,7 +63,7 @@ export const CommandPopover = memo(function CommandPopover({
     }
 
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () => { document.removeEventListener('mousedown', handleClickOutside); }
   }, [isOpen, onClose])
 
   if (!isOpen || commands.length === 0) return null
@@ -103,7 +103,7 @@ export const CommandPopover = memo(function CommandPopover({
                 ref={isSelected ? selectedRef : null}
                 command={cmd}
                 isSelected={isSelected}
-                onClick={() => onSelect(cmd)}
+                onClick={() => { onSelect(cmd); }}
               />
             )
           })}

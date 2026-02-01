@@ -195,6 +195,7 @@ export const MessageItem = memo(function MessageItem({
       <div
         data-testid={`message-${message.id}`}
         data-turn-index={turnIndex}
+        data-message-role="system"
         className="pb-3 max-w-6xl mx-auto scroll-mt-24"
       >
         <div className="flex justify-center px-7 py-2">
@@ -212,6 +213,7 @@ export const MessageItem = memo(function MessageItem({
       <div
         data-testid={`message-${message.id}`}
         data-turn-index={turnIndex}
+        data-message-role="user"
         className="pb-3 max-w-6xl mx-auto scroll-mt-24"
       >
         <div className="flex flex-col gap-1 w-full px-7 py-2">
@@ -232,6 +234,7 @@ export const MessageItem = memo(function MessageItem({
     <div
       data-testid={`message-${message.id}`}
       data-turn-index={turnIndex}
+      data-message-role="assistant"
       className="pb-3 max-w-6xl mx-auto scroll-mt-24"
     >
       <div className="flex flex-col gap-1 w-full px-7 py-2">

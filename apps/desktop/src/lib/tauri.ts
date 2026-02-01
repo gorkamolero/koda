@@ -204,6 +204,7 @@ export async function onNotification<T>(
     // In E2E tests, return a no-op unlisten function
     return () => {}
   }
+  const { listen } = await import('@tauri-apps/api/event')
   return listen<T>(`rpc-notification:${method}`, (event) => {
     callback(event.payload)
   })

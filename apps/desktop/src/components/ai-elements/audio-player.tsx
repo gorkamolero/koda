@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - Imported component with complex types
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ export type AudioPlayerProps = Omit<
 >;
 
 export const AudioPlayer = ({
-  className,
+  className: _className,
   children,
   style,
   ...props

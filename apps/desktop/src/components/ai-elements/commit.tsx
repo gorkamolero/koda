@@ -186,8 +186,8 @@ export const CommitActions = ({
   // biome-ignore lint/a11y/useSemanticElements: fieldset doesn't fit this UI pattern
   <div
     className={cn("flex items-center gap-1", className)}
-    onClick={(e) => e.stopPropagation()}
-    onKeyDown={(e) => e.stopPropagation()}
+    onClick={(e) => { e.stopPropagation(); }}
+    onKeyDown={(e) => { e.stopPropagation(); }}
     role="group"
     {...props}
   >
@@ -226,7 +226,7 @@ export const CommitCopyButton = ({
         setIsCopied(true);
         onCopy?.();
         timeoutRef.current = window.setTimeout(
-          () => setIsCopied(false),
+          () => { setIsCopied(false); },
           timeout
         );
       }

@@ -18,9 +18,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.23",
     "@liveblocks/node": "^3.13.3",
-    "@modelcontextprotocol/sdk": "^1.5.0",
     "@openai/codex-sdk": "^0.92.0",
     "better-sqlite3": "^9.2.2",
     "drizzle-orm": "^0.45.1",
@@ -32,6 +30,8 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.29",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^20.11.5",
     "@types/uuid": "^11.0.0",

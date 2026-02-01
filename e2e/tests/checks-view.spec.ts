@@ -41,7 +41,7 @@ async function navigateToChecksView(
   await expect(page).toHaveURL(/\/workspace\//)
 
   // Navigate to Checks tab
-  await page.getByTestId('tab-checks').click()
+  await page.getByTestId('right-tab-checks').click()
   await expect(page.getByTestId('checks-view-container')).toBeVisible()
 
   return 'success'

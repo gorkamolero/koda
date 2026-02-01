@@ -19,12 +19,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources/scripts/*"
-    ],
-    "externalBin": [
-      "bin/watchexec"
-    ],
+    "resources": [],
+    "externalBin": [],
     "copyright": "",
     "category": "DeveloperTool",
     "shortDescription": "AI Agent Orchestrator",

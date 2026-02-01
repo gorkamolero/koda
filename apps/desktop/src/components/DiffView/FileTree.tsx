@@ -207,7 +207,7 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setFileFilter(tab.id)}
+              onClick={() => { setFileFilter(tab.id); }}
               className={cn(
                 'flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
                 isActive

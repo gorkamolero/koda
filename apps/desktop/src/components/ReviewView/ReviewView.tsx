@@ -117,7 +117,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
           {/* Filter tabs */}
           <div className="flex items-center gap-1 bg-surface-control rounded-md p-0.5" data-testid="review-filter-tabs">
             <button
-              onClick={() => setFilter('all')}
+              onClick={() => { setFilter('all'); }}
               data-testid="review-filter-all"
               data-active={filter === 'all'}
               className={cn(
@@ -130,7 +130,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
               All ({comments.length})
             </button>
             <button
-              onClick={() => setFilter('open')}
+              onClick={() => { setFilter('open'); }}
               data-testid="review-filter-open"
               data-active={filter === 'open'}
               className={cn(
@@ -143,7 +143,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
               Open ({openCount})
             </button>
             <button
-              onClick={() => setFilter('resolved')}
+              onClick={() => { setFilter('resolved'); }}
               data-testid="review-filter-resolved"
               data-active={filter === 'resolved'}
               className={cn(
@@ -185,7 +185,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
               >
                 {/* Comment header */}
                 <button
-                  onClick={() => toggleComment(comment.id)}
+                  onClick={() => { toggleComment(comment.id); }}
                   data-testid={`review-comment-toggle-${comment.id}`}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
                 >
@@ -234,7 +234,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                     {/* Actions */}
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => toggleResolved(comment.id)}
+                        onClick={() => { toggleResolved(comment.id); }}
                         data-testid={`review-comment-${comment.resolved ? 'reopen' : 'resolve'}-${comment.id}`}
                         className={cn(
                           'flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors',

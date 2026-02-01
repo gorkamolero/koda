@@ -261,7 +261,7 @@ export const EnvironmentVariableCopyButton = ({
       await navigator.clipboard.writeText(textToCopy);
       setIsCopied(true);
       onCopy?.();
-      setTimeout(() => setIsCopied(false), timeout);
+      setTimeout(() => { setIsCopied(false); }, timeout);
     } catch (error) {
       onError?.(error as Error);
     }
