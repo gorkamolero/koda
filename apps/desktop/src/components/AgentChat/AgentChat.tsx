@@ -1,5 +1,6 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
+import { Sparkles, Brain, Map, Plus, ArrowUp, Square } from 'lucide-react'
 import {
   currentWorkspaceIdAtom,
   addMessageAtom,
@@ -10,6 +11,7 @@ import {
   planModeAtom,
   exitPlanModeAtom,
   AGENT_MODELS,
+  type AgentModel,
 } from '@/store/chat'
 import { rpcRequest } from '@/lib/tauri'
 import {
@@ -22,44 +24,39 @@ import {
 } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { PlanModeIndicator } from './PlanModeIndicator'
-import { ContextMeter } from '@/components/ContextMeter'
 import { useNotifications } from '@/hooks/useNotifications'
+import { cn } from '@/lib/utils'
 import {
-  PromptInput,
-  PromptInputTextarea,
-  PromptInputFooter,
-  PromptInputTools,
-  PromptInputSubmit,
-  PromptInputSelect,
-  PromptInputSelectTrigger,
-  PromptInputSelectContent,
-  PromptInputSelectItem,
-  PromptInputSelectValue,
-  PromptInputActionMenu,
-  PromptInputActionMenuTrigger,
-  PromptInputActionMenuContent,
-  PromptInputActionAddAttachments,
-  type PromptInputMessage,
-} from '@/components/ai-elements/prompt-input'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface AgentChatProps {
   workspaceId: string
   sessionId?: string
 }
 
+/** Get display name for model */
+function getModelDisplayName(model: AgentModel): string {
+  switch (model) {
+    case 'claude':
+      return 'Opus 4.5'
+    case 'codex':
+      return 'Codex'
+    case 'kimi':
+      return 'Kimi'
+    default:
+      return model
+  }
+}
+
 /**
  * Main agent chat component - Conductor-style layout
- * 
- * Structure:
- * ┌─────────────────────────────────────┐
- * │ Plan Mode Indicator (if active)    │
- * ├─────────────────────────────────────┤
- * │ Message List (virtuoso)            │
- * │                                    │
- * ├─────────────────────────────────────┤
- * │ Composer (ai-elements PromptInput) │
- * │ [+] [textarea] [model ▼] [context] │
- * └─────────────────────────────────────┘
+ *
+ * Footer layout (matching Conductor screenshot):
+ * [✱ Model] [🧠 Thinking] [📖 Context] .............. [+] [↑]
  */
 export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps) {
   void _sessionId
@@ -73,7 +70,12 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
   const planMode = useAtomValue(planModeAtom)
   const exitPlanMode = useSetAtom(exitPlanModeAtom)
   const { showToast } = useNotifications()
-  
+
+  // Local state
+  const [inputValue, setInputValue] = useState('')
+  const [thinkingEnabled, setThinkingEnabled] = useState(true)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   // Track active session for polling
   const activeSessionRef = useRef<string | null>(null)
   const messageIndexRef = useRef(0)
@@ -91,6 +93,20 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
       }
     }
   }, [workspaceId, setCurrentWorkspaceId])
+
+  // Global Cmd+L focus handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
+        e.preventDefault()
+        textareaRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   // Poll for messages from active session
   const pollMessages = useCallback(async () => {
@@ -145,7 +161,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
               },
             })
           }
-          
+
           if (pollingRef.current) {
             clearInterval(pollingRef.current)
             pollingRef.current = null
@@ -181,15 +197,20 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           RPC_METHODS.CLAUDE_GET_SESSION,
           { sessionId: activeSessionRef.current }
         )
-        
-        if (session && (session.status === 'completed' || session.status === 'error' || session.status === 'cancelled')) {
+
+        if (
+          session &&
+          (session.status === 'completed' ||
+            session.status === 'error' ||
+            session.status === 'cancelled')
+        ) {
           if (pollingRef.current) {
             clearInterval(pollingRef.current)
             pollingRef.current = null
           }
           activeSessionRef.current = null
           setIsStreaming(false)
-          
+
           if (currentMessageIdRef.current) {
             updateMessage({
               id: currentMessageIdRef.current,
@@ -207,6 +228,8 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
 
   const handleSendMessage = useCallback(
     async (content: string) => {
+      if (!content.trim()) return
+
       addMessage({
         role: 'user',
         content,
@@ -214,6 +237,7 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
         model: selectedModel,
       })
 
+      setInputValue('')
       setIsStreaming(true)
       accumulatedTextRef.current = ''
       messageIndexRef.current = 0
@@ -229,20 +253,16 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
           model: selectedModel,
         })
 
-        const result = await rpcRequest<ClaudeStartResult>(
-          RPC_METHODS.CLAUDE_START,
-          {
-            workspaceId,
-            prompt: content,
-          } satisfies ClaudeStartParams
-        )
+        const result = await rpcRequest<ClaudeStartResult>(RPC_METHODS.CLAUDE_START, {
+          workspaceId,
+          prompt: content,
+        } satisfies ClaudeStartParams)
 
         activeSessionRef.current = result.sessionId
 
         pollingRef.current = setInterval(() => {
           void pollMessages()
         }, 300)
-
       } catch (error) {
         console.error('Failed to start Claude session:', error)
         setIsStreaming(false)
@@ -257,24 +277,42 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
     [selectedModel, workspaceId, setIsStreaming, addMessage, pollMessages]
   )
 
-  // Handle PromptInput submit
+  // Handle form submit
   const handleSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      if (message.text.trim()) {
-        void handleSendMessage(message.text)
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      if (inputValue.trim() && !isStreaming) {
+        void handleSendMessage(inputValue)
       }
     },
-    [handleSendMessage]
+    [inputValue, isStreaming, handleSendMessage]
   )
 
-  // Get chat status for submit button
-  const chatStatus = isStreaming ? 'streaming' : undefined
+  // Handle Enter to submit (Shift+Enter for newline)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        if (inputValue.trim() && !isStreaming) {
+          void handleSendMessage(inputValue)
+        }
+      }
+    },
+    [inputValue, isStreaming, handleSendMessage]
+  )
+
+  // Auto-resize textarea
+  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const textarea = e.target
+    setInputValue(textarea.value)
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto'
+    // Set to scrollHeight but cap at max
+    textarea.style.height = `${String(Math.min(textarea.scrollHeight, 200))}px`
+  }, [])
 
   return (
-    <div
-      data-testid="agent-chat-container"
-      className="h-full flex flex-col bg-background"
-    >
+    <div data-testid="agent-chat-container" className="h-full flex flex-col bg-background">
       {/* Plan mode indicator */}
       <PlanModeIndicator
         isActive={planMode.isActive}
@@ -285,66 +323,122 @@ export function AgentChat({ workspaceId, sessionId: _sessionId }: AgentChatProps
       />
 
       {/* Message list */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <MessageList />
       </div>
 
       {/* Conductor-style Composer */}
       <div className="px-4 pb-4 pt-2">
-        <PromptInput
+        <form
           onSubmit={handleSubmit}
-          accept="image/*"
-          multiple
-          className="relative shadow-sm bg-[hsl(var(--composer-background))] focus-within:ring-0 focus-within:outline-none rounded-lg"
+          className="relative bg-[hsl(var(--composer-background))] rounded-lg border border-border"
         >
           {/* Textarea */}
-          <PromptInputTextarea
+          <textarea
+            ref={textareaRef}
+            data-testid="chat-input"
+            value={inputValue}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
             placeholder="Ask to make changes, @mention files, run /commands"
-            className="bg-transparent border-none focus:ring-0 resize-none"
             disabled={isStreaming}
+            rows={1}
+            className="w-full px-4 py-3 bg-transparent border-none resize-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground"
+            style={{ minHeight: '60px', maxHeight: '200px' }}
           />
 
-          {/* Footer with tools, model selector, and submit */}
-          <PromptInputFooter className="px-3 pb-2">
-            <PromptInputTools>
-              {/* Attachments menu */}
-              <PromptInputActionMenu>
-                <PromptInputActionMenuTrigger />
-                <PromptInputActionMenuContent>
-                  <PromptInputActionAddAttachments />
-                </PromptInputActionMenuContent>
-              </PromptInputActionMenu>
-
+          {/* Footer */}
+          <div className="flex items-center justify-between px-3 pb-2">
+            {/* Left side: Model, Thinking, Context */}
+            <div className="flex items-center gap-1">
               {/* Model selector */}
-              <PromptInputSelect
-                value={selectedModel}
-                onValueChange={setSelectedModel}
-              >
-                <PromptInputSelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
-                  <PromptInputSelectValue placeholder="Select model" />
-                </PromptInputSelectTrigger>
-                <PromptInputSelectContent>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground rounded transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>{getModelDisplayName(selectedModel)}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
                   {AGENT_MODELS.map((model) => (
-                    <PromptInputSelectItem key={model.id} value={model.id}>
+                    <DropdownMenuItem
+                      key={model.id}
+                      onClick={() => {
+                        setSelectedModel(model.id)
+                      }}
+                      className={cn(selectedModel === model.id && 'bg-accent')}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 mr-2" />
                       {model.name}
-                    </PromptInputSelectItem>
+                    </DropdownMenuItem>
                   ))}
-                </PromptInputSelectContent>
-              </PromptInputSelect>
-            </PromptInputTools>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            <div className="flex items-center gap-2">
-              {/* Context meter */}
-              <ContextMeter />
+              {/* Thinking toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  setThinkingEnabled(!thinkingEnabled)
+                }}
+                className={cn(
+                  'flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded transition-colors',
+                  thinkingEnabled
+                    ? 'bg-[hsl(var(--destructive)/0.2)] text-[hsl(var(--destructive))]'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Brain className="h-3.5 w-3.5" />
+                <span>Thinking</span>
+              </button>
+
+              {/* Context/Plan icon */}
+              <button
+                type="button"
+                className="flex items-center justify-center size-7 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title="View context"
+              >
+                <Map className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Right side: Add, Submit */}
+            <div className="flex items-center gap-1">
+              {/* Add attachment */}
+              <button
+                type="button"
+                className="flex items-center justify-center size-7 text-muted-foreground hover:text-foreground rounded transition-colors"
+                title="Add attachment"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
 
               {/* Submit button */}
-              <PromptInputSubmit
-                status={chatStatus}
-                disabled={isStreaming}
-              />
+              <button
+                type="submit"
+                disabled={isStreaming || !inputValue.trim()}
+                className={cn(
+                  'flex items-center justify-center size-7 rounded transition-colors',
+                  isStreaming
+                    ? 'bg-destructive text-destructive-foreground'
+                    : inputValue.trim()
+                      ? 'bg-foreground text-background hover:bg-foreground/90'
+                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+                )}
+                title={isStreaming ? 'Stop' : 'Send'}
+              >
+                {isStreaming ? (
+                  <Square className="h-3 w-3 fill-current" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </button>
             </div>
-          </PromptInputFooter>
-        </PromptInput>
+          </div>
+        </form>
       </div>
     </div>
   )
