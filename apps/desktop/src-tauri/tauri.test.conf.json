@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Koda",
+  "version": "0.1.0",
+  "identifier": "com.koda.app.test",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1421",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "DeveloperTool",
+    "shortDescription": "AI Agent Orchestrator",
+    "longDescription": "",
+    "macOS": {
+      "minimumSystemVersion": "10.13"
+    }
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Koda (Test)",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "acceptFirstMouse": false,
+        "tabbingIdentifier": null,
+        "additionalBrowserArgs": "",
+        "userAgent": null,
+        "visible": true,
+        "focus": true,
+        "skipTaskbar": false,
+        "theme": null,
+        "titleBarStyle": "Visible",
+        "hiddenTitle": false,
+        "minWidth": 800,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null,
+      "devCsp": null,
+      "freezePrototype": false,
+      "dangerousDisableAssetCspModification": false,
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      },
+      "pattern": {
+        "use": "brownfield"
+      },
+      "capabilities": []
+    }
+  },
+  "plugins": {
+    "sql": {
+      "preload": ["sqlite:koda.db"]
+    }
+  }
+}
