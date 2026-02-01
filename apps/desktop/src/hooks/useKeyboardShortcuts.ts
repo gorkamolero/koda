@@ -98,6 +98,10 @@ interface UseKeyboardShortcutsOptions {
   onSendMessage?: () => void
   /** Number of available tabs */
   tabCount?: number
+  /** Callback for toggling terminal panel */
+  onToggleTerminal?: () => void
+  /** Callback for toggling right sidebar */
+  onToggleSidebar?: () => void
 }
 
 /**
@@ -106,12 +110,14 @@ interface UseKeyboardShortcutsOptions {
  * Shortcuts:
  * - Cmd+K: Command palette
  * - Cmd+P: Quick open file
- * - Cmd+B: Toggle sidebar
+ * - Cmd+B: Toggle left sidebar
+ * - Cmd+J: Toggle terminal
+ * - Cmd+\: Toggle right sidebar
  * - Cmd+1/2/3: Switch tabs
  * - Cmd+Enter: Send message (when in chat input)
  */
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) {
-  const { onSwitchTab, onSendMessage, tabCount = 4 } = options
+  const { onSwitchTab, onSendMessage, tabCount = 4, onToggleTerminal, onToggleSidebar } = options
 
   const toggleCommandPalette = useSetAtom(toggleCommandPaletteAtom)
   const toggleSidebar = useSetAtom(toggleSidebarAtom)
@@ -144,9 +150,29 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       {
         key: 'b',
         metaKey: true,
-        description: 'Toggle sidebar',
+        description: 'Toggle left sidebar',
         handler: () => {
           toggleSidebar()
+        },
+        preventDefault: true,
+        ignoreWhenInputFocused: true,
+      },
+      {
+        key: 'j',
+        metaKey: true,
+        description: 'Toggle terminal',
+        handler: () => {
+          onToggleTerminal?.()
+        },
+        preventDefault: true,
+        ignoreWhenInputFocused: true,
+      },
+      {
+        key: '\\',
+        metaKey: true,
+        description: 'Toggle right sidebar',
+        handler: () => {
+          onToggleSidebar?.()
         },
         preventDefault: true,
         ignoreWhenInputFocused: true,
@@ -165,7 +191,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         ignoreWhenInputFocused: true,
       })),
     ],
-    [toggleCommandPalette, setQuickOpenVisible, toggleSidebar, onSwitchTab, tabCount]
+    [toggleCommandPalette, setQuickOpenVisible, toggleSidebar, onSwitchTab, tabCount, onToggleTerminal, onToggleSidebar]
   )
 
   // Update commands for command palette
@@ -182,13 +208,33 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         },
       },
       {
-        id: 'toggle-sidebar',
-        name: 'Toggle Sidebar',
-        description: 'Show or hide the sidebar',
+        id: 'toggle-left-sidebar',
+        name: 'Toggle Left Sidebar',
+        description: 'Show or hide the repos sidebar',
         shortcut: 'Cmd+B',
         category: 'view',
         action: () => {
           toggleSidebar()
+        },
+      },
+      {
+        id: 'toggle-terminal',
+        name: 'Toggle Terminal',
+        description: 'Show or hide the terminal panel',
+        shortcut: 'Cmd+J',
+        category: 'view',
+        action: () => {
+          onToggleTerminal?.()
+        },
+      },
+      {
+        id: 'toggle-right-sidebar',
+        name: 'Toggle Right Sidebar',
+        description: 'Show or hide the files/changes sidebar',
+        shortcut: 'Cmd+\\',
+        category: 'view',
+        action: () => {
+          onToggleSidebar?.()
         },
       },
       {
@@ -202,33 +248,13 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
         },
       },
       {
-        id: 'switch-files',
-        name: 'Go to Files Tab',
-        description: 'Switch to the Files tab',
+        id: 'switch-scratchpad',
+        name: 'Go to Scratchpad Tab',
+        description: 'Switch to the Scratchpad tab',
         shortcut: 'Cmd+2',
         category: 'navigation',
         action: () => {
           onSwitchTab?.(1)
-        },
-      },
-      {
-        id: 'switch-diff',
-        name: 'Go to Diff Tab',
-        description: 'Switch to the Diff tab',
-        shortcut: 'Cmd+3',
-        category: 'navigation',
-        action: () => {
-          onSwitchTab?.(2)
-        },
-      },
-      {
-        id: 'switch-terminal',
-        name: 'Go to Terminal Tab',
-        description: 'Switch to the Terminal tab',
-        shortcut: 'Cmd+4',
-        category: 'navigation',
-        action: () => {
-          onSwitchTab?.(3)
         },
       },
       {
@@ -244,7 +270,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
     ]
 
     setCommands(commands)
-  }, [setCommands, setQuickOpenVisible, toggleSidebar, onSwitchTab])
+  }, [setCommands, setQuickOpenVisible, toggleSidebar, onSwitchTab, onToggleTerminal, onToggleSidebar])
 
   // Global keyboard event handler
   const handleKeyDown = useCallback(
