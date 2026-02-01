@@ -20,11 +20,15 @@ import {
   type CreateRepoParams,
   type CreateWorktreeParams,
   type CheckpointDiff,
+  type WorktreeDiff,
   type Session,
   type WorkspaceRepo,
   type AttachRepoParams,
   type DetachRepoParams,
   type CreateStandaloneWorkspaceParams,
+  type CreatePrParams,
+  type PrResult,
+  type ChecksResult,
 } from '@/lib/rpc'
 
 /**
@@ -426,6 +430,21 @@ export function useCheckpointDiff(checkpointId1: string, checkpointId2: string, 
 }
 
 /**
+ * Get diff for a worktree against its merge base
+ * Shows all changes (committed and uncommitted) compared to target branch
+ */
+export function useWorktreeDiff(worktreeId: string) {
+  return useQuery({
+    queryKey: ['worktree-diff', worktreeId],
+    queryFn: () =>
+      rpcRequest<WorktreeDiff>(RPC_METHODS.WORKTREE_GET_DIFF, { worktreeId }),
+    enabled: !!worktreeId,
+    retry: false,
+    refetchInterval: 10000, // Poll every 10 seconds to catch new changes
+  })
+}
+
+/**
  * List checkpoints for a worktree
  */
 export function useCheckpoints(worktreeId: string) {
@@ -453,17 +472,26 @@ interface DiffStats {
 
 /**
  * Get diff stats for a workspace (changed files count, etc.)
- * TODO: Implement actual RPC call when diff stats endpoint is ready
+ * Uses the worktree.getDiff RPC to get real git diff stats
  */
 export function useWorkspaceDiffStats(workspaceId: string) {
   return useQuery({
     queryKey: ['workspace-diff-stats', workspaceId],
-    queryFn: (): DiffStats => {
-      // Placeholder until we have a proper diff stats endpoint
-      return { filesChanged: 0, insertions: 0, deletions: 0 }
+    queryFn: async (): Promise<DiffStats> => {
+      try {
+        const diff = await rpcRequest<WorktreeDiff>(RPC_METHODS.WORKTREE_GET_DIFF, { worktreeId: workspaceId })
+        return {
+          filesChanged: diff.summary?.filesChanged ?? diff.files?.length ?? 0,
+          insertions: diff.summary?.additions ?? 0,
+          deletions: diff.summary?.deletions ?? 0,
+        }
+      } catch {
+        return { filesChanged: 0, insertions: 0, deletions: 0 }
+      }
     },
     enabled: !!workspaceId,
     retry: false,
+    refetchInterval: 10000, // Poll every 10 seconds
   })
 }
 
@@ -496,5 +524,38 @@ export function useCreateSession() {
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['sessions', variables.worktreeId] })
     },
+  })
+}
+
+// ============================================================================
+// GitHub Hooks
+// ============================================================================
+
+/**
+ * Create a pull request for a worktree
+ */
+export function useCreatePr() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: CreatePrParams) =>
+      rpcRequest<PrResult>(RPC_METHODS.GITHUB_CREATE_PR, params),
+    onSuccess: (_, variables) => {
+      // Invalidate checks to refetch after PR is created
+      void queryClient.invalidateQueries({ queryKey: ['github-checks', variables.worktreeId] })
+    },
+  })
+}
+
+/**
+ * Get CI/CD checks for a worktree
+ */
+export function useChecks(worktreeId: string) {
+  return useQuery({
+    queryKey: ['github-checks', worktreeId],
+    queryFn: () => rpcRequest<ChecksResult>(RPC_METHODS.GITHUB_GET_CHECKS, { worktreeId }),
+    enabled: !!worktreeId,
+    retry: false,
+    refetchInterval: 30000, // Poll every 30 seconds for check updates
   })
 }

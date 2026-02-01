@@ -66,6 +66,7 @@ export const RPC_METHODS = {
   WORKTREE_LIST_BY_WORKSPACE: 'worktree.listByWorkspace',
   WORKTREE_ADD_TO_WORKSPACE: 'worktree.addToWorkspace',
   WORKTREE_REMOVE_FROM_WORKSPACE: 'worktree.removeFromWorkspace',
+  WORKTREE_GET_DIFF: 'worktree.getDiff',
   // Sessions
   SESSION_LIST: 'session.list',
   SESSION_CREATE: 'session.create',
@@ -86,6 +87,9 @@ export const RPC_METHODS = {
   PULSE_STOP: 'pulse.stop',
   PULSE_STATUS: 'pulse.status',
   PULSE_LIST_ACTIVE: 'pulse.listActive',
+  // GitHub
+  GITHUB_CREATE_PR: 'github.createPr',
+  GITHUB_GET_CHECKS: 'github.getChecks',
 } as const
 
 /**
@@ -237,6 +241,16 @@ export interface DiffStats {
   additions: number
   deletions: number
   filesChanged: number
+}
+
+/**
+ * Worktree diff - changes compared to merge base
+ */
+export interface WorktreeDiff {
+  files: FileDiff[]
+  summary: DiffSummary
+  mergeBase?: string
+  targetBranch?: string
 }
 
 /**
@@ -502,4 +516,41 @@ export interface PulseLogNotification {
   line: string
   stream: 'stdout' | 'stderr'
   timestamp: number
+}
+
+/**
+ * GitHub types
+ */
+export interface CreatePrParams {
+  worktreeId: string
+  title?: string
+  body?: string
+  draft?: boolean
+}
+
+export interface PrResult {
+  url: string
+  number: number
+  state: 'open' | 'draft'
+}
+
+export interface GetChecksParams {
+  worktreeId: string
+}
+
+export type GhCheckStatus = 'pending' | 'running' | 'success' | 'failure' | 'skipped'
+
+export interface GhCheck {
+  id: string
+  name: string
+  status: GhCheckStatus
+  description?: string
+  duration?: string
+  url?: string
+}
+
+export interface ChecksResult {
+  checks: GhCheck[]
+  prUrl?: string
+  commitSha?: string
 }

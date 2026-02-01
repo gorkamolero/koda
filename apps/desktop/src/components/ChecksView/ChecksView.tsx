@@ -9,64 +9,17 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
+import { useChecks } from '@/hooks/useRpc'
+import type { GhCheckStatus } from '@/lib/rpc'
 
 interface ChecksViewProps {
   workspaceId: string
 }
 
 /**
- * Check status types
- */
-type CheckStatus = 'pending' | 'running' | 'success' | 'failure' | 'skipped'
-
-/**
- * CI/CD Check interface
- */
-interface Check {
-  id: string
-  name: string
-  status: CheckStatus
-  description?: string
-  duration?: string
-  url?: string
-}
-
-/**
- * Mock checks data - would be replaced with real CI/CD integration
- */
-const MOCK_CHECKS: Check[] = [
-  {
-    id: 'typecheck',
-    name: 'TypeScript',
-    status: 'success',
-    description: 'Type checking passed',
-    duration: '12s',
-  },
-  {
-    id: 'lint',
-    name: 'ESLint',
-    status: 'success',
-    description: 'No linting errors',
-    duration: '8s',
-  },
-  {
-    id: 'test',
-    name: 'Tests',
-    status: 'pending',
-    description: 'Waiting to run',
-  },
-  {
-    id: 'build',
-    name: 'Build',
-    status: 'pending',
-    description: 'Waiting for tests',
-  },
-]
-
-/**
  * Status icon component
  */
-function StatusIcon({ status }: { status: CheckStatus }) {
+function StatusIcon({ status }: { status: GhCheckStatus }) {
   switch (status) {
     case 'success':
       return <CheckCircle2 className="w-4 h-4 text-status-success" />
@@ -85,12 +38,15 @@ function StatusIcon({ status }: { status: CheckStatus }) {
 
 /**
  * Conductor-style CI/CD Checks view.
- * Shows status of automated checks (TypeScript, Lint, Tests, Build).
+ * Shows status of automated checks from GitHub Actions.
  */
 export function ChecksView({ workspaceId }: ChecksViewProps) {
-  void workspaceId // Will be used for real CI/CD integration
-  const [checks] = useState<Check[]>(MOCK_CHECKS)
+  const { data, isLoading, refetch, isRefetching } = useChecks(workspaceId)
   const [expandedChecks, setExpandedChecks] = useState<Set<string>>(new Set())
+
+  const checks = data?.checks ?? []
+  const prUrl = data?.prUrl
+  const commitSha = data?.commitSha
 
   const successCount = checks.filter((c) => c.status === 'success').length
   const failureCount = checks.filter((c) => c.status === 'failure').length
@@ -108,6 +64,15 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
       }
       return next
     })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        Loading checks...
+      </div>
+    )
   }
 
   return (
@@ -141,11 +106,35 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
         </div>
 
         {/* Actions */}
-        <button className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors">
-          <RefreshCw className="w-3 h-3" />
-          Re-run all
-        </button>
+        <div className="flex items-center gap-2">
+          {prUrl && (
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              View PR
+            </a>
+          )}
+          <button
+            onClick={() => void refetch()}
+            disabled={isRefetching}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Commit info */}
+      {commitSha && (
+        <div className="px-4 py-2 text-xs text-text-faint border-b border-border-subtle/50">
+          Checks for commit <code className="font-mono">{commitSha.slice(0, 7)}</code>
+        </div>
+      )}
 
       {/* Checks list */}
       <div className="flex-1 overflow-y-auto p-4">
@@ -205,10 +194,10 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
                 {/* Expanded details */}
                 {isExpanded && (
                   <div className="px-4 pb-3 pt-1 border-t border-border-subtle/50">
-                    <p className="text-xs text-text-muted">{check.description}</p>
+                    <p className="text-xs text-text-muted">{check.description ?? `Status: ${check.status}`}</p>
                     {check.status === 'failure' && (
                       <div className="mt-2 p-2 rounded bg-status-error/10 text-xs text-status-error font-mono">
-                        Error: Check failed. See logs for details.
+                        Check failed. {check.url ? 'Click the link to see logs.' : ''}
                       </div>
                     )}
                   </div>
@@ -222,9 +211,11 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
         {checks.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <CheckCircle2 className="w-12 h-12 text-text-dim mb-4" />
-            <p className="text-sm text-text-muted">No checks configured</p>
+            <p className="text-sm text-text-muted">No checks found</p>
             <p className="text-xs text-text-faint mt-1">
-              Configure CI/CD to see check status here
+              {prUrl
+                ? 'No CI/CD checks have run for this PR yet'
+                : 'Push changes or create a PR to trigger CI/CD checks'}
             </p>
           </div>
         )}
