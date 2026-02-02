@@ -151,7 +151,7 @@ function WorkspaceCard({ workspace, isSelected, onSelect, onDelete }: WorkspaceC
   const { data: worktrees } = useWorktreesByWorkspace(workspace.id)
 
   const handleWorktreeClick = (worktree: Worktree) => {
-    void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
+    void navigate({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId: workspace.id, worktreeId: worktree.id } })
   }
 
   const worktreeCount = worktrees?.length ?? 0
