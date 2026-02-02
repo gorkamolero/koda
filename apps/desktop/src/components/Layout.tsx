@@ -6,7 +6,7 @@ import { useSidecar } from '@/hooks/useRpc'
 import { useSidebarResize } from '@/hooks/useResizable'
 import { initializeThemeAtom } from '@/store/theme'
 import { cn } from '@/lib/utils'
-import { KodaLoadingScreen } from '@/components/KodaSpinner'
+import { KodaLoadingScreen, KodaWaveSpinner } from '@/components/KodaSpinner'
 import { startSidecarRpcListener } from '@/lib/sidecarRpc'
 
 interface LayoutProps {
@@ -35,8 +35,8 @@ function SidecarStatus() {
 
   if (!status?.running) {
     return (
-      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-warning animate-in fade-in slide-in-from-bottom-2">
-        Connecting...
+      <div className="fixed bottom-4 right-4 px-4 py-2 rounded-lg bg-surface-card border border-border-subtle animate-in fade-in slide-in-from-bottom-2">
+        <KodaWaveSpinner label="Connecting" speed={120} />
       </div>
     )
   }
