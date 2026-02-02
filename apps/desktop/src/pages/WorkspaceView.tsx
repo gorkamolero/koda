@@ -18,6 +18,7 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
+import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
 import { Loader2, AlertCircle, ArrowLeft, FolderPlus, GitBranch } from 'lucide-react'
@@ -66,6 +67,9 @@ export function WorkspaceView() {
 
   // Fetch sessions for this workspace (only if we have a worktree)
   const { data: sessions } = useSessions(worktree ? id : '')
+
+  // Register MCP tool handlers (GetWorkspaceDiff, DiffComment) for Claude
+  useSidecarRpcHandlers(worktree?.id ?? '')
 
   // Repos and worktree creation for connecting repos to standalone workspaces
   const { data: repos } = useRepos()

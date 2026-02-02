@@ -7,6 +7,7 @@ import { useSidebarResize } from '@/hooks/useResizable'
 import { initializeThemeAtom } from '@/store/theme'
 import { cn } from '@/lib/utils'
 import { KodaLoadingScreen } from '@/components/KodaSpinner'
+import { startSidecarRpcListener } from '@/lib/sidecarRpc'
 
 interface LayoutProps {
   children: ReactNode
@@ -93,6 +94,11 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     initializeTheme()
   }, [initializeTheme])
+
+  // Start listening for sidecar RPC requests (for MCP tools)
+  useEffect(() => {
+    startSidecarRpcListener()
+  }, [])
 
   // Show loading screen until sidecar connects (with minimum display time)
   useEffect(() => {

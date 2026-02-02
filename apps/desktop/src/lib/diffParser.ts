@@ -11,6 +11,100 @@ export interface ParsedDiff {
 }
 
 /**
+ * Parsed file from a multi-file unified diff
+ */
+export interface ParsedFileDiff {
+  path: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+  additions: number
+  deletions: number
+  diff: string
+}
+
+/**
+ * Parse a multi-file unified diff into individual file diffs
+ *
+ * @param fullDiff - The full unified diff output from `git diff`
+ * @returns Array of parsed file diffs
+ */
+export function parseMultiFileDiff(fullDiff: string): ParsedFileDiff[] {
+  if (!fullDiff?.trim()) {
+    return []
+  }
+
+  const files: ParsedFileDiff[] = []
+  const lines = fullDiff.split('\n')
+
+  let currentFile: ParsedFileDiff | null = null
+  let currentDiff: string[] = []
+  let additions = 0
+  let deletions = 0
+
+  const flushCurrentFile = () => {
+    if (currentFile) {
+      currentFile.diff = currentDiff.join('\n')
+      currentFile.additions = additions
+      currentFile.deletions = deletions
+      files.push(currentFile)
+    }
+    currentDiff = []
+    additions = 0
+    deletions = 0
+  }
+
+  for (const line of lines) {
+    // New file header
+    if (line.startsWith('diff --git ')) {
+      flushCurrentFile()
+
+      // Extract path from "diff --git a/path b/path"
+      const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/)
+      if (match) {
+        const [, oldPath, newPath] = match
+        // Use newPath for display (handles renames)
+        currentFile = {
+          path: newPath ?? oldPath ?? 'unknown',
+          status: 'modified',
+          additions: 0,
+          deletions: 0,
+          diff: '',
+        }
+        currentDiff.push(line)
+      }
+      continue
+    }
+
+    // Detect file status
+    if (currentFile) {
+      if (line.startsWith('new file mode')) {
+        currentFile.status = 'added'
+      } else if (line.startsWith('deleted file mode')) {
+        currentFile.status = 'deleted'
+      } else if (line.startsWith('rename from')) {
+        currentFile.status = 'renamed'
+      }
+    }
+
+    // Count additions/deletions in hunks
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      additions++
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      deletions++
+    }
+
+    // Collect diff content
+    if (currentFile) {
+      currentDiff.push(line)
+    }
+  }
+
+  // Don't forget the last file
+  flushCurrentFile()
+
+  return files
+}
+
+/**
  * Parse a unified diff into original and modified content
  *
  * @param unifiedDiff - The unified diff string (from `git diff`)

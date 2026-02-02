@@ -140,6 +140,12 @@ import {
   ClosePtySchema,
   GetPtySchema,
 } from './handlers/pty.js';
+
+// Import diff handlers
+import {
+  getWorkspaceDiff,
+  GetWorkspaceDiffSchema,
+} from './handlers/diff.js';
 import { getNotificationEmitter } from './rpc/notifications.js';
 
 // Import pulse handlers
@@ -270,6 +276,9 @@ function registerMethods() {
   router.register('pty.close', closePty, ClosePtySchema);
   router.register('pty.get', getPty, GetPtySchema);
   router.register('pty.list', listPtySessions);
+
+  // Diff management (for MCP tools)
+  router.register('workspace.getDiff', getWorkspaceDiff, GetWorkspaceDiffSchema);
 
   // Pulse management
   router.register('pulse.start', rpcStartPulse, StartPulseSchema);
