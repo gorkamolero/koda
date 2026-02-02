@@ -24,10 +24,19 @@ function WorkspaceRow({ workspace }: { workspace: Worktree }) {
   const isArchived = workspace.state === 'archived'
   const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
 
+  // Parse workspaceIds to get the first workspace
+  let wsId = ''
+  try {
+    const wsIds = JSON.parse(workspace.workspaceIds ?? '[]') as string[]
+    wsId = wsIds[0] ?? ''
+  } catch {
+    // ignore
+  }
+
   return (
     <Link
-      to="/workspace/$id"
-      params={{ id: workspace.id }}
+      to="/workspace/$workspaceId/$worktreeId"
+      params={{ workspaceId: wsId, worktreeId: workspace.id }}
       className={cn(
         'flex items-center gap-4 px-4 py-3 rounded-lg border transition-colors',
         'hover:bg-surface-hover',

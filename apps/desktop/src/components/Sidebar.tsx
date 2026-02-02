@@ -235,10 +235,12 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
 
 function WorktreeRow({
   worktree,
+  workspaceId,
   isActive,
   isMain = false,
 }: {
   worktree: Worktree
+  workspaceId: string
   isActive: boolean
   isMain?: boolean
 }): React.ReactElement {
@@ -259,8 +261,8 @@ function WorktreeRow({
   return (
     <>
       <Link
-        to="/workspace/$id"
-        params={{ id: worktree.id }}
+        to="/workspace/$workspaceId/$worktreeId"
+        params={{ workspaceId, worktreeId: worktree.id }}
         className={cn(
           'group flex items-center gap-2 px-2 py-1.5 font-mono text-xs',
           'border-l-2 border-transparent',
@@ -403,11 +405,13 @@ function WorktreeContextMenu({
 function RepoGroup({
   repo,
   worktrees,
+  workspaceId,
   activeWorktreeId,
   defaultBranch,
 }: {
   repo: WorkspaceRepo
   worktrees: Worktree[]
+  workspaceId: string
   activeWorktreeId?: string
   defaultBranch?: string
 }): React.ReactElement {
@@ -485,6 +489,7 @@ function RepoGroup({
           {mainWorktree && (
             <WorktreeRow
               worktree={mainWorktree}
+              workspaceId={workspaceId}
               isActive={mainWorktree.id === activeWorktreeId}
               isMain
             />
@@ -494,6 +499,7 @@ function RepoGroup({
             <WorktreeRow
               key={wt.id}
               worktree={wt}
+              workspaceId={workspaceId}
               isActive={wt.id === activeWorktreeId}
             />
           ))}
@@ -677,7 +683,7 @@ function SidebarFooter({ onAddRepo, hasWorkspace }: { onAddRepo: () => void; has
 function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => void; onCreateWorkspace: () => void }): React.ReactElement {
   const selectedWorkspaceId = useAtomValue(selectedWorkspaceIdAtom)
   const params = useParams({ strict: false })
-  const activeWorktreeId = (params as { id?: string }).id
+  const activeWorktreeId = (params as { worktreeId?: string }).worktreeId
 
   // Fetch repos attached to this workspace
   const { data: workspaceRepos, isLoading: loadingRepos } = useWorkspaceRepos(selectedWorkspaceId ?? '')
@@ -774,6 +780,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
           key={wsRepo.id}
           repo={wsRepo}
           worktrees={worktreesByRepo.get(wsRepo.repoId) ?? []}
+          workspaceId={selectedWorkspaceId}
           activeWorktreeId={activeWorktreeId}
           defaultBranch={wsRepo.repoDefaultBranch ?? 'main'}
         />

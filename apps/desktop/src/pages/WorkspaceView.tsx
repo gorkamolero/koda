@@ -47,22 +47,25 @@ type ConnectStep = 'idle' | 'repo' | 'branch'
  * └─────────────────────────────────────────┴────────────────────────────┘
  */
 export function WorkspaceView() {
-  const { id } = useParams({ from: '/workspace/$id' })
-  const search = useSearch({ from: '/workspace/$id' })
+  const { workspaceId, worktreeId } = useParams({ from: '/workspace/$workspaceId/$worktreeId' })
+  const search = useSearch({ from: '/workspace/$workspaceId/$worktreeId' })
   const navigate = useNavigate()
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const openFiles = useAtomValue(openFilesAtom)
 
-  // Sidebar workspace sync
+  // Sync atom from URL (for sidebar compatibility during transition)
   const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
+  useEffect(() => {
+    setSelectedWorkspaceId(workspaceId)
+  }, [workspaceId, setSelectedWorkspaceId])
 
-  // Try fetching as worktree first (git-backed workspace)
-  const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(id)
+  // Fetch worktree data
+  const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(worktreeId)
 
-  // If worktree not found, try fetching as standalone workspace
+  // If worktree not found, try fetching workspace directly (standalone workspace case)
   const shouldTryWorkspace = !isLoadingWorktree && (worktreeError || !worktree)
   const { data: standaloneWorkspace, isLoading: isLoadingWorkspace } = useWorkspace(
-    shouldTryWorkspace ? id : ''
+    shouldTryWorkspace ? workspaceId : ''
   )
 
   // Determine what we're working with
@@ -71,7 +74,7 @@ export function WorkspaceView() {
   const notFound = !isLoading && !worktree && !standaloneWorkspace
 
   // Fetch sessions for this workspace (only if we have a worktree)
-  const { data: sessions } = useSessions(worktree ? id : '')
+  const { data: sessions } = useSessions(worktree ? worktreeId : '')
 
   // Register MCP tool handlers (GetWorkspaceDiff, DiffComment) for Claude
   useSidecarRpcHandlers(worktree?.id ?? '')
@@ -98,21 +101,6 @@ export function WorkspaceView() {
       setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
     }
   }, [sessions, activeSessionId])
-
-  // Sync sidebar workspace selection when navigating to a worktree
-  useEffect(() => {
-    if (worktree?.workspaceIds) {
-      try {
-        const wsIds = JSON.parse(worktree.workspaceIds) as string[]
-        const firstWsId = wsIds[0]
-        if (firstWsId) {
-          setSelectedWorkspaceId(firstWsId)
-        }
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-  }, [worktree?.workspaceIds, setSelectedWorkspaceId])
 
   // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
@@ -248,11 +236,11 @@ export function WorkspaceView() {
       const newWorktree = await createWorktree.mutateAsync({
         repoId: selectedRepoId,
         branch: branchName.trim(),
-        workspaceId: id, // Associate with this standalone workspace
+        workspaceId: workspaceId,
       })
 
-      // Navigate to the new worktree (replace the standalone workspace URL)
-      void navigate({ to: '/workspace/$id', params: { id: newWorktree.id } })
+      // Navigate to the new worktree
+      void navigate({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId, worktreeId: newWorktree.id } })
     } catch (err) {
       setConnectError(err instanceof Error ? err.message : 'Failed to create workspace')
     }
@@ -269,7 +257,7 @@ export function WorkspaceView() {
   const hasRepos = repos && repos.length > 0
 
   return (
-    <CollaborativeWorkspaceProvider workspaceId={id}>
+    <CollaborativeWorkspaceProvider workspaceId={worktreeId}>
       <div className="h-full flex">
         {/* Command Palette (global) */}
         <CommandPalette />
@@ -496,24 +484,24 @@ export function WorkspaceView() {
 
           {/* Normal content when worktree exists and no files open */}
           {!isLoading && worktree && activeTab === 'chat' && openFiles.length === 0 && (
-            <AgentChat worktreeId={id} sessionId={activeSessionId} workingDirectory={rootPath} />
+            <AgentChat worktreeId={worktreeId} sessionId={activeSessionId} workingDirectory={rootPath} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (
-            <SpecDrivenView workspaceId={id} />
+            <SpecDrivenView workspaceId={worktreeId} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'ralph' && (
-            <RalphView workspaceId={id} />
+            <RalphView workspaceId={worktreeId} />
           )}
 
           {activeTab === 'spec' &&
             startMode === 'interview' &&
             workspaceType === 'standard' && (
-              <InterviewMode workspaceId={id} />
+              <InterviewMode workspaceId={worktreeId} />
             )}
 
-          {activeTab === 'scratchpad' && <Scratchpad workspaceId={id} />}
+          {activeTab === 'scratchpad' && <Scratchpad workspaceId={worktreeId} />}
         </div>
       </div>
 
@@ -544,7 +532,7 @@ export function WorkspaceView() {
               )}
             >
               <RightSidebar
-                workspaceId={id}
+                workspaceId={worktreeId}
                 rootPath={rootPath}
                 onToggleTerminal={() => { setShowTerminal((prev) => !prev) }}
                 onToggleSidebar={() => { setShowRightPanel(false) }}
@@ -569,7 +557,7 @@ export function WorkspaceView() {
                   style={{ height: `${String(terminalResize.size)}px` }}
                   className="flex-shrink-0 border-t border-border"
                 >
-                  <TerminalPanel workspaceId={id} workingDirectory={rootPath} />
+                  <TerminalPanel workspaceId={worktreeId} workingDirectory={rootPath} />
                 </div>
               </>
             )}

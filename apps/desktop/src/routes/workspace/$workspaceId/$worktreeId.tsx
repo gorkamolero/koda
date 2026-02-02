@@ -6,11 +6,10 @@ interface WorkspaceSearchParams {
   mode?: string
 }
 
-export const Route = createFileRoute('/workspace/$id')({
+export const Route = createFileRoute('/workspace/$workspaceId/$worktreeId')({
   component: WorkspaceView,
   validateSearch: (search: Record<string, unknown>): WorkspaceSearchParams => {
     return {
-      // TanStack Router auto-parses 'true'/'false' as booleans
       mock: search.mock === true || search.mock === 'true',
       mode: typeof search.mode === 'string' ? search.mode : undefined,
     }
