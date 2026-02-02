@@ -110,25 +110,25 @@ function AsciiBox({
 // Workspace Row - Terminal Table Style
 // ============================================================================
 
-interface WorkspaceRowProps {
-  workspace: Worktree
+interface WorktreeRowProps {
+  worktree: Worktree
   onClick: () => void
   index: number
 }
 
-function WorkspaceRow({ workspace, onClick, index }: WorkspaceRowProps) {
-  const status = workspace.manualStatus ?? workspace.derivedStatus ?? 'in-progress'
+function WorktreeRow({ worktree, onClick, index }: WorktreeRowProps) {
+  const status = worktree.manualStatus ?? worktree.derivedStatus ?? 'in-progress'
   const statusLabel = STATUS_LABELS[status]
-  const typeLabel = TYPE_LABELS[workspace.worktreeType ?? 'standard']
-  const isArchived = workspace.state === 'archived'
-  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
-  const timeAgo = formatTimeAgo(workspace.updatedAt)
-  const hasUnread = (workspace.unread ?? 0) > 0
-  const isPinned = !!workspace.pinnedAt
+  const typeLabel = TYPE_LABELS[worktree.worktreeType ?? 'standard']
+  const isArchived = worktree.state === 'archived'
+  const displayName = worktree.branch ?? worktree.worktreePath?.split('/').pop() ?? 'unnamed'
+  const timeAgo = formatTimeAgo(worktree.updatedAt)
+  const hasUnread = (worktree.unread ?? 0) > 0
+  const isPinned = !!worktree.pinnedAt
 
   return (
     <button
-      data-testid="workspace-card"
+      data-testid="worktree-card"
       onClick={onClick}
       style={{ animationDelay: `${index * 30}ms` }}
       className={cn(
@@ -175,16 +175,16 @@ function WorkspaceRow({ workspace, onClick, index }: WorkspaceRowProps) {
         </span>
 
         {/* Target branch */}
-        {workspace.intendedTargetBranch && (
+        {worktree.intendedTargetBranch && (
           <span className="text-xs text-text-dim hidden lg:block">
-            → {workspace.intendedTargetBranch}
+            → {worktree.intendedTargetBranch}
           </span>
         )}
 
         {/* Unread */}
         {hasUnread && (
           <span className="px-2 py-0.5 text-[10px] font-bold bg-border-accent text-white">
-            {workspace.unread}
+            {worktree.unread}
           </span>
         )}
 
@@ -206,15 +206,15 @@ function WorkspaceRow({ workspace, onClick, index }: WorkspaceRowProps) {
 // Stats Bar - Terminal Style
 // ============================================================================
 
-function StatsBar({ workspaces }: { workspaces: Worktree[] }) {
+function StatsBar({ worktrees }: { worktrees: Worktree[] }) {
   const stats = useMemo(() => {
-    const active = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'in-progress' && w.state !== 'archived').length
-    const review = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'needs-review').length
-    const blocked = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'blocked').length
-    const done = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'done').length
-    const total = workspaces.filter(w => w.state !== 'archived').length
+    const active = worktrees.filter(w => (w.manualStatus ?? w.derivedStatus) === 'in-progress' && w.state !== 'archived').length
+    const review = worktrees.filter(w => (w.manualStatus ?? w.derivedStatus) === 'needs-review').length
+    const blocked = worktrees.filter(w => (w.manualStatus ?? w.derivedStatus) === 'blocked').length
+    const done = worktrees.filter(w => (w.manualStatus ?? w.derivedStatus) === 'done').length
+    const total = worktrees.filter(w => w.state !== 'archived').length
     return { active, review, blocked, done, total }
-  }, [workspaces])
+  }, [worktrees])
 
   return (
     <div className="font-mono text-xs flex items-center gap-6 text-text-dim">
@@ -541,7 +541,7 @@ export function WorkspaceList() {
   const { repoId: urlRepoId } = useSearch({ from: Route.fullPath })
   const selectedWorkspaceId = useAtomValue(selectedWorkspaceIdAtom)
   const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
-  const { data: workspaces, isLoading: loadingWorkspaces, error: workspacesError } = useAllWorktrees()
+  const { data: worktrees, isLoading: loadingWorktrees, error: worktreesError } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
@@ -565,11 +565,11 @@ export function WorkspaceList() {
     }
   }, [urlRepoId, repos, navigate])
 
-  // Sort workspaces: pinned first, then by updatedAt
-  const sortedWorkspaces = useMemo(() => {
-    if (!workspaces) return []
+  // Sort worktrees: pinned first, then by updatedAt
+  const sortedWorktrees = useMemo(() => {
+    if (!worktrees) return []
 
-    return [...workspaces]
+    return [...worktrees]
       .filter(w => w.state !== 'archived')
       .sort((a, b) => {
         // Pinned first
@@ -581,7 +581,7 @@ export function WorkspaceList() {
         const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
         return bTime - aTime
       })
-  }, [workspaces])
+  }, [worktrees])
 
   const handleSelectFolder = async () => {
     try {
@@ -633,8 +633,8 @@ export function WorkspaceList() {
     }
   }
 
-  const handleWorkspaceClick = (workspace: Worktree) => {
-    void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
+  const handleWorktreeClick = (worktree: Worktree) => {
+    void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
   }
 
   const handleRepoSelect = (repoId: string) => {
@@ -651,9 +651,9 @@ export function WorkspaceList() {
     setCreateError(null)
   }
 
-  const isLoading = loadingWorkspaces || loadingRepos
+  const isLoading = loadingWorktrees || loadingRepos
   const selectedRepo = repos?.find(r => r.id === selectedRepoId)
-  const hasWorkspaces = sortedWorkspaces.length > 0
+  const hasWorktrees = sortedWorktrees.length > 0
 
   if (isLoading) {
     return (
@@ -663,7 +663,7 @@ export function WorkspaceList() {
     )
   }
 
-  if (workspacesError) {
+  if (worktreesError) {
     return (
       <div className="h-full flex items-center justify-center bg-surface-messages font-mono">
         <div className="text-center">
@@ -673,7 +673,7 @@ export function WorkspaceList() {
 └─────────────────────────────┘`}
           </pre>
           <p className="text-xs text-text-dim">
-            {workspacesError instanceof Error ? workspacesError.message : 'Unknown error'}
+            {worktreesError instanceof Error ? worktreesError.message : 'Unknown error'}
           </p>
         </div>
       </div>
@@ -687,11 +687,11 @@ export function WorkspaceList() {
         <div className="flex items-center justify-between gap-4">
           <div className="font-mono">
             <h1 className="text-xl text-text-primary tracking-tight">
-              WORKSPACES
+              WORKTREES
             </h1>
-            {hasWorkspaces && workspaces && (
+            {hasWorktrees && worktrees && (
               <div className="mt-2">
-                <StatsBar workspaces={workspaces} />
+                <StatsBar worktrees={worktrees} />
               </div>
             )}
           </div>
@@ -711,7 +711,7 @@ export function WorkspaceList() {
       </header>
 
       {/* Table Header */}
-      {hasWorkspaces && (
+      {hasWorktrees && (
         <div className="px-6 py-2 border-b border-dashed border-text-dim/20 font-mono text-[10px] text-text-dim uppercase tracking-wider">
           <div className="flex items-center gap-4">
             <span className="w-4"></span>
@@ -726,13 +726,13 @@ export function WorkspaceList() {
       )}
 
       {/* Content */}
-      {hasWorkspaces ? (
-        <div className="flex-1 overflow-y-auto" data-testid="workspace-grid">
-          {sortedWorkspaces.map((workspace, index) => (
-            <WorkspaceRow
-              key={workspace.id}
-              workspace={workspace}
-              onClick={() => handleWorkspaceClick(workspace)}
+      {hasWorktrees ? (
+        <div className="flex-1 overflow-y-auto" data-testid="worktree-grid">
+          {sortedWorktrees.map((worktree, index) => (
+            <WorktreeRow
+              key={worktree.id}
+              worktree={worktree}
+              onClick={() => handleWorktreeClick(worktree)}
               index={index}
             />
           ))}

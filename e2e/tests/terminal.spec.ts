@@ -20,10 +20,10 @@ test.describe('Terminal', () => {
     const loading = page.getByText('Loading...')
     await expect(loading).not.toBeVisible({ timeout: 15000 })
 
-    // Click on the first workspace to open it
-    const workspaceCard = page.locator('[data-testid="workspace-card"]').first()
-    if (await workspaceCard.isVisible()) {
-      await workspaceCard.click()
+    // Click on the first worktree to open it
+    const worktreeCard = page.locator('[data-testid="worktree-card"]').first()
+    if (await worktreeCard.isVisible()) {
+      await worktreeCard.click()
       await page.waitForLoadState('networkidle')
     }
   })

@@ -66,10 +66,10 @@ test.describe('Workspace CRUD', () => {
 
       // Should show either workspace cards or empty state
       const emptyState = page.getByTestId('empty-state')
-      const workspaceGrid = page.getByTestId('workspace-grid')
+      const worktreeGrid = page.getByTestId('worktree-grid')
 
       const hasEmptyState = await emptyState.isVisible().catch(() => false)
-      const hasGrid = await workspaceGrid.isVisible().catch(() => false)
+      const hasGrid = await worktreeGrid.isVisible().catch(() => false)
 
       expect(hasEmptyState || hasGrid).toBe(true)
     })
