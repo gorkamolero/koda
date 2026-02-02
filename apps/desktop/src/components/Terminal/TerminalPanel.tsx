@@ -90,6 +90,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
       // Mount terminal
       activeTab.terminal.open(containerRef.current)
       activeTab.fitAddon.fit()
+      activeTab.terminal.scrollToTop()
 
       // Focus terminal
       activeTab.terminal.focus()
@@ -196,33 +197,34 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
     const id = `term-${Date.now()}`
     const terminal = new Terminal({
       theme: {
-        background: '#1a1b1e',
-        foreground: '#e4e4e7',
-        cursor: '#e4e4e7',
-        cursorAccent: '#1a1b1e',
-        selectionBackground: 'rgba(255, 255, 255, 0.2)',
-        black: '#27272a',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#e4e4e7',
-        brightBlack: '#52525b',
+        background: '#000000',
+        foreground: '#c5c5c5',
+        cursor: '#e07a5f',
+        cursorAccent: '#000000',
+        selectionBackground: 'rgba(224, 122, 95, 0.25)',
+        black: '#141414',
+        red: '#f87171',
+        green: '#4ade80',
+        yellow: '#fbbf24',
+        blue: '#60a5fa',
+        magenta: '#c084fc',
+        cyan: '#22d3ee',
+        white: '#c5c5c5',
+        brightBlack: '#3a3a3a',
         brightRed: '#f87171',
         brightGreen: '#4ade80',
         brightYellow: '#facc15',
         brightBlue: '#60a5fa',
         brightMagenta: '#c084fc',
         brightCyan: '#22d3ee',
-        brightWhite: '#fafafa',
+        brightWhite: '#e8e8e8',
       },
       fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace',
       fontSize: 13,
-      lineHeight: 1.4,
+      lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: 'bar',
+      scrollback: 1000,
     })
 
     const fitAddon = new FitAddon()
@@ -254,7 +256,8 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
         rows: terminal.rows,
       })
 
-      // Subscribe to PTY data
+      // Clear terminal and subscribe to PTY data
+      terminal.clear()
       subscribeToPtyData(result.sessionId, terminal)
 
       // Update tab with PTY session info
@@ -385,7 +388,7 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
       </div>
 
       {/* Terminal container */}
-      <div ref={containerRef} className="flex-1 p-2" data-testid="terminal-viewport" />
+      <div ref={containerRef} className="flex-1" data-testid="terminal-viewport" />
 
       {/* Empty state */}
       {tabs.length === 0 && (
