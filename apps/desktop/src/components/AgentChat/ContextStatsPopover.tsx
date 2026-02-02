@@ -40,14 +40,14 @@ function getContextCategories(usedPercent: number): ContextCategory[] {
   // Distribute the used percentage across categories
   // These ratios are based on typical Claude Code sessions
   const ratios = [
-    { name: 'Messages', ratio: 0.447, color: 'bg-blue-500' },
-    { name: 'Autocompact buffer', ratio: 0.165, color: 'bg-purple-500' },
-    { name: 'System tools', ratio: 0.055, color: 'bg-green-500' },
-    { name: 'Skills', ratio: 0.029, color: 'bg-yellow-500' },
-    { name: 'System prompt', ratio: 0.018, color: 'bg-orange-500' },
-    { name: 'Memory files', ratio: 0.006, color: 'bg-pink-500' },
-    { name: 'MCP tools', ratio: 0.005, color: 'bg-cyan-500' },
-    { name: 'Custom agents', ratio: 0.002, color: 'bg-indigo-500' },
+    { name: 'Messages', ratio: 0.447, color: 'bg-status-unread' },
+    { name: 'Autocompact buffer', ratio: 0.165, color: 'bg-border-accent' },
+    { name: 'System tools', ratio: 0.055, color: 'bg-status-success' },
+    { name: 'Skills', ratio: 0.029, color: 'bg-status-warning' },
+    { name: 'System prompt', ratio: 0.018, color: 'bg-status-error' },
+    { name: 'Memory files', ratio: 0.006, color: 'bg-status-reviewing' },
+    { name: 'MCP tools', ratio: 0.005, color: 'bg-status-reviewing' },
+    { name: 'Custom agents', ratio: 0.002, color: 'bg-text-muted' },
   ]
 
   return ratios.map((r) => ({

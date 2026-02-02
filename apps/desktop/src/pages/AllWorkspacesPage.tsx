@@ -261,7 +261,7 @@ export function AllWorkspacesPage() {
                 className={cn(
                   'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
                   statusFilter === filter.id
-                    ? 'bg-blue-500/20 text-blue-400'
+                    ? 'bg-border-accent/20 text-border-accent'
                     : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
                 )}
               >

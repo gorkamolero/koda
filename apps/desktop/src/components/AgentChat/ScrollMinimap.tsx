@@ -26,15 +26,15 @@ interface MinimapSegment {
 function getSegmentColor(type: MinimapSegment['type']): string {
   switch (type) {
     case 'user':
-      return 'bg-blue-500'
+      return 'bg-status-unread'
     case 'thinking':
-      return 'bg-purple-500'
+      return 'bg-border-accent'  // terracotta
     case 'tool':
-      return 'bg-green-500'
+      return 'bg-status-success'
     case 'assistant':
       return 'bg-text-muted'
     case 'system':
-      return 'bg-yellow-500/50'
+      return 'bg-status-warning/50'
     default:
       return 'bg-text-dim'
   }

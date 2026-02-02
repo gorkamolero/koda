@@ -103,10 +103,10 @@ function ContextUsageMeter({ percent }: { percent: number }) {
         className={cn(
           'h-full rounded-full transition-all',
           isCritical
-            ? 'bg-red-500'
+            ? 'bg-status-error'
             : isHigh
-              ? 'bg-orange-500'
-              : 'bg-blue-500'
+              ? 'bg-status-warning'
+              : 'bg-status-unread'
         )}
         style={{ width: `${String(Math.min(100, percent))}%` }}
       />
@@ -184,7 +184,7 @@ export function SessionButton({
             )}
           </div>
           {unreadCount > 0 && (
-            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex-shrink-0">
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-status-unread/20 text-status-unread flex-shrink-0">
               {String(unreadCount)}
             </span>
           )}

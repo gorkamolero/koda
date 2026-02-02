@@ -21,7 +21,7 @@ const AVAILABLE_MODELS: ModelOption[] = [
     description: 'Fast & capable',
     icon: <Zap className="w-4 h-4" />,
     badge: 'Default',
-    badgeColor: 'bg-blue-500/20 text-blue-400',
+    badgeColor: 'bg-status-unread/20 text-status-unread',
   },
   {
     id: 'claude-opus-4-20250514',
@@ -43,7 +43,7 @@ const AVAILABLE_MODELS: ModelOption[] = [
     description: 'Quick responses',
     icon: <Bot className="w-4 h-4" />,
     badge: 'Fast',
-    badgeColor: 'bg-green-500/20 text-green-400',
+    badgeColor: 'bg-status-success/20 text-status-success',
   },
 ]
 

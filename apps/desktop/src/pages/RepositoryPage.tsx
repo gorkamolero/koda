@@ -142,7 +142,7 @@ export function RepositoryPage() {
             <Link
               to="/"
               search={{ repoId }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-border-accent/20 text-border-accent hover:bg-border-accent/30 transition-colors"
             >
               <Plus className="w-4 h-4" />
               New Workspace
@@ -192,7 +192,7 @@ export function RepositoryPage() {
                   <Link
                     to="/"
                     search={{ repoId }}
-                    className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 text-sm font-medium rounded-md bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                    className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 text-sm font-medium rounded-md bg-border-accent/20 text-border-accent hover:bg-border-accent/30 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Create Workspace

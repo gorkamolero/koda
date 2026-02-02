@@ -7,10 +7,10 @@ interface WorktreeStatusBadgeProps {
 }
 
 const STATUS_CONFIG: Record<WorktreeStatus, { icon: React.ReactNode; color: string }> = {
-  done: { icon: <Check className="w-3 h-3" />, color: 'text-green-500 bg-green-500/10' },
-  blocked: { icon: <AlertCircle className="w-3 h-3" />, color: 'text-orange-500 bg-orange-500/10' },
-  'needs-review': { icon: <AlertCircle className="w-3 h-3" />, color: 'text-yellow-500 bg-yellow-500/10' },
-  'in-progress': { icon: null, color: 'text-blue-500 bg-blue-500/10' },
+  done: { icon: <Check className="w-3 h-3" />, color: 'text-status-success bg-status-success/10' },
+  blocked: { icon: <AlertCircle className="w-3 h-3" />, color: 'text-status-warning bg-status-warning/10' },
+  'needs-review': { icon: <AlertCircle className="w-3 h-3" />, color: 'text-status-warning bg-status-warning/10' },
+  'in-progress': { icon: null, color: 'text-status-unread bg-status-unread/10' },
 }
 
 /**

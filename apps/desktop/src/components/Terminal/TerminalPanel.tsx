@@ -325,17 +325,15 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
     })
   }
 
-  const activeTab = tabs.find(t => t.id === activeTabId)
-
   return (
-    <div 
+    <div
       ref={panelRef}
-      className="h-full flex flex-col bg-[#1a1b1e]" 
+      className="h-full flex flex-col bg-surface-terminal"
       data-testid="terminal-container"
       tabIndex={-1}
     >
       {/* Tab bar */}
-      <div className="flex items-center border-b border-border/50 bg-[#141517]" data-testid="terminal-tab-bar">
+      <div className="flex items-center border-b border-border-subtle bg-surface-card" data-testid="terminal-tab-bar">
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
             <div
@@ -344,10 +342,10 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
               data-pid={tab.pid}
               data-connecting={tab.connecting}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border/30 cursor-pointer group whitespace-nowrap flex-shrink-0',
+                'flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border-subtle cursor-pointer group whitespace-nowrap flex-shrink-0',
                 activeTabId === tab.id
-                  ? 'bg-[#1a1b1e] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-[#1a1b1e]/50'
+                  ? 'bg-surface-terminal text-text-primary'
+                  : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
               )}
               onClick={() => { setActiveTabId(tab.id); }}
             >
@@ -400,16 +398,6 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
             <Plus className="h-4 w-4" />
             New Terminal
           </button>
-        </div>
-      )}
-
-      {/* Connection status */}
-      {activeTab?.connecting && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#1a1b1e]/80" data-testid="terminal-connecting-overlay">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Connecting to shell...</span>
-          </div>
         </div>
       )}
     </div>

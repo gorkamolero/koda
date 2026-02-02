@@ -170,7 +170,7 @@ export function SessionSidebar({
             </p>
             <button
               onClick={() => { setShowNewSessionPicker(true) }}
-              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500/20 text-blue-400 rounded-md hover:bg-blue-500/30 transition-colors"
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-status-unread/20 text-status-unread rounded-md hover:bg-status-unread/30 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               New Session

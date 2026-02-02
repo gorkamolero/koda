@@ -52,7 +52,7 @@ export function PulseButton({
       className={cn(
         'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
         isActive
-          ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+          ? 'bg-status-success/20 text-status-success hover:bg-status-success/30'
           : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover',
         isLoading && 'opacity-50 cursor-not-allowed',
         className

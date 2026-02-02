@@ -60,7 +60,7 @@ function ThemeCard({
         <div
           className={cn(
             'w-8 h-8 rounded-lg flex items-center justify-center',
-            theme.type === 'dark' ? 'bg-gray-800' : 'bg-gray-200'
+            theme.type === 'dark' ? 'bg-surface-card' : 'bg-surface-hover'
           )}
         >
           {theme.type === 'dark' ? (

@@ -363,7 +363,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
             className={cn(
               "h-6 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-all duration-200",
               planModeEnabled
-                ? "bg-amber-500/90 hover:bg-amber-500/80 text-white"
+                ? "bg-status-warning hover:brightness-110 text-black"
                 : "hover:bg-accent text-muted-foreground hover:text-foreground"
             )}
             title={planModeEnabled ? "Plan mode enabled" : "Plan mode disabled"}

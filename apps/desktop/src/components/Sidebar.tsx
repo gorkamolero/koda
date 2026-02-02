@@ -404,7 +404,7 @@ function WorkspaceRow({
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {unreadCount > 0 && (
-                <div className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                <div className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded bg-status-unread/20 text-status-unread">
                   <MessageCircle className="w-3 h-3" />
                   <span>{String(unreadCount)}</span>
                 </div>
@@ -635,7 +635,7 @@ function SidebarFooter(): React.ReactElement {
           <span
             className={cn(
               'w-2 h-2 rounded-full transition-colors',
-              status?.running ? 'bg-green-500' : 'bg-gray-500'
+              status?.running ? 'bg-status-success' : 'bg-text-faint'
             )}
             title={status?.running ? 'Connected' : 'Disconnected'}
           />
