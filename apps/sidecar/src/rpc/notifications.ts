@@ -199,6 +199,7 @@ export class NotificationEmitter {
    * Emit a message notification (streaming response)
    */
   emitMessage(sessionId: string, event: ClaudeStreamEvent): void {
+    console.log('[NotificationEmitter] Emitting message:', event.type, 'to', this.sockets.size, 'sockets')
     this.emit<MessageNotification>(SIDECAR_NOTIFICATIONS.MESSAGE, {
       sessionId,
       event,

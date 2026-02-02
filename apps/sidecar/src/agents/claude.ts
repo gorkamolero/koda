@@ -186,10 +186,11 @@ export interface ClaudeCancelResult {
  */
 export type ClaudeStreamEvent =
   | { type: 'system'; message: string; subtype?: string }
-  | { type: 'assistant'; message: { type: string; text?: string; name?: string; input?: unknown } }
+  | { type: 'assistant'; message: { type: string; text?: string; name?: string; input?: unknown; content?: Array<{ type: string; text?: string }> } }
   | { type: 'user'; message: { type: string; content: unknown } }
   | { type: 'tool_use'; tool: string; input: unknown; id?: string }
   | { type: 'tool_result'; tool: string; output: unknown; id?: string; error?: string }
+  | { type: 'text_delta'; text: string }
   | { type: 'result'; result: string; cost_usd?: number; duration_ms?: number; duration_api_ms?: number; num_turns?: number; session_id?: string; total_cost_usd?: number; usage?: TokenUsage }
   | { type: string; [key: string]: unknown };
 
@@ -568,6 +569,8 @@ export class ClaudeHandler extends EventEmitter {
       mcpServers: {
         koda: kodaMcp,
       },
+      // Enable streaming partial messages for real-time text display
+      includePartialMessages: true,
       // Conductor patterns
       canUseTool: createCanUseTool(session, frontendRpc),
       hooks: createHooks(session),
@@ -679,6 +682,9 @@ export class ClaudeHandler extends EventEmitter {
 
     try {
       for await (const message of sdkQuery) {
+        // Debug: log incoming SDK message types
+        console.log('[Claude] SDK message type:', message.type)
+
         // Convert SDK message to our event format
         const event = this.convertSDKMessage(message)
         if (event) {
@@ -749,6 +755,16 @@ export class ClaudeHandler extends EventEmitter {
         }
       case 'system':
         return { type: 'system', message: 'message' in message ? String(message.message) : '' }
+      case 'stream_event': {
+        // Handle streaming partial messages from the SDK
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const event = (message as any).event
+        if (event?.type === 'content_block_delta' && event?.delta?.type === 'text_delta') {
+          return { type: 'text_delta', text: event.delta.text || '' }
+        }
+        // Ignore other stream events (content_block_start, content_block_stop, etc.)
+        return null
+      }
       default:
         // Pass through other message types
         return message as ClaudeStreamEvent
@@ -799,6 +815,8 @@ export class ClaudeHandler extends EventEmitter {
       mcpServers: {
         koda: kodaMcp,
       },
+      // Enable streaming partial messages for real-time text display
+      includePartialMessages: true,
     }
 
     if (session.options?.model) {

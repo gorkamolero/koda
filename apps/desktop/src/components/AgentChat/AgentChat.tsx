@@ -32,6 +32,7 @@ interface MessageNotificationPayload {
     result?: string
     is_error?: boolean
     tool?: string
+    text?: string  // For text_delta events
     [key: string]: unknown
   }
   timestamp: number
@@ -74,22 +75,24 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
     }
   }, [worktreeId, setCurrentWorkspaceId])
 
+  // Debug counter for tracking duplicate events
+  const eventCounterRef = useRef(0)
+
   // Process a streaming event (shared by notification listener)
   const processEvent = useCallback((event: MessageNotificationPayload['event'], sessionId: string) => {
+    // Debug: log all incoming events with counter
+    eventCounterRef.current++
+    console.log(`[AgentChat] Event #${eventCounterRef.current}:`, event.type, 'text_delta' in event ? (event as { text?: string }).text?.substring(0, 20) : '')
+
     // Ignore events from other sessions
     if (activeSessionRef.current !== sessionId) return
 
-    // Handle assistant messages (streaming text content)
-    if (event.type === 'assistant') {
-      const message = event.message
-      if (message?.content) {
-        for (const block of message.content) {
-          if (block.type === 'text' && block.text) {
-            accumulatedTextRef.current += block.text
-          }
-        }
-
-        if (currentMessageIdRef.current && accumulatedTextRef.current) {
+    // Handle streaming text deltas (real-time character-by-character streaming)
+    if (event.type === 'text_delta') {
+      const deltaText = event.text
+      if (deltaText) {
+        accumulatedTextRef.current += deltaText
+        if (currentMessageIdRef.current) {
           updateMessage({
             id: currentMessageIdRef.current,
             update: {
@@ -99,6 +102,30 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
           })
         }
       }
+    } else if (event.type === 'assistant') {
+      // Complete assistant messages arrive after streaming is done
+      // Only use them if we haven't received any text_delta events (fallback mode)
+      if (!accumulatedTextRef.current) {
+        const message = event.message
+        if (message?.content) {
+          for (const block of message.content) {
+            if (block.type === 'text' && block.text) {
+              accumulatedTextRef.current += block.text
+            }
+          }
+
+          if (currentMessageIdRef.current && accumulatedTextRef.current) {
+            updateMessage({
+              id: currentMessageIdRef.current,
+              update: {
+                content: accumulatedTextRef.current,
+                status: 'streaming',
+              },
+            })
+          }
+        }
+      }
+      // Otherwise ignore - we already have the text from text_delta events
     } else if (event.type === 'result') {
       // Session complete
       const resultText = event.result
@@ -154,9 +181,13 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
     if (!isTauriContext()) return
 
     let unlisten: (() => void) | undefined
+    let mounted = true
 
     const setupListener = async () => {
       const { listen } = await import('@tauri-apps/api/event')
+
+      // Check if still mounted (handles React StrictMode double-invoke)
+      if (!mounted) return
 
       // Listen for message notifications
       unlisten = await listen<MessageNotificationPayload>('sidecar-notification:message', (event) => {
@@ -168,6 +199,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
     void setupListener()
 
     return () => {
+      mounted = false
       unlisten?.()
     }
   }, [processEvent])
