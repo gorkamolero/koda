@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { useAtomValue, useSetAtom } from 'jotai'
 import {
   ChevronDown,
   GitBranch,
@@ -14,12 +15,18 @@ import {
   Pencil,
   History,
   Share2,
+  X,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { ConversationHistoryDialog } from '@/components/ConversationHistory'
 import { cn } from '@/lib/utils'
 import type { Worktree } from '@/lib/rpc'
+import {
+  openFilesAtom,
+  activeFilePathAtom,
+  closeFileAtom,
+} from '@/store/fileExplorer'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 
@@ -55,6 +62,12 @@ export function TopBar({
   const [openDropdownVisible, setOpenDropdownVisible] = useState(false)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
   const openDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Editor file tabs
+  const openFiles = useAtomValue(openFilesAtom)
+  const activeFilePath = useAtomValue(activeFilePathAtom)
+  const setActiveFilePath = useSetAtom(activeFilePathAtom)
+  const closeFile = useSetAtom(closeFileAtom)
 
   useClickOutside(openDropdownRef, {
     onClickOutside: () => { setOpenDropdownVisible(false) },
@@ -280,6 +293,54 @@ export function TopBar({
           >
             Chat
           </TabButton>
+        )}
+
+        {/* Editor file tabs */}
+        {openFiles.length > 0 && (
+          <>
+            {/* Separator before file tabs */}
+            <div className="h-4 w-px bg-border mx-1" />
+
+            {openFiles.map((file) => {
+              const testId = `editor-tab-${file.name.replace(/\./g, '-').toLowerCase()}`
+              const isActive = file.path === activeFilePath
+
+              return (
+                <button
+                  key={file.path}
+                  data-testid={testId}
+                  data-unsaved={file.isDirty || undefined}
+                  onClick={() => { setActiveFilePath(file.path) }}
+                  className={cn(
+                    'group flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors',
+                    isActive
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                  )}
+                >
+                  {/* Dirty indicator */}
+                  {file.isDirty && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                  )}
+
+                  {/* File name */}
+                  <span className="truncate max-w-[100px]">{file.name}</span>
+
+                  {/* Close button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      closeFile(file.path)
+                    }}
+                    className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Close"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </button>
+              )
+            })}
+          </>
         )}
 
         {/* Spacer */}
