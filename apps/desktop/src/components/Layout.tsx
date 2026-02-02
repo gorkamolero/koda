@@ -84,11 +84,15 @@ function SidebarResizer({
  *
  * Note: Window drag region is in TopBar row 1, not a separate titlebar.
  */
+const MINIMUM_SPLASH_DURATION = 3000 // 3 seconds minimum
+const FADE_OUT_DURATION = 800 // 800ms fade out
+
 export function Layout({ children }: LayoutProps) {
   const initializeTheme = useSetAtom(initializeThemeAtom)
   const sidebar = useSidebarResize()
   const { status } = useSidecar()
-  const [showLoading, setShowLoading] = useState(true)
+  const [loadingState, setLoadingState] = useState<'visible' | 'dissolving' | 'hidden'>('visible')
+  const [startTime] = useState(() => Date.now())
 
   // Initialize theme on mount
   useEffect(() => {
@@ -100,19 +104,36 @@ export function Layout({ children }: LayoutProps) {
     startSidecarRpcListener()
   }, [])
 
-  // Show loading screen until sidecar connects (with minimum display time)
+  // Show loading screen for minimum duration, then dissolve elegantly
   useEffect(() => {
-    if (status?.running) {
-      // Small delay for smooth transition
-      const timer = setTimeout(() => { setShowLoading(false) }, 300)
-      return () => { clearTimeout(timer) }
+    if (status?.running && loadingState === 'visible') {
+      const elapsed = Date.now() - startTime
+      const remainingTime = Math.max(0, MINIMUM_SPLASH_DURATION - elapsed)
+
+      // Wait for minimum duration, then start dissolve
+      const dissolveTimer = setTimeout(() => {
+        setLoadingState('dissolving')
+
+        // After fade animation completes, hide completely
+        setTimeout(() => {
+          setLoadingState('hidden')
+        }, FADE_OUT_DURATION)
+      }, remainingTime)
+
+      return () => { clearTimeout(dissolveTimer) }
     }
-  }, [status?.running])
+  }, [status?.running, loadingState, startTime])
 
   // Show KODA loading screen during initial connection
-  if (showLoading && !status?.running) {
+  if (loadingState !== 'hidden') {
     return (
-      <div className="h-screen w-screen bg-surface-messages flex items-center justify-center">
+      <div
+        className={cn(
+          'h-screen w-screen bg-surface-messages flex items-center justify-center',
+          'transition-opacity duration-700 ease-out',
+          loadingState === 'dissolving' && 'opacity-0'
+        )}
+      >
         <KodaLoadingScreen message="Initializing" />
       </div>
     )

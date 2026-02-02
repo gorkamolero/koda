@@ -70,4 +70,62 @@ test.describe('Agent Conversation', () => {
     expect(responseText).toBeTruthy()
     expect(responseText!.length).toBeGreaterThan(0)
   })
+
+  /**
+   * CRITICAL: Verifies Claude runs in the worktree directory, not src-tauri.
+   *
+   * This test catches a bug where the frontend didn't pass workingDirectory
+   * to claude.start, causing Claude to fall back to process.cwd() (src-tauri).
+   * When Claude writes files in src-tauri, Tauri's file watcher triggers
+   * a rebuild loop that crashes the app.
+   */
+  test('Claude runs in the correct working directory (not src-tauri)', async ({ page }) => {
+    const navigated = await navigateToWorkspace(page)
+    if (!navigated) {
+      test.fail(true, 'Could not navigate to workspace')
+      return
+    }
+
+    // Ensure we're on the Chat tab
+    const chatTab = page.getByTestId('tab-chat')
+    await chatTab.click()
+    await expect(chatTab).toHaveAttribute('data-active', 'true')
+
+    const chatInput = page.getByTestId('chat-input')
+    await expect(chatInput).toBeVisible({ timeout: 10000 })
+
+    const existingMessages = await page.locator('[data-role="assistant"]').count()
+
+    // Ask Claude to run pwd and report the directory
+    // This is a direct test of the working directory bug
+    await chatInput.fill('Run `pwd` and tell me the current working directory path. Just output the path, nothing else.')
+
+    const sendButton = page.getByTestId('send-button')
+    await sendButton.click()
+
+    // Wait for response (may take time for Claude to use Bash tool)
+    const assistantMessages = page.locator('[data-role="assistant"]')
+    await expect(assistantMessages).toHaveCount(existingMessages + 1, { timeout: 90000 })
+
+    // Get the response text
+    const newMessage = assistantMessages.nth(existingMessages)
+    const responseText = await newMessage.textContent()
+    expect(responseText).toBeTruthy()
+
+    // CRITICAL ASSERTIONS:
+    // 1. Response should contain the worktree path (under .koda/worktrees/)
+    // 2. Response should NOT contain src-tauri (the broken fallback)
+    const response = responseText!.toLowerCase()
+
+    // The path should be in the worktree location
+    const isInWorktree = response.includes('.koda/worktrees/') ||
+                         response.includes('koda/worktrees') ||
+                         response.includes('/worktrees/')
+
+    // The path should NOT be in src-tauri
+    const isInSrcTauri = response.includes('src-tauri')
+
+    expect(isInSrcTauri).toBe(false)
+    expect(isInWorktree).toBe(true)
+  })
 })

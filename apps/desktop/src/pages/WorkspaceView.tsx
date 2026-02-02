@@ -463,7 +463,7 @@ export function WorkspaceView() {
 
           {/* Normal content when worktree exists and no files open */}
           {!isLoading && worktree && activeTab === 'chat' && openFiles.length === 0 && (
-            <AgentChat worktreeId={id} sessionId={activeSessionId} />
+            <AgentChat worktreeId={id} sessionId={activeSessionId} workingDirectory={rootPath} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (

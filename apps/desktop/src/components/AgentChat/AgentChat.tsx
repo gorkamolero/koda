@@ -40,13 +40,14 @@ interface MessageNotificationPayload {
 interface AgentChatProps {
   worktreeId: string
   sessionId?: string
+  workingDirectory?: string
 }
 
 /**
  * Main agent chat component
  * Combines MessageList, InputArea, ModelSelector, and ContextMeter
  */
-export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps) {
+export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory }: AgentChatProps) {
   // TODO: Use sessionId to scope messages to specific session
   void _sessionId
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
@@ -204,6 +205,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
           {
             workspaceId: worktreeId,
             prompt: content,
+            options: workingDirectory ? { workingDirectory } : undefined,
           } satisfies ClaudeStartParams
         )
 
@@ -220,7 +222,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId }: AgentChatProps)
         })
       }
     },
-    [selectedModel, worktreeId, setIsStreaming, addMessage]
+    [selectedModel, worktreeId, workingDirectory, setIsStreaming, addMessage]
   )
 
   // Process pending prompts from other components (e.g., PR buttons)
