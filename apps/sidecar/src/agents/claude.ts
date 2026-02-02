@@ -569,6 +569,8 @@ export class ClaudeHandler extends EventEmitter {
       mcpServers: {
         koda: kodaMcp,
       },
+      // Use Claude Code preset for full coding assistant personality
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
       // Enable streaming partial messages for real-time text display
       includePartialMessages: true,
       // Conductor patterns
@@ -815,6 +817,8 @@ export class ClaudeHandler extends EventEmitter {
       mcpServers: {
         koda: kodaMcp,
       },
+      // Use Claude Code preset for full coding assistant personality
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
       // Enable streaming partial messages for real-time text display
       includePartialMessages: true,
     }
