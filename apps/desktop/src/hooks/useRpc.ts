@@ -365,6 +365,23 @@ export function useCreateStandaloneWorkspace() {
 }
 
 /**
+ * Delete a workspace
+ */
+export function useDeleteWorkspace() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (params: { id: string }) =>
+      rpcRequest<{ success: boolean }>(RPC_METHODS.WORKSPACE_DELETE, params),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace-repos'] })
+    },
+  })
+}
+
+/**
  * List repos attached to a workspace
  */
 export function useWorkspaceRepos(workspaceId: string) {
