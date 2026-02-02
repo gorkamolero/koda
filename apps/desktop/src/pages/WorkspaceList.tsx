@@ -4,460 +4,526 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
 import type { Worktree, WorktreeStatus, WorktreeType } from '@/lib/rpc'
 import { cn } from '@/lib/utils'
-import {
-  Archive,
-  ArchiveRestore,
-  Check,
-  AlertCircle,
-  GitBranch,
-  Clock,
-  MessageSquare,
-  Pin,
-  Sparkles,
-  Bot,
-  FileText,
-  Zap,
-  ArrowRight,
-  Plus,
-  FolderGit2,
-  MessagesSquare,
-} from 'lucide-react'
-import { KodaAsciiLogo, KodaSpinner } from '@/components/KodaSpinner'
+import { KodaSpinner } from '@/components/KodaSpinner'
 
 type CreateMode = 'choose' | 'repo' | 'branch' | 'standalone'
 
 // ============================================================================
-// Workspace Type Configuration
+// Terminal-style Status Labels
 // ============================================================================
 
-interface TypeConfig {
-  icon: React.ReactNode
-  label: string
-  color: string
-  bgColor: string
+const STATUS_LABELS: Record<WorktreeStatus, string> = {
+  'in-progress': 'ACTIVE',
+  done: 'DONE',
+  blocked: 'BLOCKED',
+  'needs-review': 'REVIEW',
 }
 
-const WORKSPACE_TYPE_CONFIG: Record<WorktreeType, TypeConfig> = {
-  standard: {
-    icon: <GitBranch className="w-3.5 h-3.5" />,
-    label: 'Standard',
-    color: 'text-text-muted',
-    bgColor: 'bg-surface-hover',
-  },
-  'spec-driven': {
-    icon: <FileText className="w-3.5 h-3.5" />,
-    label: 'Spec-Driven',
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/10',
-  },
-  ralph: {
-    icon: <Bot className="w-3.5 h-3.5" />,
-    label: 'Ralph',
-    color: 'text-purple-400',
-    bgColor: 'bg-purple-500/10',
-  },
-  openprose: {
-    icon: <Sparkles className="w-3.5 h-3.5" />,
-    label: 'OpenProse',
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/10',
-  },
+const TYPE_LABELS: Record<WorktreeType, string> = {
+  standard: 'STD',
+  'spec-driven': 'SPEC',
+  ralph: 'RALPH',
+  openprose: 'PROSE',
 }
 
 // ============================================================================
-// Status Configuration
-// ============================================================================
-
-interface StatusConfig {
-  icon: React.ReactNode
-  label: string
-  accentColor: string
-  bgGlow: string
-}
-
-const STATUS_CONFIG: Record<WorktreeStatus, StatusConfig> = {
-  'in-progress': {
-    icon: <Zap className="w-3.5 h-3.5" />,
-    label: 'In Progress',
-    accentColor: 'border-l-blue-500',
-    bgGlow: 'hover:shadow-blue-500/5',
-  },
-  done: {
-    icon: <Check className="w-3.5 h-3.5" />,
-    label: 'Done',
-    accentColor: 'border-l-emerald-500',
-    bgGlow: 'hover:shadow-emerald-500/5',
-  },
-  blocked: {
-    icon: <AlertCircle className="w-3.5 h-3.5" />,
-    label: 'Blocked',
-    accentColor: 'border-l-red-500',
-    bgGlow: 'hover:shadow-red-500/5',
-  },
-  'needs-review': {
-    icon: <MessageSquare className="w-3.5 h-3.5" />,
-    label: 'Needs Review',
-    accentColor: 'border-l-amber-500',
-    bgGlow: 'hover:shadow-amber-500/5',
-  },
-}
-
-// ============================================================================
-// Time Formatting
+// Time Formatting - Terminal Style
 // ============================================================================
 
 function formatTimeAgo(date: string | null | undefined): string {
-  if (!date) return ''
+  if (!date) return '--:--'
 
   const diffMs = Date.now() - new Date(date).getTime()
   const diffMins = Math.floor(diffMs / 60000)
 
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffMins < 1) return 'NOW'
+  if (diffMins < 60) return `${diffMins}M`
 
   const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffHours < 24) return `${diffHours}H`
 
   const diffDays = Math.floor(diffHours / 24)
-  if (diffDays < 7) return `${diffDays}d ago`
-
-  const diffWeeks = Math.floor(diffDays / 7)
-  if (diffWeeks < 4) return `${diffWeeks}w ago`
-
-  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatDate(date: string | null | undefined): string {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  return `${diffDays}D`
 }
 
 // ============================================================================
-// Workspace Card - Premium Design
+// ASCII Box Components
 // ============================================================================
 
-interface WorkspaceCardProps {
-  workspace: Worktree
-  onClick: () => void
-  index: number
-  isPinned?: boolean
-}
-
-function WorkspaceCard({ workspace, onClick, index, isPinned }: WorkspaceCardProps) {
-  const status = workspace.manualStatus ?? workspace.derivedStatus ?? 'in-progress'
-  const statusConfig = STATUS_CONFIG[status]
-  const typeConfig = WORKSPACE_TYPE_CONFIG[workspace.worktreeType ?? 'standard']
-  const isArchived = workspace.state === 'archived'
-  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
-  const timeAgo = formatTimeAgo(workspace.updatedAt)
-  const hasUnread = (workspace.unread ?? 0) > 0
-
+function AsciiBox({
+  children,
+  title,
+  className,
+  accent = false,
+}: {
+  children: React.ReactNode
+  title?: string
+  className?: string
+  accent?: boolean
+}) {
   return (
-    <button
-      data-testid="workspace-card"
-      onClick={onClick}
-      style={{ animationDelay: `${index * 50}ms` }}
-      className={cn(
-        'group relative text-left w-full',
-        'rounded-xl border-l-[3px] transition-all duration-300',
-        'bg-gradient-to-br from-surface-card to-surface-card/80',
-        'border border-border-subtle border-l-0',
-        'hover:border-border-strong hover:shadow-xl',
-        'animate-in fade-in slide-in-from-bottom-2',
-        statusConfig.accentColor,
-        statusConfig.bgGlow,
-        isArchived && 'opacity-50 grayscale-[30%]',
-        isPinned && 'ring-1 ring-border-accent/30'
-      )}
-    >
-      {/* Pinned indicator */}
-      {isPinned && (
-        <div className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-surface-card border border-border-accent">
-          <Pin className="w-3 h-3 text-border-accent" />
-        </div>
-      )}
-
-      {/* Unread badge */}
-      {hasUnread && (
-        <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-border-accent text-white text-[10px] font-bold">
-          {workspace.unread}
-        </div>
-      )}
-
-      <div className="p-4 space-y-3">
-        {/* Header: Name + Type Badge */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary truncate group-hover:text-border-accent transition-colors">
-              {displayName}
-            </h3>
-            {workspace.intendedTargetBranch && (
-              <div className="flex items-center gap-1 mt-0.5 text-[11px] text-text-faint">
-                <ArrowRight className="w-3 h-3" />
-                <span className="truncate">{workspace.intendedTargetBranch}</span>
-              </div>
-            )}
-          </div>
-          <div className={cn('flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium', typeConfig.bgColor, typeConfig.color)}>
-            {typeConfig.icon}
-            <span className="hidden sm:inline">{typeConfig.label}</span>
-          </div>
-        </div>
-
-        {/* Status Row */}
-        <div className="flex items-center gap-3">
-          <div className={cn('flex items-center gap-1.5 text-xs', status === 'done' ? 'text-emerald-400' : status === 'blocked' ? 'text-red-400' : status === 'needs-review' ? 'text-amber-400' : 'text-blue-400')}>
-            {statusConfig.icon}
-            <span className="font-medium">{statusConfig.label}</span>
-          </div>
-          {timeAgo && (
-            <div className="flex items-center gap-1 text-[11px] text-text-faint">
-              <Clock className="w-3 h-3" />
-              {timeAgo}
-            </div>
-          )}
-        </div>
-
-        {/* Notes preview */}
-        {workspace.notes && (
-          <p className="text-xs text-text-muted line-clamp-2 leading-relaxed">
-            {workspace.notes}
-          </p>
+    <div className={cn('relative', className)}>
+      {/* Top border */}
+      <div className={cn(
+        'flex items-center font-mono text-xs select-none',
+        accent ? 'text-border-accent' : 'text-text-dim'
+      )}>
+        <span>┌</span>
+        {title && (
+          <>
+            <span className="px-1">{title}</span>
+          </>
         )}
-
-        {/* Footer: Meta info */}
-        <div className="flex items-center justify-between pt-2 border-t border-border-subtle/50">
-          <div className="flex items-center gap-2 text-[10px] text-text-faint">
-            {workspace.createdAt && (
-              <span>Created {formatDate(workspace.createdAt)}</span>
-            )}
-          </div>
-
-          {/* Archive button */}
-          <div
-            className={cn(
-              'opacity-0 group-hover:opacity-100 transition-opacity',
-              'p-1.5 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary'
-            )}
-            onClick={(e) => {
-              e.stopPropagation()
-              console.log(isArchived ? 'Restore:' : 'Archive:', workspace.id)
-            }}
-            role="button"
-            tabIndex={0}
-            title={isArchived ? 'Restore' : 'Archive'}
-          >
-            {isArchived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-          </div>
-        </div>
-      </div>
-    </button>
-  )
-}
-
-// ============================================================================
-// Featured/Pinned Workspace Card - Larger Format
-// ============================================================================
-
-function FeaturedWorkspaceCard({ workspace, onClick, index }: WorkspaceCardProps) {
-  const status = workspace.manualStatus ?? workspace.derivedStatus ?? 'in-progress'
-  const statusConfig = STATUS_CONFIG[status]
-  const typeConfig = WORKSPACE_TYPE_CONFIG[workspace.worktreeType ?? 'standard']
-  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
-  const timeAgo = formatTimeAgo(workspace.updatedAt)
-  const hasUnread = (workspace.unread ?? 0) > 0
-
-  return (
-    <button
-      data-testid="workspace-card-featured"
-      onClick={onClick}
-      style={{ animationDelay: `${index * 50}ms` }}
-      className={cn(
-        'group relative text-left w-full col-span-2',
-        'rounded-2xl border-l-4 transition-all duration-300',
-        'bg-gradient-to-br from-surface-card via-surface-card to-surface-hover/30',
-        'border border-border-subtle border-l-0',
-        'hover:border-border-accent hover:shadow-2xl hover:shadow-border-accent/10',
-        'animate-in fade-in slide-in-from-bottom-3',
-        statusConfig.accentColor
-      )}
-    >
-      {/* Pinned glow effect */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-border-accent/5 to-transparent pointer-events-none" />
-
-      {/* Pinned indicator */}
-      <div className="absolute -top-2 -right-2 p-1.5 rounded-full bg-border-accent shadow-lg">
-        <Pin className="w-4 h-4 text-white" />
+        <span className="flex-1 overflow-hidden whitespace-nowrap">
+          {'─'.repeat(100)}
+        </span>
+        <span>┐</span>
       </div>
 
-      {/* Unread badge */}
-      {hasUnread && (
-        <div className="absolute top-4 right-12 flex items-center gap-1 px-2.5 py-1 rounded-full bg-border-accent text-white text-xs font-bold shadow-lg">
-          <MessagesSquare className="w-3.5 h-3.5" />
-          {workspace.unread} new
-        </div>
-      )}
-
-      <div className="p-6 space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium mb-2', typeConfig.bgColor, typeConfig.color)}>
-              {typeConfig.icon}
-              {typeConfig.label}
-            </div>
-            <h3 className="text-lg font-bold text-text-primary truncate group-hover:text-border-accent transition-colors">
-              {displayName}
-            </h3>
-            {workspace.intendedTargetBranch && (
-              <div className="flex items-center gap-1.5 mt-1 text-xs text-text-muted">
-                <ArrowRight className="w-3.5 h-3.5" />
-                <span>targeting <span className="font-mono text-text-primary">{workspace.intendedTargetBranch}</span></span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Status + Time */}
-        <div className="flex items-center gap-4">
-          <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium', status === 'done' ? 'bg-emerald-500/10 text-emerald-400' : status === 'blocked' ? 'bg-red-500/10 text-red-400' : status === 'needs-review' ? 'bg-amber-500/10 text-amber-400' : 'bg-blue-500/10 text-blue-400')}>
-            {statusConfig.icon}
-            {statusConfig.label}
-          </div>
-          {timeAgo && (
-            <div className="flex items-center gap-1.5 text-sm text-text-muted">
-              <Clock className="w-4 h-4" />
-              Updated {timeAgo}
-            </div>
-          )}
-        </div>
-
-        {/* Notes */}
-        {workspace.notes && (
-          <p className="text-sm text-text-muted line-clamp-2 leading-relaxed">
-            {workspace.notes}
-          </p>
-        )}
-
-        {/* CTA */}
-        <div className="flex items-center gap-2 pt-2 text-sm text-border-accent font-medium group-hover:gap-3 transition-all">
-          <span>Continue working</span>
-          <ArrowRight className="w-4 h-4" />
-        </div>
+      {/* Content with side borders */}
+      <div className={cn(
+        'border-l border-r border-dashed px-3 py-2',
+        accent ? 'border-border-accent' : 'border-text-dim/30'
+      )}>
+        {children}
       </div>
-    </button>
-  )
-}
 
-// ============================================================================
-// Stats Summary
-// ============================================================================
-
-function WorkspaceStats({ workspaces }: { workspaces: Worktree[] }) {
-  const stats = useMemo(() => {
-    const inProgress = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'in-progress').length
-    const needsReview = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'needs-review').length
-    const done = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'done').length
-    const blocked = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'blocked').length
-    const totalUnread = workspaces.reduce((acc, w) => acc + (w.unread ?? 0), 0)
-    return { inProgress, needsReview, done, blocked, totalUnread, total: workspaces.length }
-  }, [workspaces])
-
-  return (
-    <div className="flex items-center gap-6 text-sm">
-      <div className="flex items-center gap-2">
-        <span className="text-text-faint">Total:</span>
-        <span className="font-semibold text-text-primary">{stats.total}</span>
+      {/* Bottom border */}
+      <div className={cn(
+        'flex items-center font-mono text-xs select-none',
+        accent ? 'text-border-accent' : 'text-text-dim'
+      )}>
+        <span>└</span>
+        <span className="flex-1 overflow-hidden whitespace-nowrap">
+          {'─'.repeat(100)}
+        </span>
+        <span>┘</span>
       </div>
-      {stats.inProgress > 0 && (
-        <div className="flex items-center gap-1.5 text-blue-400">
-          <Zap className="w-4 h-4" />
-          <span className="font-medium">{stats.inProgress}</span>
-          <span className="text-text-faint">active</span>
-        </div>
-      )}
-      {stats.needsReview > 0 && (
-        <div className="flex items-center gap-1.5 text-amber-400">
-          <MessageSquare className="w-4 h-4" />
-          <span className="font-medium">{stats.needsReview}</span>
-          <span className="text-text-faint">review</span>
-        </div>
-      )}
-      {stats.blocked > 0 && (
-        <div className="flex items-center gap-1.5 text-red-400">
-          <AlertCircle className="w-4 h-4" />
-          <span className="font-medium">{stats.blocked}</span>
-          <span className="text-text-faint">blocked</span>
-        </div>
-      )}
-      {stats.totalUnread > 0 && (
-        <div className="flex items-center gap-1.5 text-border-accent">
-          <MessagesSquare className="w-4 h-4" />
-          <span className="font-medium">{stats.totalUnread}</span>
-          <span className="text-text-faint">unread</span>
-        </div>
-      )}
     </div>
   )
 }
 
 // ============================================================================
-// Empty State - Premium Design
+// Workspace Row - Terminal Table Style
+// ============================================================================
+
+interface WorkspaceRowProps {
+  workspace: Worktree
+  onClick: () => void
+  index: number
+}
+
+function WorkspaceRow({ workspace, onClick, index }: WorkspaceRowProps) {
+  const status = workspace.manualStatus ?? workspace.derivedStatus ?? 'in-progress'
+  const statusLabel = STATUS_LABELS[status]
+  const typeLabel = TYPE_LABELS[workspace.worktreeType ?? 'standard']
+  const isArchived = workspace.state === 'archived'
+  const displayName = workspace.branch ?? workspace.worktreePath?.split('/').pop() ?? 'unnamed'
+  const timeAgo = formatTimeAgo(workspace.updatedAt)
+  const hasUnread = (workspace.unread ?? 0) > 0
+  const isPinned = !!workspace.pinnedAt
+
+  return (
+    <button
+      data-testid="workspace-card"
+      onClick={onClick}
+      style={{ animationDelay: `${index * 30}ms` }}
+      className={cn(
+        'group w-full text-left font-mono',
+        'border-b border-dashed border-text-dim/20',
+        'hover:bg-surface-hover hover:border-border-accent/50',
+        'transition-colors duration-100',
+        'animate-in fade-in slide-in-from-left-2',
+        isArchived && 'opacity-40'
+      )}
+    >
+      <div className="flex items-center gap-4 px-4 py-3">
+        {/* Pin indicator */}
+        <span className={cn(
+          'w-4 text-center text-xs',
+          isPinned ? 'text-border-accent' : 'text-text-dim/30'
+        )}>
+          {isPinned ? '▸' : '·'}
+        </span>
+
+        {/* Status */}
+        <span className={cn(
+          'w-20 text-xs font-bold tracking-wide',
+          status === 'done' ? 'text-status-success' :
+          status === 'blocked' ? 'text-status-error' :
+          status === 'needs-review' ? 'text-status-warning' :
+          'text-border-accent'
+        )}>
+          [{statusLabel}]
+        </span>
+
+        {/* Type */}
+        <span className="w-16 text-xs text-text-dim">
+          [{typeLabel}]
+        </span>
+
+        {/* Name */}
+        <span className={cn(
+          'flex-1 truncate text-sm',
+          'text-text-primary group-hover:text-border-accent',
+          'transition-colors'
+        )}>
+          {displayName}
+        </span>
+
+        {/* Target branch */}
+        {workspace.intendedTargetBranch && (
+          <span className="text-xs text-text-dim hidden lg:block">
+            → {workspace.intendedTargetBranch}
+          </span>
+        )}
+
+        {/* Unread */}
+        {hasUnread && (
+          <span className="px-2 py-0.5 text-[10px] font-bold bg-border-accent text-white">
+            {workspace.unread}
+          </span>
+        )}
+
+        {/* Time */}
+        <span className="w-12 text-right text-xs text-text-dim tabular-nums">
+          {timeAgo}
+        </span>
+
+        {/* Arrow */}
+        <span className="text-text-dim group-hover:text-border-accent transition-colors">
+          →
+        </span>
+      </div>
+    </button>
+  )
+}
+
+// ============================================================================
+// Stats Bar - Terminal Style
+// ============================================================================
+
+function StatsBar({ workspaces }: { workspaces: Worktree[] }) {
+  const stats = useMemo(() => {
+    const active = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'in-progress' && w.state !== 'archived').length
+    const review = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'needs-review').length
+    const blocked = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'blocked').length
+    const done = workspaces.filter(w => (w.manualStatus ?? w.derivedStatus) === 'done').length
+    const total = workspaces.filter(w => w.state !== 'archived').length
+    return { active, review, blocked, done, total }
+  }, [workspaces])
+
+  return (
+    <div className="font-mono text-xs flex items-center gap-6 text-text-dim">
+      <span>TOTAL: <span className="text-text-primary">{stats.total}</span></span>
+      <span>ACTIVE: <span className="text-border-accent">{stats.active}</span></span>
+      {stats.review > 0 && <span>REVIEW: <span className="text-status-warning">{stats.review}</span></span>}
+      {stats.blocked > 0 && <span>BLOCKED: <span className="text-status-error">{stats.blocked}</span></span>}
+      {stats.done > 0 && <span>DONE: <span className="text-status-success">{stats.done}</span></span>}
+    </div>
+  )
+}
+
+// ============================================================================
+// Empty State - Terminal Style
 // ============================================================================
 
 function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <div className="flex-1 flex items-center justify-center p-8" data-testid="empty-state">
-      <div className="text-center max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* ASCII Art Logo */}
-        <div className="mb-8 opacity-30">
-          <KodaAsciiLogo animated={false} size="medium" />
-        </div>
+      <div className="text-center font-mono max-w-md animate-in fade-in duration-500">
+        <pre className="text-text-dim text-xs mb-6 select-none">
+{`
+    ┌──────────────────────────────┐
+    │                              │
+    │   NO WORKSPACES DETECTED     │
+    │                              │
+    │   > Create your first        │
+    │     workspace to begin       │
+    │                              │
+    └──────────────────────────────┘
+`}
+        </pre>
 
-        <h2 className="text-2xl font-bold text-text-primary mb-3">
-          Welcome to KODA
-        </h2>
-        <p className="text-text-muted mb-8 leading-relaxed">
-          Create your first workspace to start building with AI-powered development.
-          Each workspace is an isolated environment for focused work.
-        </p>
+        <button
+          onClick={onCreateClick}
+          data-testid="new-workspace-button-empty"
+          className={cn(
+            'inline-flex items-center gap-2 px-6 py-2',
+            'border border-dashed border-border-accent',
+            'text-border-accent hover:bg-border-accent hover:text-white',
+            'font-mono text-sm uppercase tracking-wider',
+            'transition-colors duration-100'
+          )}
+        >
+          [+] NEW WORKSPACE
+        </button>
+      </div>
+    </div>
+  )
+}
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button
-            onClick={onCreateClick}
-            data-testid="new-workspace-button-empty"
-            className={cn(
-              'group flex items-center gap-3 px-6 py-3 rounded-xl',
-              'bg-border-accent text-white font-medium',
-              'hover:bg-border-accent/90 hover:shadow-lg hover:shadow-border-accent/25',
-              'transition-all duration-200'
+// ============================================================================
+// Create Modal - Terminal Style
+// ============================================================================
+
+function CreateModal({
+  isOpen,
+  mode,
+  setMode,
+  onClose,
+  repos,
+  onRepoSelect,
+  onSelectFolder,
+  branchName,
+  setBranchName,
+  standaloneName,
+  setStandaloneName,
+  onCreateWorktree,
+  onCreateStandalone,
+  createError,
+  isCreating,
+  selectedRepo,
+}: {
+  isOpen: boolean
+  mode: CreateMode
+  setMode: (mode: CreateMode) => void
+  onClose: () => void
+  repos: Array<{ id: string; name?: string | null; rootPath: string }> | undefined
+  onRepoSelect: (id: string) => void
+  onSelectFolder: () => void
+  branchName: string
+  setBranchName: (name: string) => void
+  standaloneName: string
+  setStandaloneName: (name: string) => void
+  onCreateWorktree: () => void
+  onCreateStandalone: () => void
+  createError: string | null
+  isCreating: boolean
+  selectedRepo: { name?: string | null; rootPath: string } | undefined
+}) {
+  if (!isOpen) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg animate-in zoom-in-95 slide-in-from-bottom-2 duration-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <AsciiBox title="[ NEW WORKSPACE ]" accent>
+          <div className="font-mono space-y-4">
+            {createError && (
+              <div className="text-status-error text-xs border border-dashed border-status-error p-2">
+                ERROR: {createError}
+              </div>
             )}
-          >
-            <Plus className="w-5 h-5" />
-            Create Workspace
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
 
-        {/* Feature hints */}
-        <div className="mt-12 grid grid-cols-3 gap-6 text-left">
-          {[
-            { icon: <GitBranch className="w-5 h-5" />, title: 'Git Worktrees', desc: 'Isolated branches for parallel work' },
-            { icon: <Bot className="w-5 h-5" />, title: 'AI Agents', desc: 'Let agents handle the heavy lifting' },
-            { icon: <FileText className="w-5 h-5" />, title: 'Spec-Driven', desc: 'Define specs, let AI implement' },
-          ].map((feature, i) => (
-            <div key={i} className="p-4 rounded-lg bg-surface-card/50 border border-border-subtle">
-              <div className="text-border-accent mb-2">{feature.icon}</div>
-              <h4 className="text-sm font-medium text-text-primary mb-1">{feature.title}</h4>
-              <p className="text-xs text-text-faint">{feature.desc}</p>
-            </div>
-          ))}
-        </div>
+            {/* Step 1: Choose type */}
+            {mode === 'choose' && (
+              <>
+                <p className="text-text-muted text-xs mb-4">SELECT WORKSPACE TYPE:</p>
+
+                <button
+                  onClick={() => setMode('repo')}
+                  data-testid="create-with-repo"
+                  className="w-full text-left p-3 border border-dashed border-text-dim/30 hover:border-border-accent hover:text-border-accent transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-text-dim group-hover:text-border-accent">[1]</span>
+                    <div>
+                      <div className="text-sm text-text-primary group-hover:text-border-accent">FROM REPOSITORY</div>
+                      <div className="text-xs text-text-dim">Connect git repo + create worktree</div>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setMode('standalone')}
+                  data-testid="create-standalone"
+                  className="w-full text-left p-3 border border-dashed border-text-dim/30 hover:border-border-accent hover:text-border-accent transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-text-dim group-hover:text-border-accent">[2]</span>
+                    <div>
+                      <div className="text-sm text-text-primary group-hover:text-border-accent">STANDALONE</div>
+                      <div className="text-xs text-text-dim">Create workspace, connect repo later</div>
+                    </div>
+                  </div>
+                </button>
+
+                <div className="flex justify-end pt-4 border-t border-dashed border-text-dim/20">
+                  <button
+                    onClick={onClose}
+                    className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                  >
+                    [ESC] CANCEL
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2a: Select repo */}
+            {mode === 'repo' && (
+              <>
+                <p className="text-text-muted text-xs mb-4">SELECT REPOSITORY:</p>
+
+                {repos && repos.length > 0 && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto" data-testid="repo-list">
+                    {repos.map((repo, i) => (
+                      <button
+                        key={repo.id}
+                        onClick={() => onRepoSelect(repo.id)}
+                        data-testid={`repo-button-${repo.id}`}
+                        className="w-full text-left p-2 border border-dashed border-text-dim/30 hover:border-border-accent transition-colors group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-dim text-xs">[{i + 1}]</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-text-primary group-hover:text-border-accent truncate">
+                              {repo.name ?? 'unnamed'}
+                            </div>
+                            <div className="text-xs text-text-dim truncate">{repo.rootPath}</div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={onSelectFolder}
+                  className="w-full p-3 border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors text-sm"
+                >
+                  [+] ADD GIT REPOSITORY
+                </button>
+
+                <div className="flex justify-between pt-4 border-t border-dashed border-text-dim/20">
+                  <button
+                    onClick={() => setMode('choose')}
+                    className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                  >
+                    [←] BACK
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                  >
+                    [ESC] CANCEL
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2b: Standalone name */}
+            {mode === 'standalone' && (
+              <>
+                <p className="text-text-muted text-xs mb-4">ENTER WORKSPACE NAME:</p>
+
+                <div className="flex items-center gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
+                  <span className="text-text-dim">{'>'}</span>
+                  <input
+                    type="text"
+                    value={standaloneName}
+                    onChange={e => setStandaloneName(e.target.value)}
+                    placeholder="my-workspace"
+                    data-testid="standalone-name-input"
+                    className="flex-1 bg-transparent text-text-primary placeholder:text-text-dim/50 outline-none text-sm"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') onCreateStandalone()
+                      if (e.key === 'Escape') onClose()
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-dashed border-text-dim/20">
+                  <button
+                    onClick={() => setMode('choose')}
+                    className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                  >
+                    [←] BACK
+                  </button>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={onClose}
+                      className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                    >
+                      [ESC] CANCEL
+                    </button>
+                    <button
+                      onClick={onCreateStandalone}
+                      disabled={!standaloneName.trim() || isCreating}
+                      data-testid="create-standalone-button"
+                      className="text-xs text-border-accent hover:text-white hover:bg-border-accent px-2 py-1 border border-dashed border-border-accent disabled:opacity-50 transition-colors"
+                    >
+                      {isCreating ? 'CREATING...' : '[ENTER] CREATE'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Branch name */}
+            {mode === 'branch' && (
+              <>
+                <div className="text-xs text-text-dim border border-dashed border-text-dim/30 p-2 mb-4">
+                  REPO: <span className="text-text-primary">{selectedRepo?.name}</span>
+                  <br />
+                  PATH: <span className="text-text-dim">{selectedRepo?.rootPath}</span>
+                </div>
+
+                <p className="text-text-muted text-xs mb-2">ENTER BRANCH NAME:</p>
+
+                <div className="flex items-center gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
+                  <span className="text-text-dim">{'>'}</span>
+                  <input
+                    type="text"
+                    value={branchName}
+                    onChange={e => setBranchName(e.target.value)}
+                    placeholder="feature/my-feature"
+                    className="flex-1 bg-transparent text-text-primary placeholder:text-text-dim/50 outline-none text-sm"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') onCreateWorktree()
+                      if (e.key === 'Escape') onClose()
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] text-text-dim mt-1">
+                  A git worktree will be created for isolated work
+                </p>
+
+                <div className="flex justify-between pt-4 border-t border-dashed border-text-dim/20">
+                  <button
+                    onClick={() => setMode('repo')}
+                    data-testid="modal-back-button"
+                    className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                  >
+                    [←] BACK
+                  </button>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={onClose}
+                      className="text-xs text-text-dim hover:text-text-primary transition-colors"
+                    >
+                      [ESC] CANCEL
+                    </button>
+                    <button
+                      onClick={onCreateWorktree}
+                      disabled={!branchName.trim() || isCreating}
+                      className="text-xs text-border-accent hover:text-white hover:bg-border-accent px-2 py-1 border border-dashed border-border-accent disabled:opacity-50 transition-colors"
+                    >
+                      {isCreating ? 'CREATING...' : '[ENTER] CREATE'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </AsciiBox>
       </div>
     </div>
   )
@@ -482,24 +548,22 @@ export function WorkspaceList() {
   const [standaloneName, setStandaloneName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
-  // Separate pinned and regular workspaces
-  const { pinnedWorkspaces, regularWorkspaces } = useMemo(() => {
-    if (!workspaces) return { pinnedWorkspaces: [], regularWorkspaces: [] }
+  // Sort workspaces: pinned first, then by updatedAt
+  const sortedWorkspaces = useMemo(() => {
+    if (!workspaces) return []
 
-    const pinned = workspaces.filter(w => w.pinnedAt && w.state !== 'archived')
-    const regular = workspaces.filter(w => !w.pinnedAt && w.state !== 'archived')
+    return [...workspaces]
+      .filter(w => w.state !== 'archived')
+      .sort((a, b) => {
+        // Pinned first
+        if (a.pinnedAt && !b.pinnedAt) return -1
+        if (!a.pinnedAt && b.pinnedAt) return 1
 
-    // Sort by updatedAt
-    const sortByDate = (a: Worktree, b: Worktree) => {
-      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-      return bTime - aTime
-    }
-
-    return {
-      pinnedWorkspaces: pinned.sort(sortByDate),
-      regularWorkspaces: regular.sort(sortByDate),
-    }
+        // Then by updatedAt
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+        return bTime - aTime
+      })
   }, [workspaces])
 
   const handleSelectFolder = async () => {
@@ -529,10 +593,7 @@ export function WorkspaceList() {
         repoId: selectedRepoId,
         branch: branchName.trim(),
       })
-      setIsCreateOpen(false)
-      setBranchName('')
-      setSelectedRepoId('')
-      setCreateMode('choose')
+      closeModal()
       void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
@@ -546,9 +607,7 @@ export function WorkspaceList() {
       const workspace = await createStandaloneWorkspace.mutateAsync({
         name: standaloneName.trim(),
       })
-      setIsCreateOpen(false)
-      setStandaloneName('')
-      setCreateMode('choose')
+      closeModal()
       void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
@@ -574,25 +633,27 @@ export function WorkspaceList() {
   }
 
   const isLoading = loadingWorkspaces || loadingRepos
-  const selectedRepo = repos?.find((r) => r.id === selectedRepoId)
-  const hasWorkspaces = workspaces && workspaces.length > 0
-  const hasRepos = repos && repos.length > 0
+  const selectedRepo = repos?.find(r => r.id === selectedRepoId)
+  const hasWorkspaces = sortedWorkspaces.length > 0
 
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-surface-messages">
-        <KodaSpinner style="wave" label="Loading workspaces" />
+        <KodaSpinner style="wave" label="Loading" />
       </div>
     )
   }
 
   if (workspacesError) {
     return (
-      <div className="h-full flex items-center justify-center bg-surface-messages">
-        <div className="text-center max-w-md p-8">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-text-primary mb-2">Failed to load workspaces</h2>
-          <p className="text-sm text-text-muted">
+      <div className="h-full flex items-center justify-center bg-surface-messages font-mono">
+        <div className="text-center">
+          <pre className="text-status-error text-xs mb-4">
+{`┌─────────────────────────────┐
+│ ERROR: FAILED TO LOAD       │
+└─────────────────────────────┘`}
+          </pre>
+          <p className="text-xs text-text-dim">
             {workspacesError instanceof Error ? workspacesError.message : 'Unknown error'}
           </p>
         </div>
@@ -603,350 +664,91 @@ export function WorkspaceList() {
   return (
     <div className="h-full flex flex-col bg-surface-messages">
       {/* Header */}
-      <header className="px-8 pt-8 pb-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-text-primary mb-2 tracking-tight">
-              Workspaces
+      <header className="px-6 pt-6 pb-4 border-b border-dashed border-text-dim/20">
+        <div className="flex items-center justify-between gap-4">
+          <div className="font-mono">
+            <h1 className="text-xl text-text-primary tracking-tight">
+              WORKSPACES
             </h1>
-            {hasWorkspaces && workspaces && <WorkspaceStats workspaces={workspaces} />}
-            {!hasWorkspaces && (
-              <p className="text-text-muted">Isolated environments for focused AI-powered development</p>
+            {hasWorkspaces && workspaces && (
+              <div className="mt-2">
+                <StatsBar workspaces={workspaces} />
+              </div>
             )}
           </div>
           <button
-            onClick={() => { setIsCreateOpen(true) }}
+            onClick={() => setIsCreateOpen(true)}
             data-testid="new-workspace-button"
             className={cn(
-              'group flex items-center gap-2 px-4 py-2.5 rounded-xl',
-              'bg-surface-card border border-border-subtle',
-              'hover:border-border-accent hover:bg-surface-hover',
-              'text-sm font-medium text-text-primary',
-              'transition-all duration-200'
+              'px-4 py-2 font-mono text-xs uppercase tracking-wider',
+              'border border-dashed border-border-accent',
+              'text-border-accent hover:bg-border-accent hover:text-white',
+              'transition-colors duration-100'
             )}
           >
-            <Plus className="w-4 h-4 text-border-accent" />
-            New Workspace
+            [+] NEW
           </button>
         </div>
       </header>
 
-      {/* Content */}
-      {hasWorkspaces ? (
-        <div className="flex-1 overflow-y-auto px-8 pb-8">
-          {/* Pinned Workspaces */}
-          {pinnedWorkspaces.length > 0 && (
-            <section className="mb-8">
-              <h2 className="text-xs font-semibold text-text-faint uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Pin className="w-3.5 h-3.5" />
-                Pinned
-              </h2>
-              <div className="grid gap-4 grid-cols-1 lg:grid-cols-2" data-testid="pinned-workspace-grid">
-                {pinnedWorkspaces.map((workspace, index) => (
-                  <FeaturedWorkspaceCard
-                    key={workspace.id}
-                    workspace={workspace}
-                    onClick={() => { handleWorkspaceClick(workspace) }}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Recent Workspaces */}
-          {regularWorkspaces.length > 0 && (
-            <section>
-              <h2 className="text-xs font-semibold text-text-faint uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5" />
-                Recent
-              </h2>
-              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3" data-testid="workspace-grid">
-                {regularWorkspaces.map((workspace, index) => (
-                  <WorkspaceCard
-                    key={workspace.id}
-                    workspace={workspace}
-                    onClick={() => { handleWorkspaceClick(workspace) }}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      ) : (
-        <EmptyState onCreateClick={() => { setIsCreateOpen(true) }} />
-      )}
-
-      {/* Create Modal */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="bg-surface-card border border-border-subtle rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
-            onClick={(e) => { e.stopPropagation() }}
-          >
-            {/* Step 1: Choose workspace type */}
-            {createMode === 'choose' && (
-              <>
-                <h2 className="text-xl font-bold text-text-primary mb-2">New Workspace</h2>
-                <p className="text-sm text-text-muted mb-6">
-                  Choose how to create your workspace.
-                </p>
-
-                <div className="space-y-3">
-                  <button
-                    onClick={() => { setCreateMode('repo') }}
-                    data-testid="create-with-repo"
-                    className="w-full text-left p-4 border border-border-subtle rounded-xl hover:border-border-accent hover:bg-surface-hover transition-all group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500/20 transition-colors">
-                        <FolderGit2 className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-text-primary mb-0.5">From Repository</div>
-                        <div className="text-xs text-text-faint">Connect a git repo and create a worktree branch</div>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-text-dim group-hover:text-border-accent group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => { setCreateMode('standalone') }}
-                    data-testid="create-standalone"
-                    className="w-full text-left p-4 border border-border-subtle rounded-xl hover:border-border-accent hover:bg-surface-hover transition-all group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20 transition-colors">
-                        <Sparkles className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-text-primary mb-0.5">Standalone</div>
-                        <div className="text-xs text-text-faint">Create workspace first, connect repository later</div>
-                      </div>
-                      <ArrowRight className="w-5 h-5 text-text-dim group-hover:text-border-accent group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </button>
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Step 2a: Select repository */}
-            {createMode === 'repo' && (
-              <>
-                <h2 className="text-xl font-bold text-text-primary mb-2">Select Repository</h2>
-
-                {createError && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                    {createError}
-                  </div>
-                )}
-
-                <p className="text-sm text-text-muted mb-6">
-                  Choose a git repository to create a new workspace branch.
-                </p>
-
-                {/* Existing repos */}
-                {hasRepos && (
-                  <div className="mb-4">
-                    <label className="block text-xs font-medium text-text-faint uppercase tracking-wider mb-2">Recent Repositories</label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto" data-testid="repo-list">
-                      {repos.map((repo) => (
-                        <button
-                          key={repo.id}
-                          onClick={() => { handleRepoSelect(repo.id) }}
-                          data-testid={`repo-button-${repo.id}`}
-                          className="w-full text-left p-3 border border-border-subtle rounded-lg hover:border-border-accent hover:bg-surface-hover transition-all group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FolderGit2 className="w-5 h-5 text-text-dim group-hover:text-border-accent transition-colors" />
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-text-primary truncate">{repo.name}</div>
-                              <div className="text-xs text-text-faint truncate">{repo.rootPath}</div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Add new repo */}
-                <button
-                  onClick={() => void handleSelectFolder()}
-                  disabled={createRepo.isPending}
-                  className="w-full p-4 border-2 border-dashed border-border-subtle rounded-xl hover:border-border-accent hover:bg-surface-hover transition-all flex items-center justify-center gap-2 text-text-muted hover:text-text-primary"
-                >
-                  <Plus className="w-5 h-5" />
-                  {createRepo.isPending ? 'Registering...' : 'Add Git Repository'}
-                </button>
-
-                <div className="flex justify-between mt-6">
-                  <button
-                    onClick={() => { setCreateMode('choose') }}
-                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Step 2b: Standalone workspace name */}
-            {createMode === 'standalone' && (
-              <>
-                <h2 className="text-xl font-bold text-text-primary mb-2">Standalone Workspace</h2>
-
-                {createError && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                    {createError}
-                  </div>
-                )}
-
-                <p className="text-sm text-text-muted mb-6">
-                  Create a workspace without a repository. You can connect one later.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-text-faint uppercase tracking-wider mb-2">Workspace Name</label>
-                    <input
-                      type="text"
-                      value={standaloneName}
-                      onChange={(e) => { setStandaloneName(e.target.value) }}
-                      placeholder="My Workspace"
-                      data-testid="standalone-name-input"
-                      className="w-full px-4 py-3 border border-border-subtle rounded-xl bg-surface-inset text-text-primary placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-border-accent focus:border-transparent transition-all"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void handleCreateStandalone()
-                        if (e.key === 'Escape') closeModal()
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-between mt-6">
-                  <button
-                    onClick={() => { setCreateMode('choose') }}
-                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    Back
-                  </button>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={closeModal}
-                      className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => void handleCreateStandalone()}
-                      disabled={!standaloneName.trim() || createStandaloneWorkspace.isPending}
-                      data-testid="create-standalone-button"
-                      className={cn(
-                        'px-5 py-2 text-sm font-medium rounded-xl transition-all',
-                        'bg-border-accent text-white',
-                        'hover:bg-border-accent/90 disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    >
-                      {createStandaloneWorkspace.isPending ? 'Creating...' : 'Create'}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Step 3: Branch name (for repo-based) */}
-            {createMode === 'branch' && (
-              <>
-                <h2 className="text-xl font-bold text-text-primary mb-2">Create Branch</h2>
-
-                {createError && (
-                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                    {createError}
-                  </div>
-                )}
-
-                <div className="mb-6 p-3 rounded-xl bg-surface-hover border border-border-subtle">
-                  <div className="flex items-center gap-3">
-                    <FolderGit2 className="w-5 h-5 text-border-accent" />
-                    <div>
-                      <div className="text-sm font-medium text-text-primary">{selectedRepo?.name}</div>
-                      <div className="text-xs text-text-faint truncate">{selectedRepo?.rootPath}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-text-faint uppercase tracking-wider mb-2">Branch Name</label>
-                    <input
-                      type="text"
-                      value={branchName}
-                      onChange={(e) => { setBranchName(e.target.value) }}
-                      placeholder="feature/my-feature"
-                      className="w-full px-4 py-3 border border-border-subtle rounded-xl bg-surface-inset text-text-primary placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-border-accent focus:border-transparent transition-all font-mono"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void handleCreateWorktree()
-                        if (e.key === 'Escape') closeModal()
-                      }}
-                    />
-                    <p className="text-xs text-text-faint mt-2">
-                      A git worktree will be created for isolated work
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex justify-between mt-6">
-                  <button
-                    onClick={() => { setCreateMode('repo') }}
-                    data-testid="modal-back-button"
-                    className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    Back
-                  </button>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={closeModal}
-                      className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => void handleCreateWorktree()}
-                      disabled={!branchName.trim() || createWorktree.isPending}
-                      className={cn(
-                        'px-5 py-2 text-sm font-medium rounded-xl transition-all',
-                        'bg-border-accent text-white',
-                        'hover:bg-border-accent/90 disabled:opacity-50 disabled:cursor-not-allowed'
-                      )}
-                    >
-                      {createWorktree.isPending ? 'Creating...' : 'Create Workspace'}
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
+      {/* Table Header */}
+      {hasWorkspaces && (
+        <div className="px-6 py-2 border-b border-dashed border-text-dim/20 font-mono text-[10px] text-text-dim uppercase tracking-wider">
+          <div className="flex items-center gap-4">
+            <span className="w-4"></span>
+            <span className="w-20">[STATUS]</span>
+            <span className="w-16">[TYPE]</span>
+            <span className="flex-1">[BRANCH]</span>
+            <span className="hidden lg:block w-32">[TARGET]</span>
+            <span className="w-12 text-right">[AGO]</span>
+            <span className="w-4"></span>
           </div>
         </div>
       )}
+
+      {/* Content */}
+      {hasWorkspaces ? (
+        <div className="flex-1 overflow-y-auto" data-testid="workspace-grid">
+          {sortedWorkspaces.map((workspace, index) => (
+            <WorkspaceRow
+              key={workspace.id}
+              workspace={workspace}
+              onClick={() => handleWorkspaceClick(workspace)}
+              index={index}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState onCreateClick={() => setIsCreateOpen(true)} />
+      )}
+
+      {/* Footer */}
+      <footer className="px-6 py-3 border-t border-dashed border-text-dim/20 font-mono text-[10px] text-text-dim">
+        <div className="flex items-center justify-between">
+          <span>KODA v0.1.0</span>
+          <span>↑↓ NAVIGATE • ENTER SELECT • ESC CLOSE</span>
+        </div>
+      </footer>
+
+      {/* Create Modal */}
+      <CreateModal
+        isOpen={isCreateOpen}
+        mode={createMode}
+        setMode={setCreateMode}
+        onClose={closeModal}
+        repos={repos}
+        onRepoSelect={handleRepoSelect}
+        onSelectFolder={() => void handleSelectFolder()}
+        branchName={branchName}
+        setBranchName={setBranchName}
+        standaloneName={standaloneName}
+        setStandaloneName={setStandaloneName}
+        onCreateWorktree={() => void handleCreateWorktree()}
+        onCreateStandalone={() => void handleCreateStandalone()}
+        createError={createError}
+        isCreating={createWorktree.isPending || createStandaloneWorkspace.isPending}
+        selectedRepo={selectedRepo}
+      />
     </div>
   )
 }
