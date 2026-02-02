@@ -481,28 +481,125 @@ function SidebarHeader(): React.ReactElement {
 }
 
 // ============================================================================
+// Quick Navigation Panel - Terminal Style
+// ============================================================================
+
+function QuickNavPanel(): React.ReactElement {
+  const navigate = useNavigate()
+  const { data: workspaces } = useAllWorktrees()
+  const { data: repos } = useRepos()
+  const params = useParams({ strict: false })
+  const activeId = (params as { id?: string }).id
+  const [showWorkspaces, setShowWorkspaces] = useState(false)
+
+  // Get recent workspaces (non-archived, sorted by updatedAt)
+  const recentWorkspaces = useMemo(() => {
+    if (!workspaces) return []
+    return workspaces
+      .filter(w => w.state !== 'archived')
+      .sort((a, b) => {
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+        return bTime - aTime
+      })
+      .slice(0, 8) // Show max 8 recent
+  }, [workspaces])
+
+  return (
+    <div className="border-t border-dashed border-text-dim/20 font-mono text-xs">
+      {/* Section header */}
+      <div className="px-3 py-1.5 text-[10px] text-text-dim border-b border-dashed border-text-dim/20">
+        ├─ QUICK NAV ──────────────────
+      </div>
+
+      {/* Add buttons */}
+      <div className="px-2 py-1 space-y-0.5">
+        <button
+          className="flex items-center gap-2 w-full px-2 py-1 text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
+          onClick={() => void navigate({ to: '/' })}
+        >
+          [+] NEW WORKSPACE
+        </button>
+        <button
+          className="flex items-center gap-2 w-full px-2 py-1 text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
+          onClick={() => void navigate({ to: '/' })}
+        >
+          [+] ADD REPOSITORY
+        </button>
+      </div>
+
+      {/* Workspaces toggle */}
+      {recentWorkspaces.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowWorkspaces(!showWorkspaces)}
+            className="flex items-center gap-2 w-full px-3 py-1.5 text-text-dim hover:bg-surface-hover transition-colors border-t border-dashed border-text-dim/20"
+          >
+            <span>{showWorkspaces ? '▼' : '▶'}</span>
+            <span className="flex-1 text-left uppercase">WORKSPACES</span>
+            <span>({recentWorkspaces.length})</span>
+          </button>
+
+          {showWorkspaces && (
+            <div className="max-h-32 overflow-y-auto border-t border-dashed border-text-dim/20">
+              {recentWorkspaces.map((ws) => {
+                const isActive = ws.id === activeId
+                const status = ws.manualStatus ?? ws.derivedStatus ?? 'in-progress'
+                const statusLabel = STATUS_LABELS[status]
+
+                return (
+                  <Link
+                    key={ws.id}
+                    to="/workspace/$id"
+                    params={{ id: ws.id }}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1 text-[10px]',
+                      'hover:bg-surface-hover transition-colors',
+                      isActive ? 'text-border-accent bg-surface-hover' : 'text-text-dim'
+                    )}
+                  >
+                    <span className={cn('w-10', getStatusColor(status))}>
+                      [{statusLabel}]
+                    </span>
+                    <span className="truncate flex-1">
+                      {ws.branch ?? 'unnamed'}
+                    </span>
+                    {isActive && <span>◀</span>}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Repos summary */}
+      {repos && repos.length > 0 && (
+        <div className="px-3 py-1 text-[10px] text-text-dim border-t border-dashed border-text-dim/20">
+          REPOS: {repos.length} │ TOTAL: {workspaces?.length ?? 0}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // Sidebar Footer - Terminal Style
 // ============================================================================
 
 function SidebarFooter(): React.ReactElement {
   const { status } = useSidecar()
-  const navigate = useNavigate()
 
   return (
-    <div className="border-t border-dashed border-text-dim/20 font-mono">
+    <div className="font-mono">
+      {/* Quick navigation */}
+      <QuickNavPanel />
+
       {/* Usage stats */}
-      <div className="px-3 py-2 space-y-1 border-b border-dashed border-text-dim/20">
+      <div className="px-3 py-2 space-y-1 border-t border-dashed border-text-dim/20">
         <UsageBar label="SESSION" value={45} max={100} />
         <UsageBar label="WEEKLY" value={230} max={1000} />
       </div>
-
-      {/* Add repository button */}
-      <button
-        className="flex items-center gap-2 w-full px-3 py-2 text-xs text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
-        onClick={() => void navigate({ to: '/' })}
-      >
-        [+] ADD REPOSITORY
-      </button>
 
       {/* Bottom status bar */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-text-dim/20 text-[10px]">
