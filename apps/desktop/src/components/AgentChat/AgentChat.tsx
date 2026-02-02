@@ -11,6 +11,9 @@ import {
   exitPlanModeAtom,
   pendingPromptAtom,
   type MessageMention,
+  type ContentBlock,
+  type ToolUseContentBlock,
+  type ToolResultContentBlock,
 } from '@/store/chat'
 import { rpcRequest, isTauriContext } from '@/lib/tauri'
 import {
@@ -32,6 +35,11 @@ interface MessageNotificationPayload {
     result?: string
     is_error?: boolean
     tool?: string
+    tool_id?: string
+    tool_use_id?: string
+    input?: Record<string, unknown>
+    output?: string
+    error?: string
     text?: string  // For text_delta events
     [key: string]: unknown
   }
@@ -66,6 +74,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
   const activeSessionRef = useRef<string | null>(null)
   const currentMessageIdRef = useRef<string | null>(null)
   const accumulatedTextRef = useRef('')
+  const contentBlocksRef = useRef<ContentBlock[]>([])
 
   // Set current workspace when component mounts
   useEffect(() => {
@@ -98,6 +107,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
             update: {
               content: accumulatedTextRef.current,
               status: 'streaming',
+              contentBlocks: contentBlocksRef.current.length > 0 ? [...contentBlocksRef.current] : undefined,
             },
           })
         }
@@ -120,6 +130,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
               update: {
                 content: accumulatedTextRef.current,
                 status: 'streaming',
+                contentBlocks: contentBlocksRef.current.length > 0 ? [...contentBlocksRef.current] : undefined,
               },
             })
           }
@@ -146,30 +157,70 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
           update: {
             content: finalContent,
             status: isError ? 'error' : 'complete',
+            contentBlocks: contentBlocksRef.current.length > 0 ? [...contentBlocksRef.current] : undefined,
           },
         })
       }
 
       activeSessionRef.current = null
+      contentBlocksRef.current = []
       setIsStreaming(false)
     } else if (event.type === 'tool_use') {
       const toolName = event.tool ?? 'tool'
+      const toolId = event.tool_id ?? `tool-${Date.now()}`
+      const toolInput = event.input ?? {}
+      
+      // Create tool_use content block
+      const toolUseBlock: ToolUseContentBlock = {
+        type: 'tool_use',
+        id: toolId,
+        name: toolName,
+        input: toolInput,
+        status: 'running',
+      }
+      contentBlocksRef.current = [...contentBlocksRef.current, toolUseBlock]
+      
       if (currentMessageIdRef.current) {
         updateMessage({
           id: currentMessageIdRef.current,
           update: {
             content: accumulatedTextRef.current || `Using ${toolName}...`,
             status: 'streaming',
+            contentBlocks: [...contentBlocksRef.current],
           },
         })
       }
     } else if (event.type === 'tool_result') {
-      if (currentMessageIdRef.current && !accumulatedTextRef.current) {
+      const toolUseId = event.tool_use_id ?? ''
+      const toolOutput = event.output ?? event.result ?? ''
+      const toolError = event.error
+      const toolName = event.tool ?? 'tool'
+      
+      // Update the corresponding tool_use block status
+      contentBlocksRef.current = contentBlocksRef.current.map(block => {
+        if (block.type === 'tool_use' && block.id === toolUseId) {
+          return { ...block, status: toolError ? 'error' : 'complete' } as ToolUseContentBlock
+        }
+        return block
+      })
+      
+      // Create tool_result content block
+      const toolResultBlock: ToolResultContentBlock = {
+        type: 'tool_result',
+        toolUseId,
+        toolName,
+        output: typeof toolOutput === 'string' ? toolOutput : JSON.stringify(toolOutput),
+        error: toolError,
+      }
+      contentBlocksRef.current = [...contentBlocksRef.current, toolResultBlock]
+      
+      if (currentMessageIdRef.current) {
         updateMessage({
           id: currentMessageIdRef.current,
           update: {
-            content: 'Processing...',
+            content: accumulatedTextRef.current || 'Processing...',
             status: 'streaming',
+            contentBlocks: [...contentBlocksRef.current],
           },
         })
       }
@@ -218,6 +269,7 @@ export function AgentChat({ worktreeId, sessionId: _sessionId, workingDirectory 
       // Call sidecar to start Claude session
       setIsStreaming(true)
       accumulatedTextRef.current = ''
+      contentBlocksRef.current = []
 
       try {
         // Create placeholder for assistant response with known ID for later updates

@@ -1,25 +1,13 @@
 import { memo, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface WorkingIndicatorProps {
   startTime: number
   className?: string
 }
 
-// ============================================================================
-// KODA Animation Constants
-// ============================================================================
-
 const KODA_LETTERS = ['K', 'O', 'D', 'A']
-const LETTER_INTERVAL = 150 // ms per letter
-
-// ============================================================================
-// WorkingIndicator Component - Terminal Aesthetic
-// ============================================================================
+const LETTER_INTERVAL = 150
 
 export const WorkingIndicator = memo(function WorkingIndicator({
   startTime,
@@ -28,7 +16,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const [activeIndex, setActiveIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
 
-  // Animate KODA letters
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveIndex(i => (i + 1) % (KODA_LETTERS.length + 1))
@@ -37,7 +24,6 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     return () => { clearInterval(interval) }
   }, [])
 
-  // Track elapsed time
   useEffect(() => {
     const updateElapsed = () => {
       setElapsed(Date.now() - startTime)
@@ -50,28 +36,17 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   }, [startTime])
 
   const formatElapsed = (ms: number): string => {
-    const totalSeconds = ms / 1000
+    const totalSeconds = Math.floor(ms / 1000)
     if (totalSeconds < 60) {
-      return `${totalSeconds.toFixed(1)}s`
+      return `${totalSeconds}s`
     }
-
     const minutes = Math.floor(totalSeconds / 60)
     const remainingSeconds = Math.floor(totalSeconds % 60)
-    return `${String(minutes)}m${String(remainingSeconds)}s`
+    return `${minutes}m ${remainingSeconds}s`
   }
 
-  // Generate ASCII progress bar based on active index
-  const progressBar = KODA_LETTERS.map((_, i) => 
-    i <= activeIndex ? '█' : '░'
-  ).join('')
-
   return (
-    <div
-      className={cn(
-        'inline-flex items-center gap-2 font-mono',
-        className
-      )}
-    >
+    <div className={cn('inline-flex items-center gap-2 font-mono', className)}>
       <span className="text-text-faint">[</span>
       <span className="inline-flex">
         {KODA_LETTERS.map((letter, i) => (
@@ -91,15 +66,11 @@ export const WorkingIndicator = memo(function WorkingIndicator({
         ))}
       </span>
       <span className="text-text-faint">]</span>
-      <span className="text-text-muted">{progressBar}</span>
+      <span className="text-text-muted">working</span>
       <span className="tabular-nums text-text-faint">{formatElapsed(elapsed)}</span>
     </div>
   )
 })
-
-// ============================================================================
-// Compact variant for inline use
-// ============================================================================
 
 interface CompactWorkingIndicatorProps {
   startTime: number
@@ -131,13 +102,13 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
   }, [startTime])
 
   const formatElapsed = (ms: number): string => {
-    const totalSeconds = ms / 1000
+    const totalSeconds = Math.floor(ms / 1000)
     if (totalSeconds < 60) {
-      return `${totalSeconds.toFixed(1)}s`
+      return `${totalSeconds}s`
     }
     const minutes = Math.floor(totalSeconds / 60)
     const remainingSeconds = Math.floor(totalSeconds % 60)
-    return `${String(minutes)}m${String(remainingSeconds)}s`
+    return `${minutes}m ${remainingSeconds}s`
   }
 
   return (
