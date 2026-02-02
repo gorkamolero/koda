@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { open } from '@tauri-apps/plugin-dialog'
+import { useSetAtom, useAtomValue } from 'jotai'
 import { useAllWorktrees, useRepos, useCreateRepo, useCreateWorktree, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
+import { selectedWorkspaceIdAtom } from '@/store/workspace'
 import type { Worktree, WorktreeStatus, WorktreeType } from '@/lib/rpc'
 import { cn } from '@/lib/utils'
 import { KodaSpinner } from '@/components/KodaSpinner'
+import { Route } from '@/routes/index'
 
 type CreateMode = 'choose' | 'repo' | 'branch' | 'standalone'
 
@@ -535,6 +538,9 @@ function CreateModal({
 
 export function WorkspaceList() {
   const navigate = useNavigate()
+  const { repoId: urlRepoId } = useSearch({ from: Route.fullPath })
+  const selectedWorkspaceId = useAtomValue(selectedWorkspaceIdAtom)
+  const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
   const { data: workspaces, isLoading: loadingWorkspaces, error: workspacesError } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const createRepo = useCreateRepo()
@@ -547,6 +553,17 @@ export function WorkspaceList() {
   const [branchName, setBranchName] = useState('')
   const [standaloneName, setStandaloneName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+
+  // Handle repoId from URL - auto-open create modal with repo pre-selected
+  useEffect(() => {
+    if (urlRepoId && repos?.some(r => r.id === urlRepoId)) {
+      setSelectedRepoId(urlRepoId)
+      setCreateMode('branch')
+      setIsCreateOpen(true)
+      // Clear the URL param so refreshing doesn't re-open the modal
+      void navigate({ to: '/', search: {}, replace: true })
+    }
+  }, [urlRepoId, repos, navigate])
 
   // Sort workspaces: pinned first, then by updatedAt
   const sortedWorkspaces = useMemo(() => {
@@ -592,6 +609,7 @@ export function WorkspaceList() {
       const worktree = await createWorktree.mutateAsync({
         repoId: selectedRepoId,
         branch: branchName.trim(),
+        workspaceId: selectedWorkspaceId ?? undefined,
       })
       closeModal()
       void navigate({ to: '/workspace/$id', params: { id: worktree.id } })
@@ -608,7 +626,8 @@ export function WorkspaceList() {
         name: standaloneName.trim(),
       })
       closeModal()
-      void navigate({ to: '/workspace/$id', params: { id: workspace.id } })
+      // Select the new workspace in the sidebar
+      setSelectedWorkspaceId(workspace.id)
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create workspace')
     }

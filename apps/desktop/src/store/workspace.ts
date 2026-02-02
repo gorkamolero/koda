@@ -1,20 +1,70 @@
 import { atom } from 'jotai'
-import type { Worktree, Session, WorktreeStatus } from '@/lib/rpc'
+import { atomWithStorage } from 'jotai/utils'
+import type { Worktree, Session, WorktreeStatus, Workspace as WorkspaceContainer } from '@/lib/rpc'
 
 /**
  * Worktree Store - Conductor-style state management
  *
- * NOTE: This store manages "worktrees" which are git worktrees tied to repos.
- * The naming uses "workspace" in some places for backwards compatibility with
- * the UI, but the underlying data is worktrees.
- *
- * In the new model:
- * - Workspace = pure container (just name/description)
+ * Architecture:
+ * - Workspace = pure container (just name/description) - groups repos
+ * - Repo = git repository - contains worktrees
  * - Worktree = git worktree (has branch, repoId, workspaceIds[])
+ *
+ * Hierarchy: Workspace → Repo → Worktree
  */
 
 // =============================================================================
-// Core Worktree State (UI calls these "workspaces" for now)
+// Workspace Container State (the top-level grouping)
+// =============================================================================
+
+/**
+ * Currently selected workspace container ID (persisted)
+ * This is the top-level workspace that groups repos
+ */
+export const selectedWorkspaceIdAtom = atomWithStorage<string | null>(
+  'koda-selected-workspace-id',
+  null
+)
+
+/**
+ * All workspace containers, keyed by ID
+ */
+export const workspaceContainersMapAtom = atom<Map<string, WorkspaceContainer>>(new Map())
+
+/**
+ * All workspace containers as array
+ */
+export const workspaceContainersAtom = atom((get) => {
+  const map = get(workspaceContainersMapAtom)
+  return Array.from(map.values())
+})
+
+/**
+ * Currently selected workspace container (derived)
+ */
+export const selectedWorkspaceAtom = atom((get) => {
+  const id = get(selectedWorkspaceIdAtom)
+  if (!id) return null
+  const map = get(workspaceContainersMapAtom)
+  return map.get(id) ?? null
+})
+
+/**
+ * Set all workspace containers
+ */
+export const setWorkspaceContainersAtom = atom(
+  null,
+  (_get, set, workspaces: WorkspaceContainer[]) => {
+    const map = new Map<string, WorkspaceContainer>()
+    for (const ws of workspaces) {
+      map.set(ws.id, ws)
+    }
+    set(workspaceContainersMapAtom, map)
+  }
+)
+
+// =============================================================================
+// Core Worktree State
 // =============================================================================
 
 /**

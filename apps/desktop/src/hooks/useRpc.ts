@@ -388,6 +388,8 @@ export function useAttachRepo() {
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['workspace-repos', variables.workspaceId] })
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      // Also invalidate worktrees since attachRepo creates the main worktree
+      void queryClient.invalidateQueries({ queryKey: ['worktrees', 'workspace', variables.workspaceId] })
     },
   })
 }
@@ -404,6 +406,8 @@ export function useDetachRepo() {
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['workspace-repos', variables.workspaceId] })
       void queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      // Also invalidate worktrees since detachRepo removes workspace from worktrees
+      void queryClient.invalidateQueries({ queryKey: ['worktrees', 'workspace', variables.workspaceId] })
     },
   })
 }
