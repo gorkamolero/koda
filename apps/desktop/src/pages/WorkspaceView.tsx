@@ -1,6 +1,7 @@
 import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
-import { useAtomValue } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { selectedWorkspaceIdAtom } from '@/store/workspace'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AgentChat } from '@/components/AgentChat'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -52,6 +53,9 @@ export function WorkspaceView() {
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const openFiles = useAtomValue(openFilesAtom)
 
+  // Sidebar workspace sync
+  const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
+
   // Try fetching as worktree first (git-backed workspace)
   const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(id)
 
@@ -94,6 +98,21 @@ export function WorkspaceView() {
       setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
     }
   }, [sessions, activeSessionId])
+
+  // Sync sidebar workspace selection when navigating to a worktree
+  useEffect(() => {
+    if (worktree?.workspaceIds) {
+      try {
+        const wsIds = JSON.parse(worktree.workspaceIds) as string[]
+        const firstWsId = wsIds[0]
+        if (firstWsId) {
+          setSelectedWorkspaceId(firstWsId)
+        }
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+  }, [worktree?.workspaceIds, setSelectedWorkspaceId])
 
   // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
