@@ -4,44 +4,48 @@ import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
 import type { Worktree, Repo, WorktreeStatus } from '@/lib/rpc'
 import { useState, useMemo, useRef } from 'react'
-import {
-  Plus,
-  Settings,
-  ChevronRight,
-  ChevronDown,
-  MoreHorizontal,
-  Check,
-  AlertCircle,
-  HelpCircle,
-  Archive,
-  FolderPlus,
-  Pin,
-  MessageCircle,
-  FolderOpen,
-  Trash2,
-  ExternalLink,
-  Copy,
-  PinOff,
-  ArchiveRestore,
-} from 'lucide-react'
 import { KodaSpinner } from '@/components/KodaSpinner'
 
 // ============================================================================
-// Shared Components
+// Terminal-style Status Labels
 // ============================================================================
 
-interface ExpandChevronProps {
-  isExpanded: boolean
-  className?: string
+const STATUS_LABELS: Record<WorktreeStatus, string> = {
+  'in-progress': 'ACTV',
+  done: 'DONE',
+  blocked: 'BLKD',
+  'needs-review': 'REVW',
 }
 
-function ExpandChevron({ isExpanded, className = 'w-4 h-4 text-text-dim' }: ExpandChevronProps): React.ReactElement {
-  const Icon = isExpanded ? ChevronDown : ChevronRight
-  return <Icon className={className} />
+function getStatusColor(status?: WorktreeStatus | null): string {
+  if (status === 'done') return 'text-status-success'
+  if (status === 'blocked') return 'text-status-error'
+  if (status === 'needs-review') return 'text-status-warning'
+  return 'text-border-accent'
 }
 
 // ============================================================================
-// Usage Bar
+// Time Formatting - Terminal Style
+// ============================================================================
+
+function formatTimeAgo(date: string | null | undefined): string {
+  if (!date) return '--'
+
+  const diffMs = Date.now() - new Date(date).getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'NOW'
+  if (diffMins < 60) return `${diffMins}M`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}H`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}D`
+}
+
+// ============================================================================
+// ASCII Progress Bar
 // ============================================================================
 
 interface UsageBarProps {
@@ -52,85 +56,34 @@ interface UsageBarProps {
 
 function UsageBar({ label, value, max }: UsageBarProps): React.ReactElement {
   const percent = Math.min(100, Math.round((value / max) * 100))
+  const filled = Math.round(percent / 10)
+  const empty = 10 - filled
   const isHigh = percent > 80
 
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs">
-        <span className="text-text-faint">{label}</span>
-        <span className={cn('text-text-muted', isHigh && 'text-orange-400')}>
-          {percent}%
-        </span>
-      </div>
-      <div className="h-1 rounded-full bg-surface-inset overflow-hidden">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all',
-            isHigh
-              ? 'bg-gradient-to-r from-orange-500 to-red-500'
-              : 'bg-gradient-to-r from-blue-500 to-emerald-500'
-          )}
-          style={{ width: `${String(percent)}%` }}
-        />
-      </div>
+    <div className="font-mono text-[10px] flex items-center gap-2">
+      <span className="text-text-dim w-14 uppercase">{label}</span>
+      <span className={cn('tracking-tighter', isHigh ? 'text-status-warning' : 'text-border-accent')}>
+        [{`${'█'.repeat(filled)}${'░'.repeat(empty)}`}]
+      </span>
+      <span className={cn('w-8 text-right tabular-nums', isHigh ? 'text-status-warning' : 'text-text-dim')}>
+        {percent}%
+      </span>
     </div>
   )
 }
 
 // ============================================================================
-// Status Indicators
-// ============================================================================
-
-interface StatusConfig {
-  icon: React.ReactNode
-  colorClass: string
-}
-
-function getStatusConfig(status?: WorktreeStatus | null): StatusConfig {
-  if (status === 'done') {
-    return { icon: <Check className="w-3.5 h-3.5" />, colorClass: 'text-green-500' }
-  }
-  if (status === 'blocked' || status === 'needs-review') {
-    return { icon: <AlertCircle className="w-3.5 h-3.5" />, colorClass: 'text-orange-500' }
-  }
-  return {
-    icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
-    colorClass: 'text-text-dim',
-  }
-}
-
-// ============================================================================
-// Time Ago Helper
-// ============================================================================
-
-function formatTimeAgo(date: string | null | undefined): string {
-  if (!date) return ''
-
-  const diffMs = Date.now() - new Date(date).getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${String(diffMins)}m ago`
-
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${String(diffHours)}h ago`
-
-  const diffDays = Math.floor(diffHours / 24)
-  return `${String(diffDays)}d ago`
-}
-
-// ============================================================================
-// Dropdown Menu Component
+// Terminal Dropdown Menu
 // ============================================================================
 
 interface DropdownMenuProps {
   isOpen: boolean
   onClose: () => void
   children: React.ReactNode
-  align?: 'left' | 'right'
 }
 
-function DropdownMenu({ isOpen, onClose, children, align = 'right' }: DropdownMenuProps): React.ReactElement | null {
+function DropdownMenu({ isOpen, onClose, children }: DropdownMenuProps): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement>(null)
 
   useClickOutside(menuRef, {
@@ -144,11 +97,7 @@ function DropdownMenu({ isOpen, onClose, children, align = 'right' }: DropdownMe
   return (
     <div
       ref={menuRef}
-      className={cn(
-        'absolute z-50 mt-1 py-1 min-w-[160px] rounded-md',
-        'bg-surface-overlay border border-border-subtle shadow-lg',
-        align === 'right' ? 'right-0' : 'left-0'
-      )}
+      className="absolute right-0 z-50 mt-1 min-w-[180px] font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
     >
       {children}
     </div>
@@ -156,30 +105,30 @@ function DropdownMenu({ isOpen, onClose, children, align = 'right' }: DropdownMe
 }
 
 interface MenuItemProps {
-  icon?: React.ReactNode
-  children: React.ReactNode
+  label: string
+  shortcut?: string
   onClick: () => void
   destructive?: boolean
 }
 
-function MenuItem({ icon, children, onClick, destructive }: MenuItemProps): React.ReactElement {
+function MenuItem({ label, shortcut, onClick, destructive }: MenuItemProps): React.ReactElement {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left',
+        'flex items-center justify-between gap-4 w-full px-3 py-1.5 text-left',
         'hover:bg-surface-hover transition-colors',
-        destructive ? 'text-red-400 hover:text-red-300' : 'text-text-primary'
+        destructive ? 'text-status-error hover:text-status-error' : 'text-text-primary hover:text-border-accent'
       )}
     >
-      {icon && <span className="w-4 h-4">{icon}</span>}
-      {children}
+      <span>{label}</span>
+      {shortcut && <span className="text-text-dim">{shortcut}</span>}
     </button>
   )
 }
 
 function MenuSeparator(): React.ReactElement {
-  return <div className="my-1 border-t border-border-subtle" />
+  return <div className="border-t border-dashed border-text-dim/20" />
 }
 
 // ============================================================================
@@ -197,57 +146,45 @@ function RepoActionsDropdown({
 
   return (
     <DropdownMenu isOpen onClose={onClose}>
-      <MenuItem
-        icon={<Plus className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Navigate to new workspace with repo pre-selected
-          void navigate({ to: '/' })
-        }}
-      >
-        New workspace
-      </MenuItem>
-      <MenuItem
-        icon={<FolderOpen className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Open in Finder/Explorer
-          console.log('Open in Finder:', repo.rootPath)
-        }}
-      >
-        Open in Finder
-      </MenuItem>
-      <MenuItem
-        icon={<ExternalLink className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Open in editor
-          console.log('Open in editor:', repo.rootPath)
-        }}
-      >
-        Open in Editor
-      </MenuItem>
-      <MenuItem
-        icon={<Copy className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          void navigator.clipboard.writeText(repo.rootPath)
-        }}
-      >
-        Copy path
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem
-        icon={<Trash2 className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Remove repository
-          console.log('Remove repo:', repo.id)
-        }}
-        destructive
-      >
-        Remove repository
-      </MenuItem>
+      <div className="py-1">
+        <MenuItem
+          label="[+] NEW WORKSPACE"
+          onClick={() => {
+            onClose()
+            void navigate({ to: '/' })
+          }}
+        />
+        <MenuItem
+          label="[↗] OPEN IN FINDER"
+          onClick={() => {
+            onClose()
+            console.log('Open in Finder:', repo.rootPath)
+          }}
+        />
+        <MenuItem
+          label="[⌘] OPEN IN EDITOR"
+          onClick={() => {
+            onClose()
+            console.log('Open in editor:', repo.rootPath)
+          }}
+        />
+        <MenuItem
+          label="[⎘] COPY PATH"
+          onClick={() => {
+            onClose()
+            void navigator.clipboard.writeText(repo.rootPath)
+          }}
+        />
+        <MenuSeparator />
+        <MenuItem
+          label="[×] REMOVE REPO"
+          onClick={() => {
+            onClose()
+            console.log('Remove repo:', repo.id)
+          }}
+          destructive
+        />
+      </div>
     </DropdownMenu>
   )
 }
@@ -277,79 +214,64 @@ function WorkspaceContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 py-1 min-w-[180px] rounded-md bg-surface-overlay border border-border-subtle shadow-lg"
+      className="fixed z-50 min-w-[180px] font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
       style={{ top: position.y, left: position.x }}
     >
-      <MenuItem
-        icon={isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Toggle pin status
-          console.log(isPinned ? 'Unpin:' : 'Pin:', workspace.id)
-        }}
-      >
-        {isPinned ? 'Unpin' : 'Pin to top'}
-      </MenuItem>
-      <MenuItem
-        icon={<Copy className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          void navigator.clipboard.writeText(workspace.branch ?? '')
-        }}
-      >
-        Copy branch name
-      </MenuItem>
-      <MenuItem
-        icon={<FolderOpen className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Open in Finder
-          console.log('Open in Finder:', workspace.worktreePath)
-        }}
-      >
-        Open in Finder
-      </MenuItem>
-      <MenuItem
-        icon={<ExternalLink className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Open in editor
-          console.log('Open in editor:', workspace.worktreePath)
-        }}
-      >
-        Open in Editor
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem
-        icon={isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-        onClick={() => {
-          onClose()
-          // TODO: Toggle archive status
-          console.log(isArchived ? 'Unarchive:' : 'Archive:', workspace.id)
-        }}
-        destructive={!isArchived}
-      >
-        {isArchived ? 'Restore from archive' : 'Archive'}
-      </MenuItem>
-      {isArchived && (
+      <div className="py-1">
         <MenuItem
-          icon={<Trash2 className="w-4 h-4" />}
+          label={isPinned ? '[⊘] UNPIN' : '[⊕] PIN TO TOP'}
           onClick={() => {
             onClose()
-            // TODO: Delete workspace permanently
-            console.log('Delete:', workspace.id)
+            console.log(isPinned ? 'Unpin:' : 'Pin:', workspace.id)
           }}
-          destructive
-        >
-          Delete permanently
-        </MenuItem>
-      )}
+        />
+        <MenuItem
+          label="[⎘] COPY BRANCH"
+          onClick={() => {
+            onClose()
+            void navigator.clipboard.writeText(workspace.branch ?? '')
+          }}
+        />
+        <MenuItem
+          label="[↗] OPEN IN FINDER"
+          onClick={() => {
+            onClose()
+            console.log('Open in Finder:', workspace.worktreePath)
+          }}
+        />
+        <MenuItem
+          label="[⌘] OPEN IN EDITOR"
+          onClick={() => {
+            onClose()
+            console.log('Open in editor:', workspace.worktreePath)
+          }}
+        />
+        <MenuSeparator />
+        <MenuItem
+          label={isArchived ? '[↺] RESTORE' : '[⌫] ARCHIVE'}
+          onClick={() => {
+            onClose()
+            console.log(isArchived ? 'Unarchive:' : 'Archive:', workspace.id)
+          }}
+          destructive={!isArchived}
+        />
+        {isArchived && (
+          <MenuItem
+            label="[×] DELETE"
+            onClick={() => {
+              onClose()
+              console.log('Delete:', workspace.id)
+            }}
+            destructive
+          />
+        )}
+      </div>
     </div>
   )
 }
 
 // ============================================================================
-// Workspace Row
+// Workspace Row - Terminal Style
 // ============================================================================
 
 function WorkspaceRow({
@@ -361,8 +283,9 @@ function WorkspaceRow({
   isActive: boolean
   showPinIndicator?: boolean
 }): React.ReactElement {
-  const status = workspace.manualStatus ?? workspace.derivedStatus
-  const { icon, colorClass } = getStatusConfig(status)
+  const status = workspace.manualStatus ?? workspace.derivedStatus ?? 'in-progress'
+  const statusLabel = STATUS_LABELS[status]
+  const statusColor = getStatusColor(status)
   const timeAgo = formatTimeAgo(workspace.updatedAt)
   const unreadCount = workspace.unread ?? 0
   const isArchived = workspace.state === 'archived'
@@ -380,69 +303,45 @@ function WorkspaceRow({
         to="/workspace/$id"
         params={{ id: workspace.id }}
         className={cn(
-          'group relative flex items-start gap-2 px-3 py-2 rounded-md transition-colors',
-          'hover:bg-surface-hover',
-          isActive && 'bg-surface-active'
+          'group flex items-center gap-2 px-2 py-1.5 font-mono text-xs',
+          'border-l-2 border-transparent',
+          'hover:bg-surface-hover hover:border-l-border-accent/50',
+          'transition-colors duration-75',
+          isActive && 'bg-surface-hover border-l-border-accent',
+          isArchived && 'opacity-40'
         )}
         onContextMenu={handleContextMenu}
       >
-        {/* Status icon */}
-        <div className={cn('mt-1 flex-shrink-0 flex items-center justify-center w-4', colorClass)}>
-          {icon}
-        </div>
+        {/* Pin indicator */}
+        <span className={cn('w-3', showPinIndicator ? 'text-border-accent' : 'text-text-dim/30')}>
+          {showPinIndicator ? '▸' : '·'}
+        </span>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              {showPinIndicator && (
-                <Pin className="w-3 h-3 text-blue-400 flex-shrink-0" />
-              )}
-              <span className="text-text-primary text-sm font-medium truncate">
-                {workspace.branch ?? 'unnamed'}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {unreadCount > 0 && (
-                <div className="flex items-center gap-0.5 text-xs font-medium px-1.5 py-0.5 rounded bg-status-unread/20 text-status-unread">
-                  <MessageCircle className="w-3 h-3" />
-                  <span>{String(unreadCount)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-text-faint">
-            <span className="truncate">{workspace.worktreePath?.split('/').pop() ?? workspace.branch}</span>
-            {timeAgo && (
-              <>
-                <span>·</span>
-                <span>{timeAgo}</span>
-              </>
-            )}
-          </div>
-        </div>
+        {/* Status */}
+        <span className={cn('w-12 font-bold', statusColor)}>
+          [{statusLabel}]
+        </span>
 
-        {/* Archive action - floating icon button on hover */}
-        <button
-          className={cn(
-            'absolute right-1.5 top-1.5',
-            'opacity-0 group-hover:opacity-100 transition-opacity',
-            'p-1 rounded hover:bg-surface-control text-text-dim hover:text-text-primary'
-          )}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            // TODO: Implement archive/restore
-            console.log(isArchived ? 'Restore:' : 'Archive:', workspace.id)
-          }}
-          title={isArchived ? 'Restore' : 'Archive'}
-        >
-          {isArchived ? (
-            <ArchiveRestore className="w-3.5 h-3.5" />
-          ) : (
-            <Archive className="w-3.5 h-3.5" />
-          )}
-        </button>
+        {/* Branch name */}
+        <span className={cn(
+          'flex-1 truncate',
+          'text-text-primary group-hover:text-border-accent',
+          isActive && 'text-border-accent'
+        )}>
+          {workspace.branch ?? 'unnamed'}
+        </span>
+
+        {/* Unread count */}
+        {unreadCount > 0 && (
+          <span className="px-1 bg-border-accent text-white text-[9px] font-bold">
+            {unreadCount}
+          </span>
+        )}
+
+        {/* Time */}
+        <span className="w-8 text-right text-text-dim tabular-nums">
+          {timeAgo}
+        </span>
       </Link>
 
       {/* Context menu */}
@@ -450,7 +349,7 @@ function WorkspaceRow({
         <WorkspaceContextMenu
           workspace={workspace}
           position={contextMenu}
-          onClose={() => { setContextMenu(null) }}
+          onClose={() => setContextMenu(null)}
         />
       )}
     </>
@@ -458,7 +357,7 @@ function WorkspaceRow({
 }
 
 // ============================================================================
-// Repo Group
+// Repo Group - Terminal Style
 // ============================================================================
 
 function RepoGroup({
@@ -474,65 +373,58 @@ function RepoGroup({
   const [isExpanded, setIsExpanded] = useState(true)
   const [showDropdown, setShowDropdown] = useState(false)
   const repoName = repo.name ?? repo.rootPath.split('/').pop() ?? 'Repository'
-  const initial = (repoName[0] ?? 'R').toUpperCase()
 
   return (
-    <div className="mb-3">
+    <div className="mb-2">
       {/* Repo header */}
-      <div className="flex items-center gap-1 group">
+      <div className="flex items-center group">
         <button
-          onClick={() => { setIsExpanded(!isExpanded) }}
-          className="flex items-center gap-2 flex-1 px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 flex-1 px-2 py-1 font-mono text-xs hover:bg-surface-hover transition-colors"
         >
-          {/* Avatar */}
-          <div className="w-6 h-6 rounded bg-surface-control flex items-center justify-center text-xs font-semibold text-text-muted">
-            {initial}
-          </div>
-
-          {/* Name */}
-          <span className="text-text-primary text-sm font-medium truncate flex-1 text-left">
+          <span className="text-text-dim">{isExpanded ? '▼' : '▶'}</span>
+          <span className="text-text-primary uppercase tracking-wide truncate flex-1 text-left">
             {repoName}
           </span>
-
-          <ExpandChevron isExpanded={isExpanded} className="w-4 h-4 text-text-dim flex-shrink-0" />
+          <span className="text-text-dim">({workspaces.length})</span>
         </button>
 
         {/* Actions (visible on hover) */}
         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity relative">
           <button
-            className="p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
+            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-[10px]"
             title="More actions"
             onClick={(e) => {
               e.stopPropagation()
               setShowDropdown(!showDropdown)
             }}
           >
-            <MoreHorizontal className="w-4 h-4" />
+            [···]
           </button>
           <button
-            className="p-1 rounded hover:bg-surface-control text-text-muted hover:text-text-primary"
+            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-[10px]"
             title="New workspace"
             onClick={(e) => {
               e.stopPropagation()
-              // Navigate to home with repo pre-selected for new workspace
               void navigate({ to: '/', search: { repoId: repo.id } })
             }}
           >
-            <Plus className="w-4 h-4" />
+            [+]
           </button>
 
-          {/* Dropdown menu */}
           {showDropdown && (
-            <RepoActionsDropdown repo={repo} onClose={() => { setShowDropdown(false) }} />
+            <RepoActionsDropdown repo={repo} onClose={() => setShowDropdown(false)} />
           )}
         </div>
       </div>
 
       {/* Workspaces */}
       {isExpanded && (
-        <div className="ml-2 mt-1">
+        <div className="border-l border-dashed border-text-dim/20 ml-3">
           {workspaces.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-text-faint italic">No workspaces</div>
+            <div className="px-3 py-2 text-[10px] text-text-dim font-mono italic">
+              -- NO WORKSPACES --
+            </div>
           ) : (
             workspaces.map((ws) => (
               <WorkspaceRow
@@ -549,62 +441,47 @@ function RepoGroup({
 }
 
 // ============================================================================
-// Sidebar Header
+// Sidebar Header - Terminal Style
 // ============================================================================
 
 function SidebarHeader(): React.ReactElement {
   const navigate = useNavigate()
 
   return (
-    <div className="flex flex-col border-b border-border-subtle">
-      {/* Row 1: Traffic lights space + navigation arrows */}
+    <div className="border-b border-dashed border-text-dim/20">
+      {/* Row 1: Traffic lights space + nav */}
       <div
-        className="flex items-center justify-between pl-[70px] pr-3 h-10"
+        className="flex items-center justify-between pl-[70px] pr-2 h-10"
         data-tauri-drag-region
       >
-        {/* Left side empty - traffic lights overlay here */}
         <div className="flex-1" data-tauri-drag-region />
-
-        {/* Right side - navigation arrows */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center font-mono text-[10px]">
           <button
-            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-            onClick={() => { void navigate({ to: '/' }) }}
+            className="px-1 text-text-dim hover:text-border-accent transition-colors"
+            onClick={() => void navigate({ to: '/' })}
             title="Back"
           >
-            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+            [←]
           </button>
           <button
-            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="px-1 text-text-dim hover:text-border-accent transition-colors"
             title="Forward"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            [→]
           </button>
         </div>
       </div>
 
-      {/* Row 2: Workspaces label (aligns with tabs row in other panels) */}
-      <div className="flex items-center gap-1.5 px-3 h-10">
-        <svg
-          className="w-4 h-4 text-text-muted"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-        </svg>
-        <span className="text-sm text-text-primary font-medium">Workspaces</span>
+      {/* Row 2: Title */}
+      <div className="px-3 py-2 font-mono">
+        <div className="text-xs text-text-dim">┌─ WORKSPACES ─────────────────</div>
       </div>
     </div>
   )
 }
 
 // ============================================================================
-// Sidebar Footer
+// Sidebar Footer - Terminal Style
 // ============================================================================
 
 function SidebarFooter(): React.ReactElement {
@@ -612,59 +489,60 @@ function SidebarFooter(): React.ReactElement {
   const navigate = useNavigate()
 
   return (
-    <div className="border-t border-border-subtle">
-      {/* Usage stats (kept from original) */}
-      <div className="px-4 py-3 space-y-2 border-b border-border-subtle">
-        <UsageBar label="Session" value={45} max={100} />
-        <UsageBar label="Weekly" value={230} max={1000} />
+    <div className="border-t border-dashed border-text-dim/20 font-mono">
+      {/* Usage stats */}
+      <div className="px-3 py-2 space-y-1 border-b border-dashed border-text-dim/20">
+        <UsageBar label="SESSION" value={45} max={100} />
+        <UsageBar label="WEEKLY" value={230} max={1000} />
       </div>
 
       {/* Add repository button */}
       <button
-        className="flex items-center gap-2 w-full px-4 py-3 text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-        onClick={() => { void navigate({ to: '/' }) }}
+        className="flex items-center gap-2 w-full px-3 py-2 text-xs text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
+        onClick={() => void navigate({ to: '/' })}
       >
-        <FolderPlus className="w-4 h-4" />
-        <span className="text-sm">Add repository</span>
+        [+] ADD REPOSITORY
       </button>
 
-      {/* Bottom icons */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border-subtle">
+      {/* Bottom status bar */}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-text-dim/20 text-[10px]">
         <div className="flex items-center gap-2">
-          {/* Sidecar status dot */}
-          <span
-            className={cn(
-              'w-2 h-2 rounded-full transition-colors',
-              status?.running ? 'bg-status-success' : 'bg-text-faint'
-            )}
-            title={status?.running ? 'Connected' : 'Disconnected'}
-          />
-          <span className="text-xs text-text-faint">
-            {status?.running ? 'Connected' : 'Offline'}
+          <span className={cn(
+            status?.running ? 'text-status-success' : 'text-text-dim'
+          )}>
+            {status?.running ? '●' : '○'}
+          </span>
+          <span className="text-text-dim uppercase">
+            {status?.running ? 'ONLINE' : 'OFFLINE'}
           </span>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-2">
           <button
-            className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="text-text-dim hover:text-border-accent transition-colors"
             title="Help"
           >
-            <HelpCircle className="w-4 h-4" />
+            [?]
           </button>
           <Link
             to="/settings"
-            className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="text-text-dim hover:text-border-accent transition-colors"
             title="Settings"
           >
-            <Settings className="w-4 h-4" />
+            [⚙]
           </Link>
         </div>
+      </div>
+
+      {/* ASCII footer decoration */}
+      <div className="px-3 py-1 text-[10px] text-text-dim/50">
+        └─────────────────────────────┘
       </div>
     </div>
   )
 }
 
 // ============================================================================
-// Pinned Workspaces Section
+// Pinned Workspaces Section - Terminal Style
 // ============================================================================
 
 function PinnedWorkspacesSection({
@@ -679,18 +557,17 @@ function PinnedWorkspacesSection({
   if (workspaces.length === 0) return null
 
   return (
-    <div className="mb-3">
+    <div className="mb-2">
       <button
-        onClick={() => { setIsExpanded(!isExpanded) }}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 w-full px-2 py-1 font-mono text-xs hover:bg-surface-hover transition-colors"
       >
-        <Pin className="w-4 h-4 text-blue-400" />
-        <span className="text-text-primary text-sm font-medium flex-1 text-left">Pinned</span>
-        <span className="text-xs text-text-faint">{workspaces.length}</span>
-        <ExpandChevron isExpanded={isExpanded} />
+        <span className="text-border-accent">{isExpanded ? '▼' : '▶'}</span>
+        <span className="text-border-accent uppercase tracking-wide flex-1 text-left">[PINNED]</span>
+        <span className="text-text-dim">({workspaces.length})</span>
       </button>
       {isExpanded && (
-        <div className="ml-2 mt-1">
+        <div className="border-l border-dashed border-border-accent/30 ml-3">
           {workspaces.map((ws) => (
             <WorkspaceRow
               key={ws.id}
@@ -706,7 +583,7 @@ function PinnedWorkspacesSection({
 }
 
 // ============================================================================
-// Archived Workspaces Section
+// Archived Workspaces Section - Terminal Style
 // ============================================================================
 
 function ArchivedWorkspacesSection({
@@ -721,18 +598,17 @@ function ArchivedWorkspacesSection({
   if (workspaces.length === 0) return null
 
   return (
-    <div className="mt-4 pt-4 border-t border-border-subtle">
+    <div className="mt-2 pt-2 border-t border-dashed border-text-dim/20">
       <button
-        onClick={() => { setIsExpanded(!isExpanded) }}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-surface-hover transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 w-full px-2 py-1 font-mono text-xs hover:bg-surface-hover transition-colors"
       >
-        <Archive className="w-4 h-4 text-text-dim" />
-        <span className="text-text-muted text-sm font-medium flex-1 text-left">Archived</span>
-        <span className="text-xs text-text-faint">{workspaces.length}</span>
-        <ExpandChevron isExpanded={isExpanded} />
+        <span className="text-text-dim">{isExpanded ? '▼' : '▶'}</span>
+        <span className="text-text-dim uppercase tracking-wide flex-1 text-left">[ARCHIVED]</span>
+        <span className="text-text-dim">({workspaces.length})</span>
       </button>
       {isExpanded && (
-        <div className="ml-2 mt-1">
+        <div className="border-l border-dashed border-text-dim/20 ml-3">
           {workspaces.map((ws) => (
             <WorkspaceRow
               key={ws.id}
@@ -750,13 +626,12 @@ function ArchivedWorkspacesSection({
 // Workspace List (grouped by repo)
 // ============================================================================
 
-function WorkspaceList(): React.ReactElement {
+function WorkspaceListContent(): React.ReactElement {
   const { data: workspaces, isLoading: loadingWorkspaces } = useAllWorktrees()
   const { data: repos, isLoading: loadingRepos } = useRepos()
   const params = useParams({ strict: false })
   const activeId = (params as { id?: string }).id
 
-  // Separate pinned, active, and archived workspaces
   const { pinnedWorkspaces, archivedWorkspaces, groupedWorkspaces } = useMemo(() => {
     if (!workspaces || !repos) {
       return {
@@ -770,12 +645,10 @@ function WorkspaceList(): React.ReactElement {
     const archived: Worktree[] = []
     const groups = new Map<string, { repo: Repo; workspaces: Worktree[] }>()
 
-    // Initialize groups for all repos
     for (const repo of repos) {
       groups.set(repo.id, { repo, workspaces: [] })
     }
 
-    // Categorize workspaces
     for (const ws of workspaces) {
       if (ws.state === 'archived') {
         archived.push(ws)
@@ -786,21 +659,21 @@ function WorkspaceList(): React.ReactElement {
       }
     }
 
-    // Sort pinned by pinnedAt (most recently pinned first)
+    // Sort pinned by pinnedAt
     pinned.sort((a, b) => {
       const aTime = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0
       const bTime = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0
       return bTime - aTime
     })
 
-    // Sort archived by updatedAt (most recently archived first)
+    // Sort archived by updatedAt
     archived.sort((a, b) => {
       const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
       const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
       return bTime - aTime
     })
 
-    // Sort workspaces within each group by updatedAt (most recent first)
+    // Sort workspaces within groups
     for (const group of groups.values()) {
       group.workspaces.sort((a, b) => {
         const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
@@ -824,20 +697,23 @@ function WorkspaceList(): React.ReactElement {
 
   if (hasNoWorkspaces) {
     return (
-      <div className="px-4 py-8 text-center">
-        <FolderPlus className="w-10 h-10 text-text-dim mx-auto mb-3" />
-        <p className="text-text-muted text-sm mb-1">No repositories yet</p>
-        <p className="text-text-faint text-xs">Add a repository to get started</p>
+      <div className="px-3 py-8 text-center font-mono">
+        <pre className="text-[10px] text-text-dim mb-4">
+{`┌──────────────────┐
+│  NO REPOS YET    │
+│                  │
+│  Add a repo to   │
+│  get started     │
+└──────────────────┘`}
+        </pre>
       </div>
     )
   }
 
   return (
-    <div className="px-2">
-      {/* Pinned workspaces at top */}
+    <div className="px-1">
       <PinnedWorkspacesSection workspaces={pinnedWorkspaces} activeWorkspaceId={activeId} />
 
-      {/* Regular workspaces grouped by repo */}
       {Array.from(groupedWorkspaces.values()).map(({ repo, workspaces: repoWorkspaces }) => (
         <RepoGroup
           key={repo.id}
@@ -847,7 +723,6 @@ function WorkspaceList(): React.ReactElement {
         />
       ))}
 
-      {/* Archived workspaces at bottom */}
       <ArchivedWorkspacesSection workspaces={archivedWorkspaces} activeWorkspaceId={activeId} />
     </div>
   )
@@ -859,11 +734,11 @@ function WorkspaceList(): React.ReactElement {
 
 export function Sidebar(): React.ReactElement {
   return (
-    <div className="flex flex-col h-full bg-surface-base">
+    <div className="flex flex-col h-full bg-surface-sidebar">
       <SidebarHeader />
 
-      <div className="flex-1 overflow-y-auto py-2">
-        <WorkspaceList />
+      <div className="flex-1 overflow-y-auto py-1">
+        <WorkspaceListContent />
       </div>
 
       <SidebarFooter />
