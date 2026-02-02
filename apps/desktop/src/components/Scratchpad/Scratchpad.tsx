@@ -1,38 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import Editor, { type Monaco } from '@monaco-editor/react'
 import { type editor } from 'monaco-editor'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { cn } from '@/lib/utils'
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
-import { ConversationHistory } from '@/components/ConversationHistory'
-
-type ScratchpadTab = 'notes' | 'history'
 
 /**
- * Scratchpad note interface
+ * Simple scratchpad content per workspace
  */
-interface ScratchpadNote {
-  id: string
-  title: string
-  content: string
-  createdAt: number
-  updatedAt: number
-}
-
-/**
- * Scratchpad state per workspace
- */
-interface WorkspaceScratchpad {
-  notes: ScratchpadNote[]
-  activeNoteId: string | null
-}
-
-/**
- * Global scratchpad state - persisted to localStorage
- */
-const scratchpadAtom = atomWithStorage<Record<string, WorkspaceScratchpad>>(
-  'koda-scratchpads',
+const scratchpadAtom = atomWithStorage<Record<string, string>>(
+  'koda-scratchpad',
   {}
 )
 
@@ -42,275 +19,247 @@ interface ScratchpadProps {
 }
 
 /**
- * Terminal-style Scratchpad with markdown editor.
- * ┌─ SCRATCHPAD ─────────────────────┐
- * │ [NOTES] [HISTORY]          [+]  │
- * ├──────────────────────────────────┤
- * │ ▼ Notes (3)                      │
- * │   Note 1 ◀                       │
- * │   Note 2                         │
- * ├──────────────────────────────────┤
- * │ # My Note                        │
- * │ Content here...                  │
- * └──────────────────────────────────┘
+ * Terminal-style Scratchpad - one buffer per workspace.
+ * 
+ * ┌─ SCRATCH ──────────────────────────┐
+ * │ > _                                │
+ * │                                    │
+ * │ Notes, code snippets, thoughts...  │
+ * │                                    │
+ * └────────────────────────────────────┘
  */
 export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
   const [scratchpads, setScratchpads] = useAtom(scratchpadAtom)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-  const [isNotesExpanded, setIsNotesExpanded] = useState(true)
-  const [activeTab, setActiveTab] = useState<ScratchpadTab>('notes')
+  const monacoRef = useRef<Monaco | null>(null)
 
-  // Get or initialize workspace scratchpad
-  const workspaceScratchpad = scratchpads[workspaceId] ?? {
-    notes: [],
-    activeNoteId: null,
-  }
+  // Get content for this workspace
+  const content = scratchpads[workspaceId] ?? ''
 
-  const { notes, activeNoteId } = workspaceScratchpad
-  const activeNote = notes.find((n) => n.id === activeNoteId)
-
-  // Update workspace scratchpad
-  const updateScratchpad = useCallback(
-    (update: Partial<WorkspaceScratchpad>) => {
+  // Update content
+  const updateContent = useCallback(
+    (newContent: string) => {
       setScratchpads((prev) => ({
         ...prev,
-        [workspaceId]: {
-          ...prev[workspaceId],
-          notes: prev[workspaceId]?.notes ?? [],
-          activeNoteId: prev[workspaceId]?.activeNoteId ?? null,
-          ...update,
-        },
+        [workspaceId]: newContent,
       }))
     },
     [workspaceId, setScratchpads]
   )
 
-  // Create new note
-  const createNote = useCallback(() => {
-    const newNote: ScratchpadNote = {
-      id: `note-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      title: `Note ${notes.length + 1}`,
-      content: '# New Note\n\nStart writing here...',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }
-    updateScratchpad({
-      notes: [...notes, newNote],
-      activeNoteId: newNote.id,
+  // Define KODA Obsidian theme for Monaco
+  const defineKodaTheme = useCallback((monaco: Monaco) => {
+    monaco.editor.defineTheme('koda-obsidian', {
+      base: 'vs-dark',
+      inherit: false,
+      rules: [
+        // Base text
+        { token: '', foreground: 'a3a3a3', background: '000000' },
+        
+        // Comments - faint
+        { token: 'comment', foreground: '525252', fontStyle: 'italic' },
+        
+        // Strings - terracotta accent
+        { token: 'string', foreground: 'e07a5f' },
+        { token: 'string.escape', foreground: 'c4634a' },
+        
+        // Numbers - slightly brighter
+        { token: 'number', foreground: 'd4d4d4' },
+        
+        // Keywords - accent
+        { token: 'keyword', foreground: 'e07a5f' },
+        { token: 'keyword.control', foreground: 'e07a5f' },
+        
+        // Types - neutral bright
+        { token: 'type', foreground: 'd4d4d4' },
+        { token: 'type.identifier', foreground: 'd4d4d4' },
+        
+        // Functions - primary text
+        { token: 'function', foreground: 'fafafa' },
+        { token: 'function.call', foreground: 'fafafa' },
+        
+        // Variables
+        { token: 'variable', foreground: 'a3a3a3' },
+        { token: 'variable.parameter', foreground: 'a3a3a3' },
+        
+        // Operators
+        { token: 'operator', foreground: '737373' },
+        { token: 'delimiter', foreground: '525252' },
+        
+        // Markdown specific
+        { token: 'markup.heading', foreground: 'e07a5f', fontStyle: 'bold' },
+        { token: 'markup.bold', foreground: 'fafafa', fontStyle: 'bold' },
+        { token: 'markup.italic', foreground: 'fafafa', fontStyle: 'italic' },
+        { token: 'markup.inline.raw', foreground: 'a3a3a3', background: '141414' },
+        { token: 'markup.list', foreground: '737373' },
+        { token: 'markup.quote', foreground: '737373', fontStyle: 'italic' },
+        { token: 'markup.link', foreground: 'e07a5f' },
+        
+        // Invalid
+        { token: 'invalid', foreground: 'ef4444' },
+      ],
+      colors: {
+        // Editor background - pure black
+        'editor.background': '#000000',
+        'editor.foreground': '#a3a3a3',
+        
+        // Selection - terracotta tinted
+        'editor.selectionBackground': '#e07a5f33',
+        'editor.selectionHighlightBackground': '#e07a5f1a',
+        'editor.inactiveSelectionBackground': '#e07a5f1a',
+        
+        // Line highlighting
+        'editor.lineHighlightBackground': '#0a0a0a',
+        'editor.lineHighlightBorder': '#00000000',
+        
+        // Cursor
+        'editorCursor.foreground': '#e07a5f',
+        'editorCursor.background': '#000000',
+        
+        // Whitespace
+        'editorWhitespace.foreground': '#262626',
+        
+        // Indent guides
+        'editorIndentGuide.background': '#1a1a1a',
+        'editorIndentGuide.activeBackground': '#333333',
+        
+        // Line numbers
+        'editorLineNumber.foreground': '#333333',
+        'editorLineNumber.activeForeground': '#525252',
+        
+        // Gutter
+        'editorGutter.background': '#000000',
+        
+        // Scrollbar - subtle
+        'scrollbar.shadow': '#00000000',
+        'scrollbarSlider.background': '#ffffff0d',
+        'scrollbarSlider.hoverBackground': '#ffffff1a',
+        'scrollbarSlider.activeBackground': '#e07a5f33',
+        
+        // Widget (autocomplete, etc)
+        'editorWidget.background': '#0a0a0a',
+        'editorWidget.border': '#262626',
+        'editorWidget.foreground': '#a3a3a3',
+        
+        // Hover widget
+        'editorHoverWidget.background': '#0a0a0a',
+        'editorHoverWidget.border': '#262626',
+        
+        // Find/replace
+        'editor.findMatchBackground': '#e07a5f4d',
+        'editor.findMatchHighlightBackground': '#e07a5f26',
+        
+        // Bracket matching
+        'editorBracketMatch.background': '#e07a5f1a',
+        'editorBracketMatch.border': '#e07a5f4d',
+        
+        // Overview ruler (right edge)
+        'editorOverviewRuler.border': '#00000000',
+        'editorOverviewRuler.findMatchForeground': '#e07a5f4d',
+        'editorOverviewRuler.selectionHighlightForeground': '#e07a5f33',
+      },
     })
-  }, [notes, updateScratchpad])
-
-  // Delete note
-  const deleteNote = useCallback(
-    (noteId: string) => {
-      const newNotes = notes.filter((n) => n.id !== noteId)
-      const newActiveId =
-        activeNoteId === noteId
-          ? newNotes[0]?.id ?? null
-          : activeNoteId
-      updateScratchpad({
-        notes: newNotes,
-        activeNoteId: newActiveId,
-      })
-    },
-    [notes, activeNoteId, updateScratchpad]
-  )
-
-  // Update note content
-  const updateNoteContent = useCallback(
-    (content: string) => {
-      if (!activeNoteId) return
-      const newNotes = notes.map((n) =>
-        n.id === activeNoteId
-          ? { ...n, content, updatedAt: Date.now() }
-          : n
-      )
-      updateScratchpad({ notes: newNotes })
-    },
-    [activeNoteId, notes, updateScratchpad]
-  )
-
-  // Select note
-  const selectNote = useCallback(
-    (noteId: string) => {
-      updateScratchpad({ activeNoteId: noteId })
-    },
-    [updateScratchpad]
-  )
+  }, [])
 
   // Handle editor mount
   const handleEditorMount = useCallback(
     (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
       editorRef.current = editor
+      monacoRef.current = monaco
 
-      // Configure markdown settings
+      // Define and apply KODA theme
+      defineKodaTheme(monaco)
+      monaco.editor.setTheme('koda-obsidian')
+
+      // Configure markdown
       monaco.languages.setLanguageConfiguration('markdown', {
         wordPattern: /(-?\d*\.\d\w*)|([^`~!@#%^&*()=+[\]{}\\|;:'",.<>/?s-]+)/g,
       })
 
-      // Set editor options - terminal aesthetic
+      // Terminal-native editor options
       editor.updateOptions({
         wordWrap: 'on',
         lineNumbers: 'off',
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        fontSize: 12,
-        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-        lineHeight: 1.5,
-        padding: { top: 12, bottom: 12 },
+        fontSize: 13,
+        fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", monospace',
+        fontLigatures: true,
+        lineHeight: 1.6,
+        letterSpacing: 0.3,
+        padding: { top: 16, bottom: 16 },
         renderLineHighlight: 'none',
         overviewRulerLanes: 0,
         hideCursorInOverviewRuler: true,
+        cursorStyle: 'line',
+        cursorBlinking: 'smooth',
+        cursorWidth: 1,
+        smoothScrolling: true,
         scrollbar: {
           vertical: 'auto',
           horizontal: 'hidden',
           verticalScrollbarSize: 6,
+          useShadows: false,
+        },
+        // Clean appearance
+        folding: false,
+        glyphMargin: false,
+        lineDecorationsWidth: 16,
+        lineNumbersMinChars: 0,
+        renderWhitespace: 'none',
+        guides: {
+          indentation: false,
+          bracketPairs: false,
         },
       })
+
+      // Focus editor
+      editor.focus()
     },
-    []
+    [defineKodaTheme]
   )
 
-  // Create initial note if none exist
+  // Set placeholder on empty content
   useEffect(() => {
-    if (notes.length === 0) {
-      createNote()
+    if (!content && editorRef.current) {
+      // Could set placeholder text here if desired
     }
-  }, [notes.length, createNote])
+  }, [content])
 
   return (
-    <div className={cn('flex flex-col h-full font-mono bg-[#000000]', className)} data-testid="scratchpad-container">
-      {/* Header with tabs */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-border-subtle" data-testid="scratchpad-header">
-        <div className="flex items-center gap-1 text-xs">
-          <span className="text-text-faint mr-1">┌─</span>
-          
-          {/* Notes tab */}
-          <button
-            onClick={() => { setActiveTab('notes') }}
-            data-testid="scratchpad-tab-notes"
-            data-active={activeTab === 'notes'}
-            className={cn(
-              'px-2 py-1 transition-colors',
-              activeTab === 'notes'
-                ? 'text-text-accent bg-surface-active'
-                : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
-            )}
-          >
-            [NOTES]
-          </button>
-
-          {/* History tab */}
-          <button
-            onClick={() => { setActiveTab('history') }}
-            data-testid="scratchpad-tab-history"
-            data-active={activeTab === 'history'}
-            className={cn(
-              'px-2 py-1 transition-colors',
-              activeTab === 'history'
-                ? 'text-text-accent bg-surface-active'
-                : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
-            )}
-          >
-            [HISTORY]
-          </button>
-        </div>
-
-        {activeTab === 'notes' && (
-          <button
-            onClick={createNote}
-            data-testid="scratchpad-new-note"
-            className="px-2 py-1 text-xs text-text-muted hover:text-text-accent transition-colors"
-            title="New note"
-          >
-            [+]
-          </button>
-        )}
+    <div 
+      className={cn('flex flex-col h-full font-mono bg-[#000000]', className)} 
+      data-testid="scratchpad-container"
+    >
+      {/* Minimal header */}
+      <div 
+        className="flex items-center px-4 py-2 border-b border-dashed border-border-subtle"
+        data-testid="scratchpad-header"
+      >
+        <span className="text-xs text-text-faint tracking-wider">
+          <span className="text-text-accent">&gt;</span> SCRATCH
+        </span>
       </div>
 
-      {/* Notes tab content */}
-      {activeTab === 'notes' && (
-        <>
-          {/* Notes list (collapsible) */}
-          <div className="border-b border-dashed border-border-subtle">
-            <button
-              onClick={() => { setIsNotesExpanded(!isNotesExpanded) }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
-            >
-              <span className="text-text-faint">│</span>
-              {isNotesExpanded ? (
-                <ChevronDown className="size-3" />
-              ) : (
-                <ChevronRight className="size-3" />
-              )}
-              <span>Notes ({notes.length})</span>
-            </button>
-
-            {isNotesExpanded && (
-              <div className="px-3 pb-2 space-y-0.5 max-h-32 overflow-y-auto">
-                {notes.map((note) => (
-                  <div
-                    key={note.id}
-                    className={cn(
-                      'group flex items-center justify-between px-2 py-1 text-xs cursor-pointer transition-colors',
-                      note.id === activeNoteId
-                        ? 'text-text-accent bg-surface-active'
-                        : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
-                    )}
-                    onClick={() => { selectNote(note.id) }}
-                  >
-                    <span className="truncate flex-1">
-                      {note.id === activeNoteId && <span className="mr-1">▶</span>}
-                      {note.title}
-                    </span>
-                    {notes.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteNote(note.id)
-                        }}
-                        className="p-0.5 opacity-0 group-hover:opacity-100 text-text-faint hover:text-status-error transition-opacity"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Editor */}
-          <div className="flex-1 min-h-0">
-            {activeNote ? (
-              <Editor
-                height="100%"
-                defaultLanguage="markdown"
-                value={activeNote.content}
-                onChange={(value) => { updateNoteContent(value ?? '') }}
-                onMount={handleEditorMount}
-                theme="vs-dark"
-                options={{
-                  readOnly: false,
-                }}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-text-faint text-xs">
-                <div>┌────────────────────┐</div>
-                <div>│   NO NOTES YET     │</div>
-                <div>│   Click [+] to     │</div>
-                <div>│   create one       │</div>
-                <div>└────────────────────┘</div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* History tab content */}
-      {activeTab === 'history' && (
-        <ConversationHistory className="flex-1" />
-      )}
+      {/* Editor */}
+      <div className="flex-1 min-h-0">
+        <Editor
+          height="100%"
+          defaultLanguage="markdown"
+          value={content}
+          onChange={(value) => { updateContent(value ?? '') }}
+          onMount={handleEditorMount}
+          theme="koda-obsidian"
+          loading={
+            <div className="flex items-center justify-center h-full text-text-faint text-xs">
+              <span className="animate-pulse">Loading...</span>
+            </div>
+          }
+          options={{
+            readOnly: false,
+          }}
+        />
+      </div>
     </div>
   )
 }

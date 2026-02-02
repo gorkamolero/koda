@@ -50,28 +50,26 @@ export function MessageList() {
       <div
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full flex flex-col items-center justify-center font-mono bg-[#000000]"
+        className="h-full w-full flex flex-col items-center justify-center font-mono bg-[#000000]"
       >
-        <div className="text-center text-xs text-text-faint">
-          <div className="mb-6">
-            <div>┌────────────────────────────────────┐</div>
-            <div>│                                    │</div>
-            <div>│      <span className="text-text-accent">KODA TERMINAL</span> v0.1.0         │</div>
-            <div>│                                    │</div>
-            <div>│  ██╗  ██╗ ██████╗ ██████╗  █████╗  │</div>
-            <div>│  ██║ ██╔╝██╔═══██╗██╔══██╗██╔══██╗ │</div>
-            <div>│  █████╔╝ ██║   ██║██║  ██║███████║ │</div>
-            <div>│  ██╔═██╗ ██║   ██║██║  ██║██╔══██║ │</div>
-            <div>│  ██║  ██╗╚██████╔╝██████╔╝██║  ██║ │</div>
-            <div>│  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ │</div>
-            <div>│                                    │</div>
-            <div>│  Ready for input...                │</div>
-            <div>│                                    │</div>
-            <div>└────────────────────────────────────┘</div>
-          </div>
-          <div className="text-text-muted">
-            Type a message or use /commands
-          </div>
+        <pre className="text-xs text-text-faint leading-tight">
+{`┌────────────────────────────────────┐
+│                                    │
+│      `}<span className="text-text-accent">KODA TERMINAL</span>{` v0.1.0          │
+│                                    │
+│  ██╗  ██╗ ██████╗ ██████╗  █████╗  │
+│  ██║ ██╔╝██╔═══██╗██╔══██╗██╔══██╗ │
+│  █████╔╝ ██║   ██║██║  ██║███████║ │
+│  ██╔═██╗ ██║   ██║██║  ██║██╔══██║ │
+│  ██║  ██╗╚██████╔╝██████╔╝██║  ██║ │
+│  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ │
+│                                    │
+│  Ready for input...                │
+│                                    │
+└────────────────────────────────────┘`}
+        </pre>
+        <div className="mt-4 text-xs text-text-muted">
+          Type a message or use /commands
         </div>
       </div>
     )
