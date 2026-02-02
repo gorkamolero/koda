@@ -105,6 +105,16 @@
     --transition-normal: 150ms;
     --transition-slow: 220ms;
 
+    /* === SIDEBAR VARIABLES (for shadcn sidebar components) === */
+    --sidebar-background: var(--surface-sidebar);
+    --sidebar-foreground: var(--text-primary);
+    --sidebar-primary: var(--text-accent);
+    --sidebar-primary-foreground: var(--text-strong);
+    --sidebar-accent: var(--surface-hover);
+    --sidebar-accent-foreground: var(--text-primary);
+    --sidebar-border: var(--border-subtle);
+    --sidebar-ring: var(--border-accent);
+
     /* === LEGACY COMPATIBILITY (keep existing functionality) === */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
@@ -169,28 +179,29 @@
     --glass-saturate: 1;
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Unified with semantic system - blue-tinted dark theme */
+    --background: 220 30% 5%;        /* Near black with blue tint */
+    --foreground: 220 10% 90%;       /* Off-white with slight blue */
+    --card: 220 20% 8%;              /* Slightly elevated surface */
+    --card-foreground: 220 10% 90%;
+    --popover: 220 25% 6%;           /* Popover bg */
+    --popover-foreground: 220 10% 90%;
+    --primary: 210 100% 70%;         /* Blue accent */
+    --primary-foreground: 220 30% 5%;
+    --secondary: 220 15% 12%;        /* Subtle elevation */
+    --secondary-foreground: 220 10% 85%;
+    --muted: 220 15% 15%;            /* Muted surfaces */
+    --muted-foreground: 220 10% 55%; /* Muted text - matches text-muted */
+    --accent: 220 20% 15%;           /* Hover states */
+    --accent-foreground: 220 10% 90%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
+    --border: 220 15% 18%;           /* Matches border-subtle opacity */
+    --input: 220 15% 18%;
+    --ring: 210 100% 60%;            /* Blue focus ring */
+    --chart-1: 210 80% 55%;
+    --chart-2: 170 70% 45%;
+    --chart-3: 35 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
@@ -649,15 +660,4 @@ body,
 [data-tauri-drag-region] a,
 [data-tauri-drag-region] input {
   -webkit-app-region: no-drag;
-}
-
-
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
 }
