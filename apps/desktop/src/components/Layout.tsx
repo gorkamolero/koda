@@ -76,13 +76,13 @@ function SidebarResizer({
  * Main application layout with CSS Grid structure.
  *
  * Layout structure:
- * ┌─────────────────────────────────────────────────────┐
- * │ Titlebar (24px, drag region)                        │
- * ├─────────┬───────────────────────────────────────────┤
- * │ Sidebar │ Main Content                              │
+ * ┌─────────┬───────────────────────────────────────────┐
+ * │ Sidebar │ Main Content (includes TopBar with drag)  │
  * │ (280px) │                                           │
  * │         │                                           │
  * └─────────┴───────────────────────────────────────────┘
+ *
+ * Note: Window drag region is in TopBar row 1, not a separate titlebar.
  */
 export function Layout({ children }: LayoutProps) {
   const initializeTheme = useSetAtom(initializeThemeAtom)
@@ -120,15 +120,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <NotificationProvider>
-      <div className="h-screen w-screen overflow-hidden bg-surface-messages grid grid-rows-[var(--titlebar-height)_1fr] grid-cols-[var(--sidebar-width)_1fr]">
-        {/* Titlebar - drag region for window */}
-        <div
-          className="col-span-2 glass-topbar border-b border-border-subtle"
-          data-tauri-drag-region
-        >
-          {/* Window controls are handled natively by Tauri on macOS */}
-        </div>
-
+      <div className="h-screen w-screen overflow-hidden bg-surface-messages grid grid-cols-[var(--sidebar-width)_1fr]">
         {/* Sidebar */}
         <aside className="relative glass-sidebar border-r border-border-subtle overflow-hidden">
           <Sidebar />

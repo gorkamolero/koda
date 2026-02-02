@@ -126,7 +126,7 @@ export function RightSidebar({
       </div>
 
       {/* Row 2: Tabs bar */}
-      <div className="flex items-center justify-between gap-1 px-2 py-2 min-w-0 overflow-hidden">
+      <div className="flex items-center justify-between gap-1 px-2 h-10 min-w-0 overflow-hidden border-b border-border">
         {/* Left side - main tabs */}
         <div className="flex items-center gap-1 flex-shrink-0">
           {tabs.map((tab) => (

@@ -50,8 +50,8 @@
         "focus": true,
         "skipTaskbar": false,
         "theme": null,
-        "titleBarStyle": "Visible",
-        "hiddenTitle": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "minWidth": 800,
         "minHeight": 600
       }

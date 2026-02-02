@@ -146,8 +146,11 @@ export function TopBar({
 
   return (
     <div className="flex flex-col">
-      {/* Row 1: Workspace header with branch info */}
-      <div className="flex items-center justify-between h-10 px-4 bg-sidebar-background border-b border-border">
+      {/* Row 1: Workspace header with branch info (also window drag region) */}
+      <div
+        className="flex items-center justify-between h-10 px-4 bg-sidebar-background border-b border-border"
+        data-tauri-drag-region
+      >
         {/* Left: Branch and origin */}
         <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {/* Branch with edit/copy on hover */}

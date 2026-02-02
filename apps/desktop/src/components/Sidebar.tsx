@@ -556,11 +556,37 @@ function SidebarHeader(): React.ReactElement {
   const navigate = useNavigate()
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-      <div className="flex items-center gap-2">
-        {/* Workspaces icon */}
+    <div className="flex flex-col border-b border-border-subtle">
+      {/* Row 1: Traffic lights space + navigation arrows */}
+      <div
+        className="flex items-center justify-between pl-[70px] pr-3 h-10"
+        data-tauri-drag-region
+      >
+        {/* Left side empty - traffic lights overlay here */}
+        <div className="flex-1" data-tauri-drag-region />
+
+        {/* Right side - navigation arrows */}
+        <div className="flex items-center gap-0.5">
+          <button
+            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            onClick={() => { void navigate({ to: '/' }) }}
+            title="Back"
+          >
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+          </button>
+          <button
+            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            title="Forward"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Row 2: Workspaces label (aligns with tabs row in other panels) */}
+      <div className="flex items-center gap-1.5 px-3 h-10">
         <svg
-          className="w-5 h-5 text-text-muted"
+          className="w-4 h-4 text-text-muted"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -571,22 +597,7 @@ function SidebarHeader(): React.ReactElement {
           <rect x="3" y="14" width="7" height="7" rx="1" />
           <rect x="14" y="14" width="7" height="7" rx="1" />
         </svg>
-        <span className="text-text-primary font-semibold">Workspaces</span>
-      </div>
-      <div className="flex items-center gap-0.5">
-        <button
-          className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-          onClick={() => { void navigate({ to: '/' }) }}
-          title="Back"
-        >
-          <ChevronRight className="w-4 h-4 rotate-180" />
-        </button>
-        <button
-          className="p-1.5 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-          title="Forward"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
+        <span className="text-sm text-text-primary font-medium">Workspaces</span>
       </div>
     </div>
   )
