@@ -347,7 +347,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
             className={cn(
               "h-6 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium transition-all duration-200",
               thinkingEnabled
-                ? "bg-sky-500/90 hover:bg-sky-500/80 text-white"
+                ? "bg-[#e07a5f] hover:bg-[#d06a4f] text-white"
                 : "hover:bg-accent text-muted-foreground hover:text-foreground"
             )}
             title={thinkingEnabled ? "Thinking enabled" : "Thinking disabled"}
