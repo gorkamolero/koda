@@ -15,7 +15,6 @@ import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '@/componen
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import { CodeBlock } from '@/components/ai-elements/code-block'
 import type { BundledLanguage } from 'shiki'
-import { Shimmer } from '@/components/ai-elements/shimmer'
 
 // ============================================================================
 // Types
@@ -62,8 +61,8 @@ function renderToolBlock(
         <ToolInput input={block.input} />
         {isCodeOutput ? (
           <div className="p-4 space-y-2">
-            <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-              Result
+            <h4 className="font-mono text-text-faint text-xs uppercase tracking-wide">
+              [RESULT]
             </h4>
             <CodeBlock
               code={result?.output ?? ''}
@@ -175,13 +174,12 @@ function renderContentBlock(
 }
 
 // ============================================================================
-// MessageItem Component - Conductor-style clean layout
+// MessageItem Component - Terminal aesthetic
 // ============================================================================
 
 export const MessageItem = memo(function MessageItem({
   message,
   turnIndex,
-  onAnswerQuestion: _onAnswerQuestion,
 }: MessageItemProps) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
@@ -189,17 +187,36 @@ export const MessageItem = memo(function MessageItem({
   const isError = message.status === 'error'
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
 
-  // System messages - centered, minimal
+  // System messages - terminal style centered notice
   if (isSystem) {
     return (
       <div
         data-testid={`message-${message.id}`}
         data-turn-index={turnIndex}
         data-message-role="system"
-        className="pb-3 max-w-6xl mx-auto scroll-mt-24"
+        className="py-2 px-6 text-xs font-mono"
       >
-        <div className="flex justify-center px-7 py-2">
-          <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+        <div className="flex justify-center">
+          <span className="text-text-faint">─── </span>
+          <span className="text-text-muted">{message.content}</span>
+          <span className="text-text-faint"> ───</span>
+        </div>
+      </div>
+    )
+  }
+
+  // User messages - terminal prompt style with '>' prefix
+  if (isUser) {
+    return (
+      <div
+        data-testid={`message-${message.id}`}
+        data-turn-index={turnIndex}
+        data-message-role="user"
+        className="py-3 px-6 font-mono"
+      >
+        <div className="flex gap-2 text-sm">
+          <span className="text-text-accent flex-shrink-0">&gt;</span>
+          <div className="text-text-primary whitespace-pre-wrap break-words">
             {message.content}
           </div>
         </div>
@@ -207,92 +224,88 @@ export const MessageItem = memo(function MessageItem({
     )
   }
 
-  // User messages - right-aligned with highlight background
-  if (isUser) {
-    return (
-      <div
-        data-testid={`message-${message.id}`}
-        data-turn-index={turnIndex}
-        data-message-role="user"
-        className="pb-3 max-w-6xl mx-auto scroll-mt-24"
-      >
-        <div className="flex flex-col gap-1 w-full px-7 py-2">
-          <div className="flex justify-end pb-6">
-            <div className="relative min-w-0 max-w-full">
-              <div className="max-w-xl lg:max-w-3xl p-3 rounded px-4 break-words overflow-hidden bg-highlight text-highlight-foreground">
-                <div className="text-sm break-words whitespace-pre-wrap">
-                  {message.content}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Assistant messages - left-aligned, Conductor-style prose
+  // Assistant messages - boxed response with KODA header
   return (
     <div
       data-testid={`message-${message.id}`}
       data-turn-index={turnIndex}
       data-message-role="assistant"
-      className="pb-3 max-w-6xl mx-auto scroll-mt-24"
+      className="py-3 px-6 font-mono text-xs"
     >
-      <div className="flex flex-col gap-1 w-full border max-w-full px-7 py-2 !border-transparent">
-        {/* Tool call summary row */}
-        {hasContentBlocks && message.contentBlocks && (
-          <ToolCallSummary
-            contentBlocks={message.contentBlocks}
-            className="w-full flex items-center text-muted-foreground hover:text-foreground mb-1"
-          />
-        )}
+      {/* Tool call summary row */}
+      {hasContentBlocks && message.contentBlocks && (
+        <ToolCallSummary
+          contentBlocks={message.contentBlocks}
+          className="mb-2"
+        />
+      )}
 
-        {/* Main content - Conductor prose styling */}
-        <div className="flex justify-start relative">
-          <div className={cn(
-            "flex flex-col w-full max-w-xl lg:max-w-3xl space-y-1 break-words",
-            isError && "border-l-2 border-destructive pl-3"
-          )}>
-            <div className="my-1" data-searchable="true">
-              <div className="prose prose-sm prose-invert antialiased select-text text-pretty prose-headings:text-balance">
-                {hasContentBlocks && message.contentBlocks ? (
-                  <div className="space-y-3">
-                    {message.contentBlocks.map((block, idx) => (
-                      <div key={`${block.type}-${String(idx)}`}>
-                        {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
-                      </div>
-                    ))}
+      {/* Response box */}
+      <div className={cn(
+        "border border-dashed border-border-subtle",
+        isError && "border-status-error/50"
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-dashed border-border-subtle">
+          <div className="flex items-center gap-2 text-text-faint">
+            <span>┌─</span>
+            <span className="text-text-accent">KODA</span>
+            {isStreaming && (
+              <span className="text-status-warning">[STREAMING]</span>
+            )}
+            {isError && (
+              <span className="text-status-error">[ERROR]</span>
+            )}
+          </div>
+          {message.model && (
+            <span className="text-text-faint text-[10px]">
+              {message.model.includes('opus') ? 'opus-4.5' : 
+               message.model.includes('sonnet') ? 'sonnet-4' : 
+               message.model.includes('haiku') ? 'haiku' : message.model}
+            </span>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="px-4 py-3">
+          <div className="prose prose-sm prose-invert prose-pre:bg-[#0a0a0a] prose-pre:border prose-pre:border-dashed prose-pre:border-border-subtle max-w-none">
+            {hasContentBlocks && message.contentBlocks ? (
+              <div className="space-y-3">
+                {message.contentBlocks.map((block, idx) => (
+                  <div key={`${block.type}-${String(idx)}`}>
+                    {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
+                {isStreaming && !message.content ? (
+                  <div className="text-text-muted">
+                    <span className="inline-block animate-pulse">█</span>
                   </div>
                 ) : (
-                  <>
-                    {isStreaming && !message.content ? (
-                      <Shimmer duration={1.5}>Thinking...</Shimmer>
-                    ) : isStreaming ? (
-                      <MessageResponse>{message.content}</MessageResponse>
-                    ) : (
-                      <MessageResponse>{message.content}</MessageResponse>
-                    )}
-                  </>
+                  <MessageResponse>{message.content}</MessageResponse>
                 )}
-              </div>
-            </div>
-
-            {/* Error indicator */}
-            {isError && !hasContentBlocks && (
-              <div className="mt-2 text-xs text-destructive">
-                Failed to generate response
-              </div>
+              </>
             )}
           </div>
         </div>
 
-        {/* Metadata row with working indicator during streaming */}
+        {/* Footer with working indicator during streaming */}
         {isStreaming && (
-          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between px-3 py-1.5 border-t border-dashed border-border-subtle">
             <WorkingIndicator
               startTime={message.startTime ?? message.timestamp}
+              className="text-xs"
             />
+            <span className="text-text-faint">─┘</span>
+          </div>
+        )}
+
+        {/* Closed footer when not streaming */}
+        {!isStreaming && (
+          <div className="px-3 py-1 text-text-faint">
+            └{'─'.repeat(40)}┘
           </div>
         )}
       </div>

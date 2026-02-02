@@ -1,42 +1,54 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { ThemeSelector } from '@/components/ThemeSelector'
-import { Bot, GitBranch, Keyboard, Info } from 'lucide-react'
 
 /**
- * Settings section wrapper component
+ * Terminal-style settings section
+ * ┌─ SECTION NAME ───────────────────┐
+ * │ description...                   │
+ * │                                  │
+ * │ content                          │
+ * └──────────────────────────────────┘
  */
-function SettingsSection({
+function TerminalSection({
   title,
   description,
-  icon: Icon,
   children,
 }: {
   title: string
   description?: string
-  icon: React.ElementType
   children: React.ReactNode
 }) {
   return (
-    <section className="card-strong p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-surface-card flex items-center justify-center">
-          <Icon className="w-5 h-5 text-text-accent" />
-        </div>
-        <div>
-          <h2 className="text-text-strong font-semibold">{title}</h2>
-          {description && <p className="text-text-faint text-sm">{description}</p>}
-        </div>
+    <section className="font-mono text-xs">
+      {/* Header */}
+      <div className="flex items-center text-text-faint mb-2">
+        <span>┌─ </span>
+        <span className="text-text-accent">{title}</span>
+        <span> {'─'.repeat(Math.max(0, 30 - title.length))}</span>
+        <span>┐</span>
       </div>
-      {children}
+      
+      {/* Content */}
+      <div className="px-4 py-3 border-l border-r border-dashed border-border-subtle">
+        {description && (
+          <p className="text-text-muted mb-3">{description}</p>
+        )}
+        {children}
+      </div>
+      
+      {/* Footer */}
+      <div className="text-text-faint">
+        └{'─'.repeat(34)}┘
+      </div>
     </section>
   )
 }
 
 /**
- * Form field component
+ * Terminal-style form field
  */
-function FormField({
+function TerminalField({
   label,
   description,
   children,
@@ -47,19 +59,24 @@ function FormField({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-text-primary">{label}</label>
+      <div className="flex items-center gap-2">
+        <span className="text-text-faint">│</span>
+        <label className="text-text-primary">[{label}]</label>
       </div>
-      {description && <p className="text-xs text-text-faint">{description}</p>}
-      {children}
+      {description && (
+        <p className="text-text-faint pl-4 text-[10px]">{description}</p>
+      )}
+      <div className="pl-4">
+        {children}
+      </div>
     </div>
   )
 }
 
 /**
- * Select input component
+ * Terminal-style select input
  */
-function Select({
+function TerminalSelect({
   value,
   onChange,
   options,
@@ -73,11 +90,11 @@ function Select({
       value={value}
       onChange={(e) => { onChange(e.target.value) }}
       className={cn(
-        'w-full rounded-lg px-3 py-2 text-sm',
-        'bg-surface-control border border-border-subtle',
+        'w-full px-3 py-2 text-xs font-mono',
+        'bg-[#0a0a0a] border border-dashed border-border-subtle',
         'text-text-primary',
-        'focus:outline-none focus:border-border-accent focus:ring-1 focus:ring-border-accent-soft',
-        'transition-colors'
+        'focus:outline-none focus:border-text-accent',
+        'transition-colors cursor-pointer'
       )}
     >
       {options.map((option) => (
@@ -90,36 +107,65 @@ function Select({
 }
 
 /**
- * Settings page component
+ * Terminal-style keyboard shortcut row
+ */
+function ShortcutRow({ action, keys }: { action: string; keys: string }) {
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-dashed border-border-subtle last:border-0">
+      <span className="text-text-muted">{action}</span>
+      <kbd className="px-2 py-1 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-accent">
+        {keys}
+      </kbd>
+    </div>
+  )
+}
+
+/**
+ * Terminal-style Settings page
+ * ┌─────────────────────────────────────────────┐
+ * │ ███████╗███████╗████████╗████████╗██╗███╗   │
+ * │ ██╔════╝██╔════╝╚══██╔══╝╚══██╔══╝██║████╗  │
+ * │ ███████╗█████╗     ██║      ██║   ██║██╔██╗ │
+ * │ ╚════██║██╔══╝     ██║      ██║   ██║██║╚██╗│
+ * │ ███████║███████╗   ██║      ██║   ██║██║ ╚██│
+ * │ ╚══════╝╚══════╝   ╚═╝      ╚═╝   ╚═╝╚═╝  ╚═│
+ * └─────────────────────────────────────────────┘
  */
 export function Settings() {
   return (
-    <div className="h-full overflow-y-auto bg-surface-messages">
-      <div className="max-w-3xl mx-auto p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-text-strong mb-2">Settings</h1>
-          <p className="text-text-muted">Configure your workspace preferences</p>
+    <div className="h-full overflow-y-auto font-mono bg-[#000000]">
+      <div className="max-w-2xl mx-auto p-8">
+        {/* ASCII Header */}
+        <div className="mb-8 text-xs">
+          <div className="text-text-faint mb-4">
+            ┌{'─'.repeat(40)}┐
+          </div>
+          <div className="text-center mb-4">
+            <h1 className="text-xl text-text-accent tracking-wider">[SETTINGS]</h1>
+            <p className="text-text-muted mt-2">Configure your workspace preferences</p>
+          </div>
+          <div className="text-text-faint">
+            └{'─'.repeat(40)}┘
+          </div>
         </div>
 
         <div className="space-y-6">
           {/* Theme Section */}
-          <section className="card-strong p-6">
+          <TerminalSection title="THEME">
             <ThemeSelector />
-          </section>
+          </TerminalSection>
 
           {/* Agent Configuration */}
-          <SettingsSection
-            title="Agent Configuration"
+          <TerminalSection
+            title="AGENT"
             description="Configure your AI agent preferences"
-            icon={Bot}
           >
             <div className="space-y-4">
-              <FormField
-                label="Default Agent"
+              <TerminalField
+                label="DEFAULT_AGENT"
                 description="The agent that will be used for new conversations"
               >
-                <Select
+                <TerminalSelect
                   value="claude-code"
                   onChange={() => {}}
                   options={[
@@ -128,79 +174,71 @@ export function Settings() {
                     { value: 'kimi-code', label: 'Kimi Code' },
                   ]}
                 />
-              </FormField>
+              </TerminalField>
             </div>
-          </SettingsSection>
+          </TerminalSection>
 
           {/* Git Configuration */}
-          <SettingsSection
-            title="Git Configuration"
+          <TerminalSection
+            title="GIT"
             description="Manage your Git identities"
-            icon={GitBranch}
           >
             <div className="space-y-4">
-              <FormField
-                label="Default Git Identity"
+              <TerminalField
+                label="GIT_IDENTITY"
                 description="Used when creating commits and PRs"
               >
-                <Select
+                <TerminalSelect
                   value="personal"
                   onChange={() => {}}
                   options={[
                     { value: 'personal', label: 'Personal (GitHub)' },
                     { value: 'work', label: 'Work (GitHub)' },
-                    { value: 'add', label: 'Add New Identity...' },
+                    { value: 'add', label: '+ Add New Identity...' },
                   ]}
                 />
-              </FormField>
+              </TerminalField>
             </div>
-          </SettingsSection>
+          </TerminalSection>
 
           {/* Keyboard Shortcuts */}
-          <SettingsSection
-            title="Keyboard Shortcuts"
-            description="Customize your keyboard shortcuts"
-            icon={Keyboard}
+          <TerminalSection
+            title="KEYBINDS"
+            description="Keyboard shortcuts reference"
           >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-text-primary">Command Palette</span>
-                <kbd className="px-2 py-1 bg-surface-control rounded text-xs text-text-faint font-mono">
-                  ⌘ K
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 border-t border-border-subtle">
-                <span className="text-sm text-text-primary">Quick Open</span>
-                <kbd className="px-2 py-1 bg-surface-control rounded text-xs text-text-faint font-mono">
-                  ⌘ P
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-2 border-t border-border-subtle">
-                <span className="text-sm text-text-primary">New Message</span>
-                <kbd className="px-2 py-1 bg-surface-control rounded text-xs text-text-faint font-mono">
-                  ⌘ ↵
-                </kbd>
-              </div>
+            <div className="space-y-1">
+              <ShortcutRow action="Command Palette" keys="⌘ K" />
+              <ShortcutRow action="Quick Open" keys="⌘ P" />
+              <ShortcutRow action="New Message" keys="⌘ ↵" />
+              <ShortcutRow action="Toggle Terminal" keys="⌘ `" />
+              <ShortcutRow action="Toggle Sidebar" keys="⌘ B" />
             </div>
-          </SettingsSection>
+          </TerminalSection>
 
           {/* About */}
-          <SettingsSection
-            title="About"
-            description="Application information"
-            icon={Info}
-          >
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-text-muted">Version</span>
-                <span className="text-text-primary font-mono">0.1.0</span>
+          <TerminalSection title="ABOUT">
+            <div className="space-y-2">
+              <div className="flex justify-between py-1">
+                <span className="text-text-muted">VERSION</span>
+                <span className="text-text-accent">0.1.0</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-muted">Build</span>
-                <span className="text-text-primary font-mono">dev</span>
+              <div className="flex justify-between py-1">
+                <span className="text-text-muted">BUILD</span>
+                <span className="text-text-accent">dev</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-text-muted">RUNTIME</span>
+                <span className="text-text-accent">Tauri v2</span>
               </div>
             </div>
-          </SettingsSection>
+          </TerminalSection>
+
+          {/* Footer */}
+          <div className="text-center text-text-faint text-[10px] pt-4">
+            <div>{'─'.repeat(40)}</div>
+            <div className="py-2">KODA TERMINAL v0.1.0</div>
+            <div>{'─'.repeat(40)}</div>
+          </div>
         </div>
       </div>
     </div>

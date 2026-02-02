@@ -10,13 +10,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ContextCategory {
   name: string
   percent: number
-  color: string
+  symbol: string
 }
 
 /**
@@ -37,23 +36,21 @@ function formatTokenCount(count: number): string {
  * In a real implementation, these would come from the agent session
  */
 function getContextCategories(usedPercent: number): ContextCategory[] {
-  // Distribute the used percentage across categories
-  // These ratios are based on typical Claude Code sessions
   const ratios = [
-    { name: 'Messages', ratio: 0.447, color: 'bg-status-unread' },
-    { name: 'Autocompact buffer', ratio: 0.165, color: 'bg-border-accent' },
-    { name: 'System tools', ratio: 0.055, color: 'bg-status-success' },
-    { name: 'Skills', ratio: 0.029, color: 'bg-status-warning' },
-    { name: 'System prompt', ratio: 0.018, color: 'bg-status-error' },
-    { name: 'Memory files', ratio: 0.006, color: 'bg-status-reviewing' },
-    { name: 'MCP tools', ratio: 0.005, color: 'bg-status-reviewing' },
-    { name: 'Custom agents', ratio: 0.002, color: 'bg-text-muted' },
+    { name: 'Messages', ratio: 0.447, symbol: '█' },
+    { name: 'Autocompact', ratio: 0.165, symbol: '▓' },
+    { name: 'System tools', ratio: 0.055, symbol: '▒' },
+    { name: 'Skills', ratio: 0.029, symbol: '░' },
+    { name: 'System prompt', ratio: 0.018, symbol: '▪' },
+    { name: 'Memory files', ratio: 0.006, symbol: '·' },
+    { name: 'MCP tools', ratio: 0.005, symbol: '·' },
+    { name: 'Custom agents', ratio: 0.002, symbol: '·' },
   ]
 
   return ratios.map((r) => ({
     name: r.name,
     percent: Number((usedPercent * r.ratio * 100).toFixed(1)),
-    color: r.color,
+    symbol: r.symbol,
   }))
 }
 
@@ -63,6 +60,7 @@ interface ContextStatsPopoverProps {
 
 /**
  * Context stats popover showing detailed breakdown of context usage
+ * Terminal aesthetic with ASCII progress bar
  */
 export function ContextStatsPopover({ className }: ContextStatsPopoverProps) {
   const totalTokens = useAtomValue(totalTokensAtom)
@@ -76,53 +74,88 @@ export function ContextStatsPopover({ className }: ContextStatsPopoverProps) {
 
   const categories = getContextCategories(usedPercent)
 
+  // ASCII progress bar
+  const barWidth = 20
+  const filledChars = Math.round(usedPercent * barWidth)
+  const progressBar = '█'.repeat(Math.min(filledChars, barWidth)) + '░'.repeat(Math.max(0, barWidth - filledChars))
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
           className={cn(
-            'flex items-center justify-center size-7 text-muted-foreground hover:text-foreground rounded transition-colors',
+            'flex items-center gap-1 px-2 py-1 text-xs font-mono',
+            'text-text-muted hover:text-text-accent transition-colors',
             className
           )}
           title="View context"
         >
-          <BarChart2 className="h-4 w-4" />
+          <span className="text-text-faint">[</span>
+          <span>CTX:</span>
+          <span className={cn(
+            usedPercent > 0.8 ? 'text-status-error' :
+            usedPercent > 0.6 ? 'text-status-warning' :
+            'text-text-muted'
+          )}>
+            {Math.round(usedPercent * 100)}%
+          </span>
+          <span className="text-text-faint">]</span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start" sideOffset={8}>
-        {/* Header with total context */}
-        <div className="p-3 border-b border-border">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Context</span>
-            <span className="text-xs text-muted-foreground">
-              {formatTokenCount(displayTokens)}/{formatTokenCount(contextLimit)}
+      <PopoverContent 
+        className="w-72 p-0 bg-[#0a0a0a] border border-dashed border-border-strong font-mono" 
+        align="start" 
+        sideOffset={8}
+      >
+        {/* Header */}
+        <div className="px-3 py-1.5 border-b border-dashed border-border-subtle text-xs">
+          <span className="text-text-faint">┌─ </span>
+          <span className="text-text-accent">CONTEXT USAGE</span>
+          <span className="text-text-faint"> {'─'.repeat(12)}┐</span>
+        </div>
+
+        {/* Progress section */}
+        <div className="px-3 py-2 border-b border-dashed border-border-subtle">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-text-faint">│</span>
+            <span className="text-text-muted">
+              {formatTokenCount(displayTokens)} / {formatTokenCount(contextLimit)}
             </span>
           </div>
-          {/* Progress bar */}
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all"
-              style={{ width: `${String(Math.min(usedPercent * 100, 100))}%` }}
-            />
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-faint">│</span>
+            <span className={cn(
+              usedPercent > 0.8 ? 'text-status-error' :
+              usedPercent > 0.6 ? 'text-status-warning' :
+              'text-text-accent'
+            )}>
+              {progressBar}
+            </span>
+            <span className="text-text-faint">{Math.round(usedPercent * 100)}%</span>
           </div>
         </div>
 
         {/* Category breakdown */}
-        <div className="p-3 space-y-2">
+        <div className="px-3 py-2 space-y-1 text-xs">
           {categories.map((category) => (
             <div key={category.name} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', category.color)} />
-                <span className="text-xs text-muted-foreground">{category.name}</span>
+                <span className="text-text-faint">│</span>
+                <span className="text-text-accent">{category.symbol}</span>
+                <span className="text-text-muted">{category.name}</span>
               </div>
-              <span className="text-xs font-mono text-foreground">
+              <span className="text-text-faint">
                 {category.percent > 0 ? `${String(category.percent)}%` : '—'}
               </span>
             </div>
           ))}
         </div>
 
+        {/* Footer */}
+        <div className="px-3 py-1 text-xs text-text-faint">
+          └{'─'.repeat(32)}┘
+        </div>
       </PopoverContent>
     </Popover>
   )

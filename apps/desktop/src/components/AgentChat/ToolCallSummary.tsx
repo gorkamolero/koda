@@ -1,7 +1,7 @@
 import { memo, useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { ContentBlock, ToolUseContentBlock, ToolResultContentBlock } from '@/store/chat'
-import { ChevronDown, ChevronRight, Check, Loader2, AlertCircle, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 // ============================================================================
 // Types
@@ -60,22 +60,22 @@ function formatDuration(ms?: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-function getStatusIcon(status: ToolSummaryItem['status']) {
+function getStatusIndicator(status: ToolSummaryItem['status']): { symbol: string; color: string } {
   switch (status) {
     case 'success':
-      return <Check className="w-3.5 h-3.5 text-status-success" />
+      return { symbol: '✓', color: 'text-[--git-green]' }
     case 'error':
-      return <AlertCircle className="w-3.5 h-3.5 text-status-error" />
+      return { symbol: '✗', color: 'text-status-error' }
     case 'running':
-      return <Loader2 className="w-3.5 h-3.5 text-status-warning animate-spin" />
+      return { symbol: '◉', color: 'text-status-warning' }
     case 'pending':
     default:
-      return <Clock className="w-3.5 h-3.5 text-text-dim" />
+      return { symbol: '○', color: 'text-text-faint' }
   }
 }
 
 // ============================================================================
-// ToolCallSummary Component
+// ToolCallSummary Component - Terminal Aesthetic
 // ============================================================================
 
 export const ToolCallSummary = memo(function ToolCallSummary({
@@ -93,62 +93,59 @@ export const ToolCallSummary = memo(function ToolCallSummary({
   const errorCount = toolItems.filter(t => t.status === 'error').length
   const runningCount = toolItems.filter(t => t.status === 'running').length
 
-  // Summary text
-  let summaryText = `${String(toolItems.length)} tool call${toolItems.length !== 1 ? 's' : ''}`
-  if (completedCount > 0 || errorCount > 0 || runningCount > 0) {
-    const parts: string[] = []
-    if (completedCount > 0) parts.push(`${String(completedCount)} completed`)
-    if (runningCount > 0) parts.push(`${String(runningCount)} running`)
-    if (errorCount > 0) parts.push(`${String(errorCount)} failed`)
-    summaryText += ` • ${parts.join(', ')}`
-  }
+  // Terminal-style summary
+  const statusParts: string[] = []
+  if (completedCount > 0) statusParts.push(`${completedCount}✓`)
+  if (runningCount > 0) statusParts.push(`${runningCount}◉`)
+  if (errorCount > 0) statusParts.push(`${errorCount}✗`)
 
   return (
-    <div className={cn('rounded-lg border border-border-subtle bg-surface-card', className)}>
+    <div className={cn('font-mono text-xs', className)}>
       {/* Collapsed header */}
       <button
         onClick={() => { setIsExpanded(!isExpanded) }}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover transition-colors"
+        className="w-full flex items-center gap-2 px-2 py-1 text-left hover:bg-surface-hover transition-colors border border-dashed border-border-subtle"
       >
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-text-muted" />
+          <ChevronDown className="size-3 text-text-faint" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-text-muted" />
+          <ChevronRight className="size-3 text-text-faint" />
         )}
 
-        {/* Status indicators */}
-        <div className="flex items-center gap-1">
-          {runningCount > 0 && (
-            <Loader2 className="w-3.5 h-3.5 text-status-warning animate-spin" />
-          )}
-          {completedCount > 0 && errorCount === 0 && runningCount === 0 && (
-            <Check className="w-3.5 h-3.5 text-status-success" />
-          )}
-          {errorCount > 0 && (
-            <AlertCircle className="w-3.5 h-3.5 text-status-error" />
-          )}
-        </div>
+        <span className="text-text-muted">
+          [TOOLS:{toolItems.length}]
+        </span>
 
-        <span className="text-sm text-text-muted">{summaryText}</span>
+        {statusParts.length > 0 && (
+          <span className="text-text-faint">
+            ({statusParts.join(' ')})
+          </span>
+        )}
       </button>
 
       {/* Expanded details */}
       {isExpanded && (
-        <div className="border-t border-border-subtle">
-          {toolItems.map(tool => (
-            <div
-              key={tool.id}
-              className="flex items-center gap-3 px-3 py-2 text-sm border-b border-border-subtle last:border-b-0"
-            >
-              {getStatusIcon(tool.status)}
-              <span className="font-mono text-text-primary">{tool.name}</span>
-              {tool.durationMs && (
-                <span className="text-text-dim text-xs ml-auto">
-                  {formatDuration(tool.durationMs)}
-                </span>
-              )}
-            </div>
-          ))}
+        <div className="border border-t-0 border-dashed border-border-subtle">
+          {toolItems.map((tool, idx) => {
+            const { symbol, color } = getStatusIndicator(tool.status)
+            return (
+              <div
+                key={tool.id}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-1.5",
+                  idx < toolItems.length - 1 && "border-b border-dashed border-border-subtle"
+                )}
+              >
+                <span className={color}>[{symbol}]</span>
+                <span className="text-text-primary">{tool.name}</span>
+                {tool.durationMs && (
+                  <span className="text-text-faint ml-auto">
+                    {formatDuration(tool.durationMs)}
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

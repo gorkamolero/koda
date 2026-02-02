@@ -18,7 +18,7 @@ const KODA_LETTERS = ['K', 'O', 'D', 'A']
 const LETTER_INTERVAL = 150 // ms per letter
 
 // ============================================================================
-// WorkingIndicator Component
+// WorkingIndicator Component - Terminal Aesthetic
 // ============================================================================
 
 export const WorkingIndicator = memo(function WorkingIndicator({
@@ -52,23 +52,27 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const formatElapsed = (ms: number): string => {
     const totalSeconds = ms / 1000
     if (totalSeconds < 60) {
-      // Show one decimal place for sub-minute durations
       return `${totalSeconds.toFixed(1)}s`
     }
 
     const minutes = Math.floor(totalSeconds / 60)
     const remainingSeconds = Math.floor(totalSeconds % 60)
-    return `${String(minutes)}m, ${String(remainingSeconds)}s`
+    return `${String(minutes)}m${String(remainingSeconds)}s`
   }
+
+  // Generate ASCII progress bar based on active index
+  const progressBar = KODA_LETTERS.map((_, i) => 
+    i <= activeIndex ? '█' : '░'
+  ).join('')
 
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-2 text-sm font-mono',
-        'text-text-accent',
+        'inline-flex items-center gap-2 font-mono',
         className
       )}
     >
+      <span className="text-text-faint">[</span>
       <span className="inline-flex">
         {KODA_LETTERS.map((letter, i) => (
           <span
@@ -76,18 +80,19 @@ export const WorkingIndicator = memo(function WorkingIndicator({
             className={cn(
               'transition-all duration-100',
               i === activeIndex
-                ? 'text-text-accent scale-110 font-bold'
+                ? 'text-text-accent'
                 : i < activeIndex
-                  ? 'text-status-success'
-                  : 'text-text-dim'
+                  ? 'text-[--git-green]'
+                  : 'text-text-faint'
             )}
           >
             {letter}
           </span>
         ))}
       </span>
-      <span className="text-text-muted">working</span>
-      <span className="tabular-nums text-text-muted">{formatElapsed(elapsed)}</span>
+      <span className="text-text-faint">]</span>
+      <span className="text-text-muted">{progressBar}</span>
+      <span className="tabular-nums text-text-faint">{formatElapsed(elapsed)}</span>
     </div>
   )
 })
@@ -104,7 +109,7 @@ interface CompactWorkingIndicatorProps {
 
 export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
   startTime,
-  label = 'Working',
+  label = 'working',
   className,
 }: CompactWorkingIndicatorProps) {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -132,11 +137,12 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
     }
     const minutes = Math.floor(totalSeconds / 60)
     const remainingSeconds = Math.floor(totalSeconds % 60)
-    return `${String(minutes)}m, ${String(remainingSeconds)}s`
+    return `${String(minutes)}m${String(remainingSeconds)}s`
   }
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5 font-mono text-xs', className)}>
+    <span className={cn('inline-flex items-center gap-1 font-mono text-xs', className)}>
+      <span className="text-text-faint">[</span>
       <span className="inline-flex">
         {KODA_LETTERS.map((letter, i) => (
           <span
@@ -144,18 +150,19 @@ export const CompactWorkingIndicator = memo(function CompactWorkingIndicator({
             className={cn(
               'transition-all duration-75',
               i === activeIndex
-                ? 'text-text-accent font-bold'
+                ? 'text-text-accent'
                 : i < activeIndex
-                  ? 'text-status-success'
-                  : 'text-text-dim'
+                  ? 'text-[--git-green]'
+                  : 'text-text-faint'
             )}
           >
             {letter}
           </span>
         ))}
       </span>
+      <span className="text-text-faint">]</span>
       <span className="text-text-muted">{label}</span>
-      <span className="text-text-dim tabular-nums">{formatElapsed(elapsed)}</span>
+      <span className="text-text-faint tabular-nums">{formatElapsed(elapsed)}</span>
     </span>
   )
 })

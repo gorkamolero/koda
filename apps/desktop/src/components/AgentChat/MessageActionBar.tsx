@@ -5,7 +5,6 @@ import { useClipboard } from '@/hooks/useClipboard'
 import { extractMessageContent } from '@/lib/messageContent'
 import type { ChatMessage } from '@/store/chat'
 import { revertToMessageAtom, splitAtMessageAtom } from '@/store/chat'
-import { Copy, Check, GitBranch, Undo2 } from 'lucide-react'
 
 // ============================================================================
 // Types
@@ -17,14 +16,14 @@ interface MessageActionBarProps {
 }
 
 // ============================================================================
-// ActionButton Component
+// ActionButton Component - Terminal style
 // ============================================================================
 
 interface ActionButtonProps {
   onClick: () => void
   title: string
-  icon: React.ReactNode
-  activeIcon?: React.ReactNode
+  label: string
+  activeLabel?: string
   isActive?: boolean
   variant?: 'default' | 'danger'
 }
@@ -32,8 +31,8 @@ interface ActionButtonProps {
 const ActionButton = memo(function ActionButton({
   onClick,
   title,
-  icon,
-  activeIcon,
+  label,
+  activeLabel,
   isActive = false,
   variant = 'default',
 }: ActionButtonProps) {
@@ -42,13 +41,13 @@ const ActionButton = memo(function ActionButton({
       onClick={onClick}
       title={title}
       className={cn(
-        'p-1.5 rounded-md transition-colors',
-        variant === 'default' && 'hover:bg-surface-hover text-text-muted hover:text-text-primary',
-        variant === 'danger' && 'hover:bg-status-error/20 text-text-muted hover:text-status-error',
-        isActive && 'text-status-success'
+        'px-1.5 py-0.5 transition-colors text-xs',
+        variant === 'default' && 'text-text-muted hover:text-text-accent',
+        variant === 'danger' && 'text-text-muted hover:text-status-error',
+        isActive && 'text-[--git-green]'
       )}
     >
-      {isActive && activeIcon ? activeIcon : icon}
+      {isActive && activeLabel ? activeLabel : label}
     </button>
   )
 })
@@ -81,35 +80,43 @@ export const MessageActionBar = memo(function MessageActionBar({
   return (
     <div
       className={cn(
-        'flex items-center gap-0.5 px-1 py-0.5 rounded-lg',
-        'bg-surface-card border border-border-subtle shadow-sm',
+        'flex items-center font-mono',
+        'bg-[#0a0a0a] border border-dashed border-border-subtle',
         'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
         className
       )}
     >
+      <span className="text-text-faint text-xs px-1">│</span>
+      
       {/* Copy button */}
       <ActionButton
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : 'Copy message'}
-        icon={<Copy className="w-3.5 h-3.5" />}
-        activeIcon={<Check className="w-3.5 h-3.5" />}
+        label="[CPY]"
+        activeLabel="[✓]"
         isActive={isCopied}
       />
+
+      <span className="text-text-faint text-xs">·</span>
 
       {/* Split/Fork button */}
       <ActionButton
         onClick={handleSplit}
         title="Fork conversation from here"
-        icon={<GitBranch className="w-3.5 h-3.5" />}
+        label="[FRK]"
       />
+
+      <span className="text-text-faint text-xs">·</span>
 
       {/* Undo/Revert button */}
       <ActionButton
         onClick={handleUndo}
         title="Revert to this message"
-        icon={<Undo2 className="w-3.5 h-3.5" />}
+        label="[REV]"
         variant="danger"
       />
+
+      <span className="text-text-faint text-xs px-1">│</span>
     </div>
   )
 })

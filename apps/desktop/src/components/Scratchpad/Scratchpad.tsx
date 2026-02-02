@@ -4,7 +4,7 @@ import { type editor } from 'monaco-editor'
 import { useAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { cn } from '@/lib/utils'
-import { FileText, ChevronDown, ChevronRight, Plus, Trash2, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { ConversationHistory } from '@/components/ConversationHistory'
 
 type ScratchpadTab = 'notes' | 'history'
@@ -42,8 +42,17 @@ interface ScratchpadProps {
 }
 
 /**
- * Conductor-style Scratchpad with markdown editor.
- * Supports multiple notes per workspace with persistence.
+ * Terminal-style Scratchpad with markdown editor.
+ * ┌─ SCRATCHPAD ─────────────────────┐
+ * │ [NOTES] [HISTORY]          [+]  │
+ * ├──────────────────────────────────┤
+ * │ ▼ Notes (3)                      │
+ * │   Note 1 ◀                       │
+ * │   Note 2                         │
+ * ├──────────────────────────────────┤
+ * │ # My Note                        │
+ * │ Content here...                  │
+ * └──────────────────────────────────┘
  */
 export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
   const [scratchpads, setScratchpads] = useAtom(scratchpadAtom)
@@ -139,14 +148,15 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
         wordPattern: /(-?\d*\.\d\w*)|([^`~!@#%^&*()=+[\]{}\\|;:'",.<>/?s-]+)/g,
       })
 
-      // Set editor options
+      // Set editor options - terminal aesthetic
       editor.updateOptions({
         wordWrap: 'on',
         lineNumbers: 'off',
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        fontSize: 13,
-        lineHeight: 1.6,
+        fontSize: 12,
+        fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+        lineHeight: 1.5,
         padding: { top: 12, bottom: 12 },
         renderLineHighlight: 'none',
         overviewRulerLanes: 0,
@@ -154,7 +164,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
         scrollbar: {
           vertical: 'auto',
           horizontal: 'hidden',
-          verticalScrollbarSize: 8,
+          verticalScrollbarSize: 6,
         },
       })
     },
@@ -169,40 +179,40 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
   }, [notes.length, createNote])
 
   return (
-    <div className={cn('flex flex-col h-full bg-surface-sidebar', className)} data-testid="scratchpad-container">
+    <div className={cn('flex flex-col h-full font-mono bg-[#000000]', className)} data-testid="scratchpad-container">
       {/* Header with tabs */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle" data-testid="scratchpad-header">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-border-subtle" data-testid="scratchpad-header">
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-text-faint mr-1">┌─</span>
+          
           {/* Notes tab */}
           <button
-            onClick={() => { setActiveTab('notes'); }}
+            onClick={() => { setActiveTab('notes') }}
             data-testid="scratchpad-tab-notes"
             data-active={activeTab === 'notes'}
             className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors',
+              'px-2 py-1 transition-colors',
               activeTab === 'notes'
-                ? 'bg-surface-active text-text-strong'
+                ? 'text-text-accent bg-surface-active'
                 : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
             )}
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Notes</span>
+            [NOTES]
           </button>
 
           {/* History tab */}
           <button
-            onClick={() => { setActiveTab('history'); }}
+            onClick={() => { setActiveTab('history') }}
             data-testid="scratchpad-tab-history"
             data-active={activeTab === 'history'}
             className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors',
+              'px-2 py-1 transition-colors',
               activeTab === 'history'
-                ? 'bg-surface-active text-text-strong'
+                ? 'text-text-accent bg-surface-active'
                 : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
             )}
           >
-            <Clock className="w-3.5 h-3.5" />
-            <span>History</span>
+            [HISTORY]
           </button>
         </div>
 
@@ -210,10 +220,10 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
           <button
             onClick={createNote}
             data-testid="scratchpad-new-note"
-            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="px-2 py-1 text-xs text-text-muted hover:text-text-accent transition-colors"
             title="New note"
           >
-            <Plus className="w-4 h-4" />
+            [+]
           </button>
         )}
       </div>
@@ -222,33 +232,37 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
       {activeTab === 'notes' && (
         <>
           {/* Notes list (collapsible) */}
-          <div className="border-b border-border-subtle">
+          <div className="border-b border-dashed border-border-subtle">
             <button
-              onClick={() => { setIsNotesExpanded(!isNotesExpanded); }}
+              onClick={() => { setIsNotesExpanded(!isNotesExpanded) }}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
             >
+              <span className="text-text-faint">│</span>
               {isNotesExpanded ? (
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="size-3" />
               ) : (
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="size-3" />
               )}
               <span>Notes ({notes.length})</span>
             </button>
 
             {isNotesExpanded && (
-              <div className="px-2 pb-2 space-y-0.5 max-h-32 overflow-y-auto">
+              <div className="px-3 pb-2 space-y-0.5 max-h-32 overflow-y-auto">
                 {notes.map((note) => (
                   <div
                     key={note.id}
                     className={cn(
-                      'flex items-center justify-between px-2 py-1.5 rounded text-xs group cursor-pointer',
+                      'group flex items-center justify-between px-2 py-1 text-xs cursor-pointer transition-colors',
                       note.id === activeNoteId
-                        ? 'bg-surface-active text-text-strong'
+                        ? 'text-text-accent bg-surface-active'
                         : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
                     )}
-                    onClick={() => { selectNote(note.id); }}
+                    onClick={() => { selectNote(note.id) }}
                   >
-                    <span className="truncate flex-1">{note.title}</span>
+                    <span className="truncate flex-1">
+                      {note.id === activeNoteId && <span className="mr-1">▶</span>}
+                      {note.title}
+                    </span>
                     {notes.length > 1 && (
                       <button
                         onClick={(e) => {
@@ -257,7 +271,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
                         }}
                         className="p-0.5 opacity-0 group-hover:opacity-100 text-text-faint hover:text-status-error transition-opacity"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="size-3" />
                       </button>
                     )}
                   </div>
@@ -273,7 +287,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
                 height="100%"
                 defaultLanguage="markdown"
                 value={activeNote.content}
-                onChange={(value) => { updateNoteContent(value ?? ''); }}
+                onChange={(value) => { updateNoteContent(value ?? '') }}
                 onMount={handleEditorMount}
                 theme="vs-dark"
                 options={{
@@ -281,8 +295,12 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
                 }}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-text-faint text-sm">
-                No notes yet
+              <div className="flex flex-col items-center justify-center h-full text-text-faint text-xs">
+                <div>┌────────────────────┐</div>
+                <div>│   NO NOTES YET     │</div>
+                <div>│   Click [+] to     │</div>
+                <div>│   create one       │</div>
+                <div>└────────────────────┘</div>
               </div>
             )}
           </div>

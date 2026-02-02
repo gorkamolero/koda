@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useWorktreeDiff } from '@/hooks/useRpc'
 import { useFileSystem } from '@/hooks/useFileSystem'
 import { openFileAtom } from '@/store/fileExplorer'
-import { Undo2, ChevronDown, SquareDot, Plus, Minus } from 'lucide-react'
+import { Undo2, ChevronDown } from 'lucide-react'
 import type { FileDiff } from '@/lib/rpc'
 
 interface DiffViewProps {
@@ -16,20 +16,20 @@ interface DiffViewProps {
 }
 
 /**
- * Get status icon and color for file status
+ * Get status label for file status - terminal style
  */
-function getStatusStyle(status: FileDiff['status']) {
+function getStatusLabel(status: FileDiff['status']): { label: string; color: string } {
   switch (status) {
     case 'added':
-      return { icon: Plus, color: 'text-[--git-green]' }
+      return { label: '+', color: 'text-[--git-green]' }
     case 'deleted':
-      return { icon: Minus, color: 'text-[--git-red]' }
+      return { label: '-', color: 'text-[--git-red]' }
     case 'modified':
-      return { icon: SquareDot, color: 'text-[--git-yellow]' }
+      return { label: 'M', color: 'text-[--git-yellow]' }
     case 'renamed':
-      return { icon: SquareDot, color: 'text-[--git-blue]' }
+      return { label: 'R', color: 'text-[--git-blue]' }
     default:
-      return { icon: SquareDot, color: 'text-[--git-yellow]' }
+      return { label: '?', color: 'text-text-muted' }
   }
 }
 
@@ -48,7 +48,8 @@ function splitPath(path: string): { directory: string; filename: string } {
 }
 
 /**
- * File row component
+ * Terminal-style file row
+ * │ [M] src/components/Button.tsx        +12 -3 │
  */
 function FileRow({
   file,
@@ -58,98 +59,64 @@ function FileRow({
   onClick?: () => void
 }) {
   const { directory, filename } = splitPath(file.path)
-  const { icon: StatusIcon, color: statusColor } = getStatusStyle(file.status)
-  // Create testid from filename: "new-feature.ts" -> "diff-file-new-feature-ts"
+  const { label: statusLabel, color: statusColor } = getStatusLabel(file.status)
   const testId = `diff-file-${filename.replace(/\./g, '-').toLowerCase()}`
 
   return (
     <div
-      className="group flex items-center py-1 px-3 mx-2 gap-1.5 hover:bg-accent has-[button:hover]:bg-transparent rounded-md cursor-pointer text-sm relative"
+      className="group flex items-center py-1.5 px-3 gap-2 hover:bg-surface-hover cursor-pointer text-xs font-mono transition-colors"
       data-testid={testId}
       data-file-status={file.status}
       onClick={onClick}
     >
+      {/* Status indicator */}
+      <span className={cn('w-4 text-center', statusColor)}>[{statusLabel}]</span>
+
       {/* File path */}
-      <div className="flex-1 min-w-0 overflow-hidden flex items-center gap-2">
-        <div className="truncate">
-          <span className="font-sans flex items-baseline min-w-0">
-            {directory && (
-              <span className="truncate min-w-0 text-muted-foreground">
-                {directory}
-              </span>
-            )}
-            <span className="truncate min-w-0">{filename}</span>
-          </span>
-        </div>
+      <div className="flex-1 min-w-0 overflow-hidden flex items-baseline">
+        {directory && (
+          <span className="text-text-faint truncate">{directory}</span>
+        )}
+        <span className="text-text-primary truncate">{filename}</span>
       </div>
 
-      {/* Actions grid - overlapping visible/hover states */}
-      <div
-        className="grid min-w-10 shrink-0 items-center"
-        style={{ gridTemplateAreas: '"content"' }}
-      >
-        {/* Hover actions */}
-        <div
-          className="flex items-center justify-end h-full invisible group-hover:visible"
-          style={{
-            gridRowStart: 'content',
-            gridColumnStart: 'content',
-            gridRowEnd: 'content',
-            gridColumnEnd: 'content',
-          }}
-        >
-          <button
-            className="inline-flex px-2 items-center gap-2 whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-none disabled:pointer-events-none disabled:opacity-50 text-foreground/90 hover:bg-sidebar-accent hover:text-accent-foreground font-450 h-6 w-6 text-xs justify-center rounded-sm"
-            data-state="closed"
-            title="Undo changes"
-          >
-            <Undo2 className="size-3" aria-hidden="true" />
-          </button>
-          <button
-            className="inline-flex items-center whitespace-nowrap ring-offset-background focus-visible:outline-none focus-visible:ring-none disabled:pointer-events-none disabled:opacity-50 text-foreground/90 hover:bg-sidebar-accent hover:text-accent-foreground h-6 w-6 text-xs justify-center rounded-sm gap-1 font-mono font-medium max-w-32 px-1.5"
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            data-state="closed"
-          >
-            <ChevronDown className="size-3" aria-hidden="true" />
-          </button>
-        </div>
+      {/* Stats - visible by default, hide on hover */}
+      <div className="flex items-center gap-2 group-hover:hidden">
+        {(file.additions ?? 0) > 0 && (
+          <span className="text-[--git-green]">+{file.additions}</span>
+        )}
+        {(file.deletions ?? 0) > 0 && (
+          <span className="text-[--git-red]">-{file.deletions}</span>
+        )}
+      </div>
 
-        {/* Default state - stats */}
-        <div
-          className="flex items-center justify-end gap-2 px-1.5 h-full visible group-hover:invisible"
-          style={{
-            gridRowStart: 'content',
-            gridColumnStart: 'content',
-            gridRowEnd: 'content',
-            gridColumnEnd: 'content',
-          }}
+      {/* Actions - hidden by default, show on hover */}
+      <div className="hidden group-hover:flex items-center gap-1">
+        <button
+          className="p-1 text-text-muted hover:text-text-accent transition-colors"
+          title="Undo changes"
+          onClick={(e) => { e.stopPropagation() }}
         >
-          <div className="flex items-center gap-1">
-            <div className="flex items-center gap-1 text-[10px] font-mono font-medium flex-shrink-0">
-              {(file.additions ?? 0) > 0 && (
-                <span className="text-[--git-green]">+{file.additions}</span>
-              )}
-              {(file.deletions ?? 0) > 0 && (
-                <span className="text-[--git-red]">-{file.deletions}</span>
-              )}
-            </div>
-            <StatusIcon
-              className={cn('size-3 flex-shrink-0', statusColor)}
-              aria-hidden="true"
-            />
-          </div>
-        </div>
+          <Undo2 className="size-3" />
+        </button>
+        <button
+          className="p-1 text-text-muted hover:text-text-accent transition-colors"
+          onClick={(e) => { e.stopPropagation() }}
+        >
+          <ChevronDown className="size-3" />
+        </button>
       </div>
     </div>
   )
 }
 
 /**
- * Main diff view component - Conductor-style flat file list
- *
- * Shows git diff of worktree against its merge base (target branch)
+ * Terminal-style diff view - flat file list with status indicators
+ * ┌─ CHANGES ────────────────────────┐
+ * │ [M] src/App.tsx           +5 -2  │
+ * │ [+] src/utils/new.ts     +42     │
+ * │ [-] src/old.ts                -8 │
+ * └──────────────────────────────────┘
  */
 export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
@@ -209,16 +176,23 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        Loading...
+      <div className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono">
+        <div>Loading...</div>
+        <div className="mt-2">████████░░░░░░░░</div>
       </div>
     )
   }
 
   if (files.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-        No changes
+      <div className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono p-4">
+        <div className="text-center">
+          <div>┌────────────────────┐</div>
+          <div>│   NO CHANGES       │</div>
+          <div>│   Working tree     │</div>
+          <div>│   is clean         │</div>
+          <div>└────────────────────┘</div>
+        </div>
       </div>
     )
   }
@@ -226,7 +200,7 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
   return (
     <div
       ref={parentRef}
-      className="flex-1 min-h-0 overflow-auto pt-2"
+      className="flex-1 min-h-0 overflow-auto font-mono"
       data-testid="diff-view-container"
     >
       <div

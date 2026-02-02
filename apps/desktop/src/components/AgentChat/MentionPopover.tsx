@@ -1,6 +1,5 @@
 import { memo, forwardRef, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { File, Folder, Code, FileText, Image } from 'lucide-react'
 
 // ============================================================================
 // Types
@@ -29,32 +28,50 @@ interface MentionItemProps {
 }
 
 // ============================================================================
-// File Icon Helper
+// File Icon Helper - Terminal style
 // ============================================================================
 
-function getFileIcon(suggestion: FileSuggestion) {
-  if (suggestion.isDirectory) {
-    return <Folder className="w-4 h-4 text-text-accent" />
-  }
+function getFileIcon(suggestion: FileSuggestion): string {
+  if (suggestion.isDirectory) return '[DIR]'
 
   const ext = suggestion.extension?.toLowerCase()
 
   // Code files
   if (['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'rb', 'php'].includes(ext ?? '')) {
-    return <Code className="w-4 h-4 text-status-success" />
+    return '[COD]'
   }
 
   // Text/doc files
   if (['md', 'txt', 'json', 'yaml', 'yml', 'toml', 'xml'].includes(ext ?? '')) {
-    return <FileText className="w-4 h-4 text-text-muted" />
+    return '[TXT]'
   }
 
   // Image files
   if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext ?? '')) {
-    return <Image className="w-4 h-4 text-status-warning" />
+    return '[IMG]'
   }
 
-  return <File className="w-4 h-4 text-text-dim" />
+  return '[FIL]'
+}
+
+function getFileIconColor(suggestion: FileSuggestion): string {
+  if (suggestion.isDirectory) return 'text-text-accent'
+
+  const ext = suggestion.extension?.toLowerCase()
+
+  if (['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'rb', 'php'].includes(ext ?? '')) {
+    return 'text-[--git-green]'
+  }
+
+  if (['md', 'txt', 'json', 'yaml', 'yml', 'toml', 'xml'].includes(ext ?? '')) {
+    return 'text-text-muted'
+  }
+
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext ?? '')) {
+    return 'text-status-warning'
+  }
+
+  return 'text-text-dim'
 }
 
 // ============================================================================
@@ -68,16 +85,19 @@ const MentionItem = forwardRef<HTMLButtonElement, MentionItemProps>(
         ref={ref}
         onClick={onClick}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors',
+          'w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs',
           isSelected
-            ? 'bg-surface-hover text-text-primary'
+            ? 'bg-surface-active text-text-primary'
             : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
         )}
       >
-        {getFileIcon(suggestion)}
+        <span className="text-text-faint">{isSelected ? '▸' : '│'}</span>
+        <span className={cn('flex-shrink-0', getFileIconColor(suggestion))}>
+          {getFileIcon(suggestion)}
+        </span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{suggestion.name}</div>
-          <div className="text-xs text-text-dim truncate">{suggestion.path}</div>
+          <span className="truncate">{suggestion.name}</span>
+          <span className="text-text-dim ml-2 truncate">{suggestion.path}</span>
         </div>
       </button>
     )
@@ -111,17 +131,17 @@ export const MentionPopover = memo(function MentionPopover({
     <div
       className={cn(
         'absolute bottom-full left-0 mb-2 z-50',
-        'w-80 max-h-64 overflow-y-auto',
-        'glass-popover rounded-lg',
-        'border border-border-strong shadow-xl',
-        'py-1 animate-fade-in'
+        'w-96 max-h-64 overflow-y-auto',
+        'bg-[#0a0a0a] font-mono',
+        'border border-dashed border-border-strong'
       )}
     >
       {/* Header */}
-      <div className="px-3 py-1.5 border-b border-border-subtle">
-        <span className="text-xs text-text-faint">
-          Files matching <span className="text-text-accent">@{query}</span>
-        </span>
+      <div className="px-3 py-1.5 border-b border-dashed border-border-subtle text-xs">
+        <span className="text-text-faint">┌─ </span>
+        <span className="text-text-accent">FILES MATCHING</span>
+        <span className="text-text-primary"> @{query}</span>
+        <span className="text-text-faint"> {'─'.repeat(Math.max(0, 15 - query.length))}┐</span>
       </div>
 
       {/* Suggestions */}
@@ -138,12 +158,16 @@ export const MentionPopover = memo(function MentionPopover({
       </div>
 
       {/* Footer hint */}
-      <div className="px-3 py-1.5 border-t border-border-subtle text-xs text-text-dim">
-        <span className="text-text-faint">↑↓</span> navigate
-        <span className="mx-2">•</span>
-        <span className="text-text-faint">Tab</span> select
-        <span className="mx-2">•</span>
-        <span className="text-text-faint">Esc</span> close
+      <div className="px-3 py-1.5 border-t border-dashed border-border-subtle text-xs text-text-faint flex items-center gap-3">
+        <span>│</span>
+        <span>[↑↓] NAV</span>
+        <span>[TAB] SELECT</span>
+        <span>[ESC] CLOSE</span>
+      </div>
+
+      {/* Bottom border */}
+      <div className="px-3 text-xs text-text-faint">
+        └{'─'.repeat(44)}┘
       </div>
     </div>
   )

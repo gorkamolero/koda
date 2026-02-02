@@ -12,15 +12,19 @@ import {
 import { FileTree } from './FileTree'
 import { QuickOpen } from './QuickOpen'
 import { useFileSystem } from '@/hooks/useFileSystem'
-import { Folder, RefreshCw, AlertCircle } from 'lucide-react'
+import { RefreshCw, AlertCircle } from 'lucide-react'
 
 interface FileExplorerProps {
   rootPath: string
 }
 
 /**
- * Main file explorer component
- * Provides tree view with lazy loading, virtual list, and quick open
+ * Terminal-style file explorer
+ * ┌─ FILES ──────────────────────────┐
+ * │ ▼ src/                           │
+ * │   ▶ components/                  │
+ * │   index.ts                       │
+ * └──────────────────────────────────┘
  */
 export function FileExplorer({ rootPath }: FileExplorerProps) {
   const [, setFileTree] = useAtom(fileTreeAtom)
@@ -110,54 +114,49 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
     [handleExpandAsync]
   )
 
+  const folderName = rootPath.split('/').pop() ?? 'Files'
+
   return (
-    <div data-testid="file-explorer" className="h-full flex flex-col bg-surface-sidebar">
+    <div data-testid="file-explorer" className="h-full flex flex-col font-mono bg-[#000000]">
       {/* Header */}
       <div
         data-testid="file-explorer-root"
-        className="flex items-center justify-between px-3 py-2 border-b border-border-subtle"
+        className="flex items-center justify-between px-3 py-2 border-b border-dashed border-border-subtle"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <Folder className="w-4 h-4 text-text-muted flex-shrink-0" />
-          <span className="text-sm font-medium text-text-primary truncate">
-            {rootPath.split('/').pop() ?? 'Files'}
-          </span>
+        <div className="flex items-center gap-2 min-w-0 text-xs">
+          <span className="text-text-faint">├─</span>
+          <span className="text-text-accent">{folderName}/</span>
         </div>
 
         {/* Refresh button */}
         <button
-          className="btn-icon"
-          title="Refresh"
+          className="p-1 text-text-muted hover:text-text-accent transition-colors"
+          title="[REFRESH]"
           onClick={handleRefresh}
         >
-          <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
+          <RefreshCw className={cn('size-3', isLoading && 'animate-spin')} />
         </button>
       </div>
 
       {/* Error state */}
       {error && (
-        <div className="px-3 py-2 flex items-center gap-2 text-xs text-status-error bg-status-error/10 border-b border-status-error/20">
-          <AlertCircle className="w-3.5 h-3.5" />
-          {error}
+        <div className="px-3 py-2 flex items-center gap-2 text-xs text-status-error border-b border-dashed border-status-error/30">
+          <AlertCircle className="size-3" />
+          <span>[ERROR] {error}</span>
         </div>
       )}
 
       {/* Loading state */}
       {isLoading && (
-        <div className="px-3 py-4 space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-6 bg-surface-control rounded shimmer"
-              style={{ width: `${String(60 + Math.random() * 30)}%` }}
-            />
-          ))}
+        <div className="px-3 py-4 space-y-1 text-xs text-text-faint">
+          <div>│ Loading...</div>
+          <div>│ ████████░░░░░░░░</div>
         </div>
       )}
 
       {/* File tree */}
       {!isLoading && (
-        <div className="flex-1 overflow-hidden fade-mask-y">
+        <div className="flex-1 overflow-hidden">
           <FileTree onFileOpen={handleFileOpen} onExpand={handleExpand} />
         </div>
       )}

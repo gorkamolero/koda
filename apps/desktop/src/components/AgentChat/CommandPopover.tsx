@@ -5,7 +5,6 @@ import {
   CATEGORY_LABELS,
   groupCommandsByCategory,
 } from '@/lib/slashCommands'
-import { Search, MessageSquare, Sparkles, Navigation, Terminal, FileText, HelpCircle, Trash2 } from 'lucide-react'
 
 interface CommandPopoverProps {
   isOpen: boolean
@@ -15,25 +14,9 @@ interface CommandPopoverProps {
   onClose: () => void
 }
 
-const COMMAND_ICONS: Record<string, React.ReactNode> = {
-  '/search': <Search className="w-4 h-4" />,
-  '/context': <FileText className="w-4 h-4" />,
-  '/clear': <Trash2 className="w-4 h-4" />,
-  '/model': <Sparkles className="w-4 h-4" />,
-  '/diff': <FileText className="w-4 h-4" />,
-  '/terminal': <Terminal className="w-4 h-4" />,
-  '/help': <HelpCircle className="w-4 h-4" />,
-}
-
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  file: <FileText className="w-3 h-3" />,
-  chat: <MessageSquare className="w-3 h-3" />,
-  model: <Sparkles className="w-3 h-3" />,
-  navigation: <Navigation className="w-3 h-3" />,
-}
-
 /**
  * Popover showing slash command suggestions
+ * Terminal aesthetic with ASCII borders
  */
 export const CommandPopover = memo(function CommandPopover({
   isOpen,
@@ -76,20 +59,27 @@ export const CommandPopover = memo(function CommandPopover({
       ref={containerRef}
       className={cn(
         'absolute bottom-full left-0 mb-2 z-50',
-        'w-72 max-h-64 overflow-y-auto',
-        'bg-surface-popover backdrop-blur-xl',
-        'border border-border-strong rounded-lg shadow-xl',
-        'py-1 animate-in fade-in slide-in-from-bottom-2 duration-150'
+        'w-80 max-h-64 overflow-y-auto',
+        'bg-[#0a0a0a] font-mono',
+        'border border-dashed border-border-strong'
       )}
       role="listbox"
       aria-label="Slash commands"
     >
+      {/* Header */}
+      <div className="px-3 py-1.5 border-b border-dashed border-border-subtle text-xs">
+        <span className="text-text-faint">┌─ </span>
+        <span className="text-text-accent">COMMANDS</span>
+        <span className="text-text-faint"> {'─'.repeat(20)}┐</span>
+      </div>
+
       {Object.entries(grouped).map(([category, cmds]) => (
         <div key={category} className="py-1">
           {/* Category header */}
-          <div className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-text-faint uppercase tracking-wider">
-            {CATEGORY_ICONS[category]}
-            <span>{CATEGORY_LABELS[category] ?? category}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1 text-xs text-text-faint">
+            <span>├─</span>
+            <span className="uppercase">{CATEGORY_LABELS[category] ?? category}</span>
+            <span>{'─'.repeat(Math.max(0, 18 - (CATEGORY_LABELS[category]?.length ?? category.length)))}</span>
           </div>
 
           {/* Commands in category */}
@@ -109,6 +99,11 @@ export const CommandPopover = memo(function CommandPopover({
           })}
         </div>
       ))}
+
+      {/* Footer */}
+      <div className="px-3 py-1 text-xs text-text-faint">
+        └{'─'.repeat(36)}┘
+      </div>
     </div>
   )
 })
@@ -128,27 +123,27 @@ const CommandItem = memo(forwardRef<HTMLButtonElement, CommandItemProps>(
         aria-selected={isSelected}
         onClick={onClick}
         className={cn(
-          'w-full text-left px-3 py-2 flex items-start gap-3',
-          'transition-colors cursor-pointer',
+          'w-full text-left px-3 py-1.5 flex items-start gap-2',
+          'transition-colors cursor-pointer text-xs',
           isSelected
             ? 'bg-surface-active text-text-primary'
             : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
         )}
       >
-        {/* Icon */}
-        <div className="flex-shrink-0 mt-0.5 text-text-faint">
-          {COMMAND_ICONS[command.trigger] ?? <Terminal className="w-4 h-4" />}
-        </div>
+        {/* Selection indicator */}
+        <span className="text-text-faint flex-shrink-0">
+          {isSelected ? '▸' : '│'}
+        </span>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium">{command.trigger}</span>
+            <span className="text-text-accent">{command.trigger}</span>
             {command.hasArgs && (
-              <span className="text-xs text-text-dim">{command.argsPlaceholder}</span>
+              <span className="text-text-dim">{command.argsPlaceholder}</span>
             )}
           </div>
-          <p className="text-xs text-text-faint mt-0.5 truncate">
+          <p className="text-text-faint mt-0.5 truncate">
             {command.description}
           </p>
         </div>

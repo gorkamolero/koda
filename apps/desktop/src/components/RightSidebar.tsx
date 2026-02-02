@@ -1,9 +1,13 @@
 /**
- * Right Sidebar Component
+ * Right Sidebar Component - Terminal Aesthetic
  *
- * Conductor-style right panel with TWO header rows:
- * Row 1 (top bar): Create PR button on the right
- * Row 2 (tabs): [All files] [Changes] [Checks] [Review]
+ * ┌─ PR ACTIONS ────────────────────────────────┐
+ * │ [CREATE PR ▼]                               │
+ * ├─ TABS ──────────────────────────────────────┤
+ * │ [FILES] [CHANGES] [CHECKS]        [REVIEW] │
+ * ├─────────────────────────────────────────────┤
+ * │ content...                                  │
+ * └─────────────────────────────────────────────┘
  */
 
 import { useState, type ReactNode } from 'react'
@@ -65,13 +69,13 @@ export function RightSidebar({
   const changedFilesCount = diffStats?.filesChanged ?? 0
 
   const tabs: TabConfig[] = [
-    { id: 'files', label: 'All files' },
+    { id: 'files', label: 'FILES' },
     {
       id: 'changes',
-      label: 'Changes',
+      label: 'CHANGES',
       badge: changedFilesCount > 0 ? changedFilesCount : undefined,
     },
-    { id: 'checks', label: 'Checks' },
+    { id: 'checks', label: 'CHECKS' },
   ]
 
   const handleCreatePr = (draft: boolean = false) => {
@@ -84,40 +88,35 @@ export function RightSidebar({
   return (
     <div
       data-testid="right-sidebar"
-      className="h-full flex flex-col"
+      className="h-full flex flex-col font-mono bg-[#000000]"
     >
-      {/* Row 1: Top bar with Create PR button */}
+      {/* Row 1: PR Actions header */}
       <div
-        className="flex items-center justify-between pl-2 pr-2 h-10 min-h-10 bg-sidebar-background border-b border-sidebar-border"
+        className="flex items-center justify-between px-3 h-10 min-h-10 border-b border-dashed border-border-subtle"
         data-tauri-drag-region="true"
       >
-        {/* Left side - workspace name could go here */}
-        <div className="flex items-center min-w-0 flex-1" data-tauri-drag-region="true">
-          <p className="text-sm font-medium truncate min-w-0 mr-3 text-sidebar-foreground" />
+        {/* Left: ASCII header */}
+        <div className="flex items-center text-xs text-text-faint" data-tauri-drag-region="true">
+          <span>┌─ PR ─</span>
+          <span className="text-text-muted">{'─'.repeat(10)}</span>
         </div>
 
-        {/* Right side - Create PR button */}
-        <div className="flex items-center drop-shadow-sm">
-          <button
-            onClick={() => handleCreatePr(false)}
-            className="flex items-center gap-1 pl-1.5 pr-2 py-1 h-6 bg-popover text-secondary-foreground rounded-l-sm text-xs cursor-pointer hover:bg-popover/90 border border-input"
-          >
-            <GitPullRequestCreate className="size-3" />
-            <span>Create PR</span>
-          </button>
+        {/* Right: Create PR button */}
+        <div className="flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="flex items-center px-1 h-6 bg-popover text-secondary-foreground rounded-r-sm text-xs cursor-pointer hover:bg-popover/90 border border-input border-l-0"
-              >
+              <button className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors">
+                <GitPullRequestCreate className="size-3" />
+                <span>[CREATE PR</span>
                 <ChevronDown className="size-3" />
+                <span>]</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleCreatePr(false)}>
+            <DropdownMenuContent align="end" className="font-mono bg-[#0a0a0a] border-dashed">
+              <DropdownMenuItem onClick={() => handleCreatePr(false)} className="text-xs">
                 Create PR
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleCreatePr(true)}>
+              <DropdownMenuItem onClick={() => handleCreatePr(true)} className="text-xs">
                 Create Draft PR
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -126,9 +125,10 @@ export function RightSidebar({
       </div>
 
       {/* Row 2: Tabs bar */}
-      <div className="flex items-center justify-between gap-1 px-2 h-10 min-w-0 overflow-hidden border-b border-border">
+      <div className="flex items-center justify-between gap-1 px-3 h-9 min-w-0 overflow-hidden border-b border-dashed border-border-subtle">
         {/* Left side - main tabs */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0 text-xs">
+          <span className="text-text-faint mr-1">│</span>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -137,49 +137,47 @@ export function RightSidebar({
               data-active={activeTab === tab.id}
               disabled={tab.disabled}
               className={cn(
-                'inline-flex items-center justify-center h-7 px-2.5 text-xs font-medium rounded-md gap-1.5',
+                'px-2 py-1 transition-colors',
                 tab.disabled
-                  ? 'text-muted-foreground/50 cursor-not-allowed'
+                  ? 'text-text-faint cursor-not-allowed'
                   : activeTab === tab.id
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent hover:text-accent-foreground'
+                    ? 'text-text-accent bg-surface-active'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
               )}
             >
-              {tab.label}
-              {tab.badge !== undefined && (
-                <span className="font-mono text-muted-foreground">{tab.badge}</span>
-              )}
+              [{tab.label}{tab.badge !== undefined ? `:${tab.badge}` : ''}]
             </button>
           ))}
         </div>
 
         {/* Right side - Review button and more */}
-        <div className="flex items-center min-w-0 overflow-hidden">
+        <div className="flex items-center min-w-0 overflow-hidden text-xs">
           <button
             onClick={() => setActiveTab('review')}
             data-testid="right-tab-review"
             data-active={activeTab === 'review'}
             className={cn(
-              'inline-flex items-center h-6 px-2 text-xs font-medium rounded-sm gap-1.5 mr-1.5',
+              'flex items-center gap-1 px-2 py-1 transition-colors',
               activeTab === 'review'
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-accent-foreground'
+                ? 'text-text-accent bg-surface-active'
+                : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
             )}
           >
-            <Eye className="h-3 w-3" />
-            Review
+            <Eye className="size-3" />
+            [REVIEW]
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="inline-flex items-center justify-center h-6 w-6 text-xs rounded-sm text-muted-foreground hover:bg-sidebar-accent hover:text-accent-foreground mr-2">
-                <MoreVertical className="h-3 w-3" />
+              <button className="px-1 py-1 text-text-muted hover:text-text-primary transition-colors">
+                <MoreVertical className="size-3" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Refresh</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="font-mono bg-[#0a0a0a] border-dashed">
+              <DropdownMenuItem className="text-xs">Refresh</DropdownMenuItem>
+              <DropdownMenuItem className="text-xs">Settings</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <span className="text-text-faint ml-1">│</span>
         </div>
       </div>
 

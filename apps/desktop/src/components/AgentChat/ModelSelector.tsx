@@ -3,10 +3,10 @@ import { useAtom } from 'jotai'
 import { cn } from '@/lib/utils'
 import { selectedModelAtom, AGENT_MODELS, type AgentModel } from '@/store/chat'
 import { useClickOutside } from '@/hooks/useClickOutside'
-import { ChevronDown, Check, Sparkles } from 'lucide-react'
 
 /**
  * Dropdown selector for choosing the AI model.
+ * Terminal aesthetic with bracket notation.
  */
 export function ModelSelector(): React.ReactElement {
   const [selectedModel, setSelectedModel] = useAtom(selectedModelAtom)
@@ -27,25 +27,25 @@ export function ModelSelector(): React.ReactElement {
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative font-mono">
       <button
         data-testid="model-selector"
         onClick={() => { setIsOpen(!isOpen) }}
         className={cn(
-          'inline-flex items-center justify-between gap-2',
-          'px-3 py-1.5 rounded-lg text-sm',
-          'bg-surface-control border border-border-subtle',
-          'text-text-muted hover:text-text-primary hover:bg-surface-control-hover',
-          'transition-colors min-w-[140px]'
+          'inline-flex items-center gap-1.5',
+          'px-2 py-1 text-xs',
+          'bg-transparent border border-dashed border-border-subtle',
+          'text-text-muted hover:text-text-accent hover:border-text-accent',
+          'transition-colors'
         )}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-text-accent" />
-          <span className="font-medium">{currentModel?.name ?? 'Select Model'}</span>
-        </div>
-        <ChevronDown className={cn('w-4 h-4 transition-transform', isOpen && 'rotate-180')} />
+        <span className="text-text-faint">[</span>
+        <span className="text-text-accent">MODEL:</span>
+        <span className="uppercase">{currentModel?.name ?? 'SELECT'}</span>
+        <span className="text-text-faint">]</span>
+        <span className={cn('text-text-faint transition-transform', isOpen && 'rotate-180')}>▼</span>
       </button>
 
       {isOpen && (
@@ -54,11 +54,19 @@ export function ModelSelector(): React.ReactElement {
           data-testid="model-selector-dropdown"
           className={cn(
             'absolute top-full left-0 mt-1 z-50',
-            'w-72 glass-popover rounded-lg',
-            'border border-border-strong shadow-xl',
-            'py-1 animate-fade-in'
+            'w-72 bg-[#0a0a0a]',
+            'border border-dashed border-border-strong',
+            'py-1'
           )}
         >
+          {/* Header */}
+          <div className="px-3 py-1.5 border-b border-dashed border-border-subtle text-xs">
+            <span className="text-text-faint">┌─ </span>
+            <span className="text-text-accent">SELECT MODEL</span>
+            <span className="text-text-faint"> {'─'.repeat(14)}┐</span>
+          </div>
+
+          {/* Model options */}
           {AGENT_MODELS.map((model) => (
             <button
               key={model.id}
@@ -67,28 +75,29 @@ export function ModelSelector(): React.ReactElement {
               aria-selected={model.id === selectedModel}
               onClick={() => { handleSelect(model.id) }}
               className={cn(
-                'w-full text-left px-3 py-2.5',
+                'w-full text-left px-3 py-2',
                 'hover:bg-surface-hover',
                 'transition-colors',
                 model.id === selectedModel && 'bg-surface-active'
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm text-text-primary">{model.name}</span>
-                {model.id === selectedModel && (
-                  <Check className="w-4 h-4 text-status-success" />
-                )}
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2">
+                  <span className="text-text-faint">{model.id === selectedModel ? '[●]' : '[ ]'}</span>
+                  <span className="text-text-primary uppercase">{model.name}</span>
+                </span>
+                <span className="text-text-dim">{formatContextLimit(model.contextLimit)}</span>
               </div>
-              <p className="text-xs text-text-faint mt-0.5">
+              <p className="text-xs text-text-faint mt-1 ml-6">
                 {model.description}
               </p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-text-dim bg-surface-control px-1.5 py-0.5 rounded">
-                  {formatContextLimit(model.contextLimit)} context
-                </span>
-              </div>
             </button>
           ))}
+
+          {/* Footer */}
+          <div className="px-3 py-1 text-xs text-text-faint">
+            └{'─'.repeat(32)}┘
+          </div>
         </div>
       )}
     </div>

@@ -6,7 +6,6 @@ import { AgentChat } from '@/components/AgentChat'
 import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
 import { TerminalPanel } from '@/components/Terminal'
-import { GitStatusBar } from '@/components/GitStatusBar'
 import { Scratchpad } from '@/components/Scratchpad'
 import { RightSidebar } from '@/components/RightSidebar'
 import { Editor } from '@/components/Editor'
@@ -23,7 +22,6 @@ import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCre
 import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
-import { Loader2, AlertCircle, ArrowLeft, FolderPlus, GitBranch } from 'lucide-react'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 type ConnectStep = 'idle' | 'repo' | 'branch'
@@ -273,68 +271,75 @@ export function WorkspaceView() {
         />
 
         {/* Content area - fills remaining space */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden font-mono">
           {/* Loading state */}
           {isLoading && (
-            <div className="h-full flex items-center justify-center">
-              <Loader2 className="w-6 h-6 text-text-muted animate-spin" />
+            <div className="h-full flex flex-col items-center justify-center text-text-faint text-xs">
+              <div>Loading...</div>
+              <div className="mt-2">████████░░░░░░░░</div>
             </div>
           )}
 
           {/* Standalone workspace - show connect flow */}
           {!isLoading && isStandaloneWorkspace && activeTab === 'chat' && (
             <div className="h-full flex flex-col items-center justify-center px-8">
-              <div className="w-full max-w-md">
+              <div className="w-full max-w-md text-xs">
                 {/* Initial state - show connect button */}
                 {connectStep === 'idle' && (
                   <div className="text-center">
-                    <FolderPlus className="w-12 h-12 text-text-dim mx-auto mb-4" />
-                    <h3 className="text-sm font-medium text-text-muted mb-1">
-                      {standaloneWorkspace.name}
-                    </h3>
-                    <p className="text-xs text-text-faint mb-4">
+                    <div className="text-text-faint mb-4">
+                      <div>┌────────────────────────────┐</div>
+                      <div>│                            │</div>
+                      <div>│   <span className="text-text-accent">{standaloneWorkspace.name}</span>   │</div>
+                      <div>│                            │</div>
+                      <div>│   No repository connected  │</div>
+                      <div>│                            │</div>
+                      <div>└────────────────────────────┘</div>
+                    </div>
+                    <p className="text-text-muted mb-4">
                       Connect a repository to start chatting with Claude about your code.
                     </p>
                     <button
                       type="button"
                       data-testid="connect-repo-button"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-surface-control hover:bg-surface-control-hover text-text-primary transition-colors"
+                      className="px-4 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
                       onClick={handleStartConnect}
                     >
-                      <FolderPlus className="w-4 h-4" />
-                      Connect Repository
+                      [CONNECT REPOSITORY]
                     </button>
                   </div>
                 )}
 
                 {/* Step 1: Select repository */}
                 {connectStep === 'repo' && (
-                  <div className="bg-surface-card border border-border-subtle rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">Select Repository</h3>
+                  <div className="border border-dashed border-border-subtle p-4">
+                    <div className="text-text-faint mb-3">
+                      ┌─ <span className="text-text-accent">SELECT REPOSITORY</span> {'─'.repeat(10)}┐
+                    </div>
 
                     {connectError && (
-                      <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                        {connectError}
+                      <div className="mb-4 px-3 py-2 border border-dashed border-status-error/50 text-status-error">
+                        [ERROR] {connectError}
                       </div>
                     )}
 
-                    <p className="text-sm text-text-muted mb-4">
-                      Choose a git repository to connect to this workspace.
+                    <p className="text-text-muted mb-4 pl-2">
+                      │ Choose a git repository to connect
                     </p>
 
                     {/* Existing repos */}
                     {hasRepos && (
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-text-primary mb-2">Recent Repositories</label>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <div className="text-text-faint mb-2 pl-2">│ Recent:</div>
+                        <div className="space-y-1 max-h-48 overflow-y-auto pl-2">
                           {repos.map((repo) => (
                             <button
                               key={repo.id}
                               onClick={() => { handleSelectRepo(repo.id) }}
-                              className="w-full text-left p-3 border border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors"
+                              className="w-full text-left px-3 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
                             >
-                              <div className="font-medium text-text-primary">{repo.name}</div>
-                              <div className="text-xs text-text-faint truncate">{repo.rootPath}</div>
+                              <div className="text-text-primary">{repo.name}</div>
+                              <div className="text-text-faint truncate">{repo.rootPath}</div>
                             </button>
                           ))}
                         </div>
@@ -342,90 +347,99 @@ export function WorkspaceView() {
                     )}
 
                     {/* Add new repo */}
-                    <button
-                      onClick={() => void handleAddRepo()}
-                      disabled={createRepo.isPending}
-                      className="w-full p-4 border-2 border-dashed border-border-subtle rounded-md hover:border-border-accent hover:bg-surface-hover transition-colors flex items-center justify-center gap-2 text-text-muted hover:text-text-primary"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      {createRepo.isPending ? 'Registering...' : 'Add Git Repository'}
-                    </button>
+                    <div className="pl-2">
+                      <button
+                        onClick={() => void handleAddRepo()}
+                        disabled={createRepo.isPending}
+                        className="w-full px-3 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors text-center"
+                      >
+                        {createRepo.isPending ? '[REGISTERING...]' : '[+ ADD GIT REPOSITORY]'}
+                      </button>
+                    </div>
 
-                    <div className="flex justify-end mt-6">
+                    <div className="flex justify-end mt-4 pt-3 border-t border-dashed border-border-subtle">
                       <button
                         onClick={handleCancelConnect}
-                        className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
+                        className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                       >
-                        Cancel
+                        [CANCEL]
                       </button>
+                    </div>
+                    
+                    <div className="text-text-faint mt-2">
+                      └{'─'.repeat(32)}┘
                     </div>
                   </div>
                 )}
 
                 {/* Step 2: Create branch */}
                 {connectStep === 'branch' && (
-                  <div className="bg-surface-card border border-border-subtle rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-text-primary mb-4">Create Branch</h3>
+                  <div className="border border-dashed border-border-subtle p-4">
+                    <div className="text-text-faint mb-3">
+                      ┌─ <span className="text-text-accent">CREATE BRANCH</span> {'─'.repeat(14)}┐
+                    </div>
 
                     {connectError && (
-                      <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-                        {connectError}
+                      <div className="mb-4 px-3 py-2 border border-dashed border-status-error/50 text-status-error">
+                        [ERROR] {connectError}
                       </div>
                     )}
 
-                    <div className="mb-4 p-3 rounded-md bg-surface-item">
-                      <div className="text-sm font-medium text-text-primary">{selectedRepo?.name}</div>
-                      <div className="text-xs text-text-faint">{selectedRepo?.rootPath}</div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-text-primary mb-1">Branch Name</label>
-                        <input
-                          type="text"
-                          value={branchName}
-                          onChange={(e) => { setBranchName(e.target.value) }}
-                          placeholder="feature/my-feature"
-                          data-testid="branch-name-input"
-                          className="w-full px-3 py-2 border border-border-subtle rounded-md bg-surface-control text-text-primary placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-border-accent"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') void handleCreateWorktree()
-                            if (e.key === 'Escape') handleCancelConnect()
-                          }}
-                        />
-                        <p className="text-xs text-text-faint mt-1">
-                          A git worktree will be created for isolated work
-                        </p>
+                    <div className="mb-4 pl-2">
+                      <div className="text-text-faint">│ Repository:</div>
+                      <div className="px-3 py-2 border border-dashed border-border-subtle mt-1">
+                        <div className="text-text-accent">{selectedRepo?.name}</div>
+                        <div className="text-text-faint truncate">{selectedRepo?.rootPath}</div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between mt-6">
+                    <div className="pl-2 space-y-2">
+                      <div className="text-text-faint">│ [BRANCH_NAME]</div>
+                      <input
+                        type="text"
+                        value={branchName}
+                        onChange={(e) => { setBranchName(e.target.value) }}
+                        placeholder="feature/my-feature"
+                        data-testid="branch-name-input"
+                        className="w-full px-3 py-2 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-primary placeholder:text-text-faint focus:outline-none focus:border-text-accent"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void handleCreateWorktree()
+                          if (e.key === 'Escape') handleCancelConnect()
+                        }}
+                      />
+                      <p className="text-text-faint text-[10px]">
+                        A git worktree will be created for isolated work
+                      </p>
+                    </div>
+
+                    <div className="flex justify-between mt-4 pt-3 border-t border-dashed border-border-subtle">
                       <button
                         onClick={() => { setConnectStep('repo') }}
-                        className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
+                        className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                       >
-                        Back
+                        [← BACK]
                       </button>
                       <div className="flex gap-2">
                         <button
                           onClick={handleCancelConnect}
-                          className="px-4 py-2 text-sm font-medium border border-border-subtle rounded-md hover:bg-surface-hover text-text-primary transition-colors"
+                          className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                         >
-                          Cancel
+                          [CANCEL]
                         </button>
                         <button
                           onClick={() => void handleCreateWorktree()}
                           disabled={!branchName.trim() || createWorktree.isPending}
                           data-testid="create-branch-button"
-                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-surface-control hover:bg-surface-control-hover text-text-primary rounded-md disabled:opacity-50 transition-colors"
+                          className="px-3 py-1 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent disabled:opacity-50 transition-colors"
                         >
-                          <GitBranch className="w-4 h-4" />
-                          {createWorktree.isPending ? 'Creating...' : 'Create & Connect'}
+                          {createWorktree.isPending ? '[CREATING...]' : '[CREATE & CONNECT]'}
                         </button>
                       </div>
+                    </div>
+                    
+                    <div className="text-text-faint mt-2">
+                      └{'─'.repeat(32)}┘
                     </div>
                   </div>
                 )}
@@ -435,24 +449,24 @@ export function WorkspaceView() {
 
           {/* Error state - truly not found */}
           {!isLoading && notFound && activeTab === 'chat' && (
-            <div className="h-full flex flex-col items-center justify-center px-8">
-              <div className="max-w-md text-center">
-                <AlertCircle className="w-12 h-12 text-text-dim mx-auto mb-4" />
-                <h3 className="text-sm font-medium text-text-muted mb-1">
-                  Workspace not found
-                </h3>
-                <p className="text-xs text-text-faint mb-4">
-                  This workspace doesn&apos;t exist or has been deleted.
-                </p>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-surface-control hover:bg-surface-control-hover text-text-primary transition-colors"
-                  onClick={() => { void navigate({ to: '/' }) }}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Workspaces
-                </button>
+            <div className="h-full flex flex-col items-center justify-center px-8 text-xs">
+              <div className="text-center text-text-faint">
+                <div>┌────────────────────────────┐</div>
+                <div>│                            │</div>
+                <div>│   <span className="text-status-error">[ERROR]</span>                 │</div>
+                <div>│                            │</div>
+                <div>│   Workspace not found      │</div>
+                <div>│   or has been deleted      │</div>
+                <div>│                            │</div>
+                <div>└────────────────────────────┘</div>
               </div>
+              <button
+                type="button"
+                className="mt-4 px-4 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
+                onClick={() => { void navigate({ to: '/' }) }}
+              >
+                [← BACK TO WORKSPACES]
+              </button>
             </div>
           )}
 
@@ -482,9 +496,6 @@ export function WorkspaceView() {
 
           {activeTab === 'scratchpad' && <Scratchpad workspaceId={id} />}
         </div>
-
-        {/* Git status bar at bottom of main content */}
-        <GitStatusBar workspace={worktree} />
       </div>
 
       {/* Right panel (Files/Changes + Terminal) */}

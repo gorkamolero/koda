@@ -4,11 +4,16 @@ import { useAtomValue } from 'jotai'
 import { messagesAtom } from '@/store/chat'
 import { MessageItem } from './MessageItem'
 import { ScrollMinimap } from './ScrollMinimap'
-import { MessageCircle } from 'lucide-react'
 
 /**
- * Virtualized message list for efficient rendering of large chat histories
- * Uses @tanstack/react-virtual for optimal performance
+ * Terminal-style virtualized message list
+ * ┌─ MESSAGES ───────────────────────────┐
+ * │ > user input here                    │
+ * │                                      │
+ * │ ┌─ KODA ──────────────────────────┐  │
+ * │ │ Response text here...           │  │
+ * │ └─────────────────────────────────┘  │
+ * └──────────────────────────────────────┘
  */
 export function MessageList() {
   const messages = useAtomValue(messagesAtom)
@@ -18,8 +23,8 @@ export function MessageList() {
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: useCallback(() => 100, []), // Estimated row height
-    overscan: 5, // Render 5 extra items above/below viewport
+    estimateSize: useCallback(() => 100, []),
+    overscan: 5,
   })
 
   const virtualItems = virtualizer.getVirtualItems()
@@ -45,16 +50,28 @@ export function MessageList() {
       <div
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full flex flex-col items-center justify-center bg-surface-messages"
+        className="h-full flex flex-col items-center justify-center font-mono bg-[#000000]"
       >
-        <div className="text-center p-8">
-          <div className="w-16 h-16 rounded-2xl bg-surface-card-strong flex items-center justify-center mx-auto mb-4">
-            <MessageCircle className="w-8 h-8 text-text-dim" />
+        <div className="text-center text-xs text-text-faint">
+          <div className="mb-6">
+            <div>┌────────────────────────────────────┐</div>
+            <div>│                                    │</div>
+            <div>│      <span className="text-text-accent">KODA TERMINAL</span> v0.1.0         │</div>
+            <div>│                                    │</div>
+            <div>│  ██╗  ██╗ ██████╗ ██████╗  █████╗  │</div>
+            <div>│  ██║ ██╔╝██╔═══██╗██╔══██╗██╔══██╗ │</div>
+            <div>│  █████╔╝ ██║   ██║██║  ██║███████║ │</div>
+            <div>│  ██╔═██╗ ██║   ██║██║  ██║██╔══██║ │</div>
+            <div>│  ██║  ██╗╚██████╔╝██████╔╝██║  ██║ │</div>
+            <div>│  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ │</div>
+            <div>│                                    │</div>
+            <div>│  Ready for input...                │</div>
+            <div>│                                    │</div>
+            <div>└────────────────────────────────────┘</div>
           </div>
-          <h3 className="text-text-muted text-sm font-medium mb-1">No messages yet</h3>
-          <p className="text-text-faint text-xs max-w-[200px]">
-            Start a conversation with the agent to begin
-          </p>
+          <div className="text-text-muted">
+            Type a message or use /commands
+          </div>
         </div>
       </div>
     )
@@ -66,7 +83,7 @@ export function MessageList() {
         ref={parentRef}
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full overflow-auto bg-surface-messages fade-mask-y"
+        className="h-full overflow-auto font-mono bg-[#000000]"
         onScroll={handleScroll}
       >
         <div

@@ -26,11 +26,11 @@ interface MinimapSegment {
 function getSegmentColor(type: MinimapSegment['type']): string {
   switch (type) {
     case 'user':
-      return 'bg-status-unread'
+      return 'bg-text-accent'  // terracotta for user
     case 'thinking':
-      return 'bg-border-accent'  // terracotta
+      return 'bg-border-accent'
     case 'tool':
-      return 'bg-status-success'
+      return 'bg-[--git-green]'
     case 'assistant':
       return 'bg-text-muted'
     case 'system':
@@ -73,7 +73,7 @@ function estimateContentLength(message: ChatMessage): number {
 }
 
 // ============================================================================
-// ScrollMinimap Component
+// ScrollMinimap Component - Terminal aesthetic
 // ============================================================================
 
 export const ScrollMinimap = memo(function ScrollMinimap({
@@ -192,9 +192,10 @@ export const ScrollMinimap = memo(function ScrollMinimap({
       ref={minimapRef}
       onClick={handleClick}
       className={cn(
-        'absolute right-1 top-2 bottom-2 w-2 rounded-full',
-        'bg-surface-card/50 cursor-pointer',
-        'hover:w-3 transition-all duration-150',
+        'absolute right-1 top-2 bottom-2 w-1.5',
+        'bg-surface-card/30 cursor-pointer',
+        'border-l border-dashed border-border-subtle',
+        'hover:w-2 transition-all duration-150',
         className
       )}
     >
@@ -203,7 +204,7 @@ export const ScrollMinimap = memo(function ScrollMinimap({
         <div
           key={segment.id}
           className={cn(
-            'absolute left-0 right-0 rounded-full',
+            'absolute left-0 right-0',
             getSegmentColor(segment.type),
             'opacity-60 hover:opacity-100 transition-opacity'
           )}
@@ -216,7 +217,7 @@ export const ScrollMinimap = memo(function ScrollMinimap({
 
       {/* Viewport indicator */}
       <div
-        className="absolute left-0 right-0 bg-white/30 border border-white/50 rounded-full pointer-events-none"
+        className="absolute left-0 right-0 bg-text-accent/30 border border-text-accent/50 pointer-events-none"
         style={{
           top: `${String(viewportInfo.top)}%`,
           height: `${String(viewportInfo.height)}%`,
