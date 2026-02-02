@@ -387,8 +387,12 @@ async function main() {
     console.log('Koda sidecar ready');
 
     // Graceful shutdown
-    const shutdown = async () => {
-      console.log('\nShutting down...');
+    let isShuttingDown = false;
+    const shutdown = async (signal?: string) => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+      
+      console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
       cleanupAllSessions(); // Close all PTY sessions
       await getPulseManager().stopAll(); // Stop all pulse processes
       if (httpServer) {
@@ -398,8 +402,21 @@ async function main() {
       process.exit(0);
     };
 
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    // Handle all termination signals
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGHUP', () => shutdown('SIGHUP'));
+    
+    // Handle uncaught errors - cleanup before exit
+    process.on('uncaughtException', async (err) => {
+      console.error('Uncaught exception:', err);
+      await shutdown('uncaughtException');
+    });
+    
+    process.on('unhandledRejection', async (reason, promise) => {
+      console.error('Unhandled rejection at:', promise, 'reason:', reason);
+      await shutdown('unhandledRejection');
+    });
   } catch (err) {
     console.error('Fatal error:', err);
     process.exit(1);

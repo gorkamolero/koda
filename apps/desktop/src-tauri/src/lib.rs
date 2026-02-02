@@ -9,11 +9,23 @@ use commands::SidecarState;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
-use tauri::{App, Manager};
+use tauri::{App, Manager, RunEvent};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 // Global sidecar process handle for cleanup
 static SIDECAR_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+
+/// Kill the sidecar process if it's running
+fn kill_sidecar() {
+    if let Some(mut child) = SIDECAR_PROCESS.lock().unwrap().take() {
+        tracing::info!("Killing sidecar process (PID: {:?})", child.id());
+        if let Err(e) = child.kill() {
+            tracing::warn!("Failed to kill sidecar: {}", e);
+        }
+        // Wait for process to fully terminate
+        let _ = child.wait();
+    }
+}
 
 /// Initialize the Tauri application with plugins and setup
 pub fn run() {
@@ -39,8 +51,13 @@ pub fn run() {
             setup_app(app)?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            if let RunEvent::Exit = event {
+                kill_sidecar();
+            }
+        });
 }
 
 /// Configure tracing/logging
