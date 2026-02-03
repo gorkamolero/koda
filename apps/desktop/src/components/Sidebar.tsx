@@ -8,6 +8,7 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { selectedWorkspaceIdAtom, setWorkspaceContainersAtom } from '@/store/workspace'
 import { KodaSpinner } from '@/components/KodaSpinner'
 import { open } from '@tauri-apps/plugin-dialog'
+import { AgentOverviewButton, AgentOverviewPanel } from '@/components/AgentOverview'
 
 // ============================================================================
 // Terminal-style Status Labels
@@ -575,6 +576,14 @@ function RepoActionsDropdown({
 
 function SidebarHeader({ onCreateWorkspace }: { onCreateWorkspace: () => void }): React.ReactElement {
   const navigate = useNavigate()
+  const [isAgentOverviewOpen, setIsAgentOverviewOpen] = useState(false)
+  const agentOverviewRef = useRef<HTMLDivElement>(null)
+
+  useClickOutside(agentOverviewRef, {
+    onClickOutside: () => setIsAgentOverviewOpen(false),
+    onEscape: () => setIsAgentOverviewOpen(false),
+    enabled: isAgentOverviewOpen,
+  })
 
   return (
     <div className="border-b border-dashed border-text-dim/20">
@@ -584,7 +593,17 @@ function SidebarHeader({ onCreateWorkspace }: { onCreateWorkspace: () => void })
         data-tauri-drag-region
       >
         <div className="flex-1" data-tauri-drag-region />
-        <div className="flex items-center font-mono text-[10px]">
+        <div className="flex items-center gap-1 font-mono text-[10px]">
+          {/* Agent Overview */}
+          <div ref={agentOverviewRef} className="relative">
+            <AgentOverviewButton
+              onClick={() => setIsAgentOverviewOpen(!isAgentOverviewOpen)}
+              isOpen={isAgentOverviewOpen}
+            />
+            {isAgentOverviewOpen && (
+              <AgentOverviewPanel onClose={() => setIsAgentOverviewOpen(false)} />
+            )}
+          </div>
           <button
             className="px-1 text-text-dim hover:text-border-accent transition-colors"
             onClick={() => void navigate({ to: '/' })}

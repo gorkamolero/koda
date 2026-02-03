@@ -79,6 +79,7 @@ function CollaborationStatusInner({
 
   return (
     <div
+      data-testid="collaboration-status"
       className={cn(
         'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
         config.bgColor,

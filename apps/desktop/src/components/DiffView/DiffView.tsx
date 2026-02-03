@@ -176,7 +176,11 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono"
+        data-testid="diff-view-container"
+        data-loading="true"
+      >
         <div>Loading...</div>
         <div className="mt-2">████████░░░░░░░░</div>
       </div>
@@ -185,7 +189,11 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
 
   if (files.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono p-4">
+      <div
+        className="flex-1 flex flex-col items-center justify-center text-text-faint text-xs font-mono p-4"
+        data-testid="diff-view-container"
+        data-empty="true"
+      >
         <div className="text-center">
           <div>┌────────────────────┐</div>
           <div>│   NO CHANGES       │</div>

@@ -10,10 +10,13 @@ import {
   Copy,
   History,
   X,
+  Users,
+  User,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { ConversationHistoryDialog } from '@/components/ConversationHistory'
+import { ActivityFeedTab } from '@/components/ActivityFeed'
 import { cn } from '@/lib/utils'
 import type { Worktree } from '@/lib/rpc'
 import {
@@ -21,17 +24,25 @@ import {
   activeFilePathAtom,
   closeFileAtom,
 } from '@/store/fileExplorer'
+import { CollaborationStatus } from '@/components/CollaborationStatus'
+import { PresenceAvatars } from '@/components/PresenceAvatars'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 
 interface TopBarProps {
   workspace: Worktree | undefined
+  worktreeId?: string
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   sessions?: { id: string; name: string }[]
   activeSessionId?: string
   onSessionChange?: (sessionId: string) => void
   onNewSession?: () => void
+  onEnableCollaboration?: () => void
+  onDisableCollaboration?: () => void
+  isCollaborationPending?: boolean
+  showActivityFeed?: boolean
+  onToggleActivityFeed?: () => void
 }
 
 /**
@@ -42,17 +53,26 @@ interface TopBarProps {
  */
 export function TopBar({
   workspace,
+  worktreeId,
   activeTab,
   onTabChange,
   sessions = [],
   activeSessionId,
   onSessionChange,
   onNewSession,
+  onEnableCollaboration,
+  onDisableCollaboration,
+  isCollaborationPending = false,
+  showActivityFeed = false,
+  onToggleActivityFeed,
 }: TopBarProps): React.ReactElement {
   const [branchCopied, setBranchCopied] = useState(false)
   const [openDropdownVisible, setOpenDropdownVisible] = useState(false)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+  const [collabModalOpen, setCollabModalOpen] = useState(false)
   const openDropdownRef = useRef<HTMLDivElement>(null)
+  
+  const isCollaborative = workspace?.collaborative ?? false
 
   // Editor file tabs
   const openFiles = useAtomValue(openFilesAtom)
@@ -149,6 +169,46 @@ export function TopBar({
             <ChevronDown className="size-3" />
             <span>]</span>
           </button>
+
+          {/* Collaboration toggle */}
+          <button
+            onClick={() => {
+              if (isCollaborative) {
+                onDisableCollaboration?.()
+              } else {
+                setCollabModalOpen(true)
+              }
+            }}
+            disabled={isCollaborationPending}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 text-xs border border-dashed transition-colors',
+              isCollaborative
+                ? 'border-[--git-green] text-[--git-green] hover:border-text-accent hover:text-text-accent'
+                : 'border-border-subtle text-text-muted hover:border-text-accent hover:text-text-accent',
+              isCollaborationPending && 'opacity-50 cursor-wait'
+            )}
+            title={isCollaborative ? 'Collaboration enabled (click to disable)' : 'Enable collaboration'}
+          >
+            {isCollaborative ? (
+              <>
+                <Users className="size-3" />
+                <span>[COLLAB]</span>
+              </>
+            ) : (
+              <>
+                <User className="size-3" />
+                <span>[SOLO]</span>
+              </>
+            )}
+          </button>
+
+          {/* Collaboration status and presence avatars - only show when collaborative */}
+          {isCollaborative && (
+            <>
+              <CollaborationStatus showLabel={false} />
+              <PresenceAvatars maxVisible={3} size="sm" />
+            </>
+          )}
 
           {openDropdownVisible && (
             <div className="absolute top-full right-0 mt-1 z-50 min-w-48 bg-[#0a0a0a] border border-dashed border-border-subtle">
@@ -268,8 +328,16 @@ export function TopBar({
           )}
         </div>
 
-        {/* Right side - History */}
+        {/* Right side - Activity + History */}
         <div className="flex items-center gap-2">
+          {/* Activity Feed Tab */}
+          {worktreeId && onToggleActivityFeed && (
+            <ActivityFeedTab
+              workspaceId={worktreeId}
+              isActive={showActivityFeed}
+              onClick={onToggleActivityFeed}
+            />
+          )}
           <button
             onClick={() => { setHistoryDialogOpen(true) }}
             title="Conversation history"
@@ -287,6 +355,44 @@ export function TopBar({
         isOpen={historyDialogOpen}
         onClose={() => { setHistoryDialogOpen(false) }}
       />
+
+      {/* Enable collaboration confirmation modal */}
+      {collabModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[#0a0a0a] border border-dashed border-border-subtle p-4 max-w-md text-xs font-mono">
+            <div className="text-text-faint mb-3">
+              ┌─ <span className="text-text-accent">Enable Collaboration?</span> {'─'.repeat(8)}┐
+            </div>
+            
+            <p className="text-text-primary mb-4 pl-2">
+              │ This workspace will be shared. Others with<br />
+              │ access can see your agent sessions in real-time.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-dashed border-border-subtle">
+              <button
+                onClick={() => { setCollabModalOpen(false) }}
+                className="px-3 py-1.5 text-text-muted hover:text-text-primary transition-colors"
+              >
+                [CANCEL]
+              </button>
+              <button
+                onClick={() => {
+                  setCollabModalOpen(false)
+                  onEnableCollaboration?.()
+                }}
+                className="px-3 py-1.5 border border-dashed border-[--git-green] text-[--git-green] hover:bg-[--git-green]/10 transition-colors"
+              >
+                [ENABLE]
+              </button>
+            </div>
+
+            <div className="text-text-faint mt-2">
+              └{'─'.repeat(38)}┘
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

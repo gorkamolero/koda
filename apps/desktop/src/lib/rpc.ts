@@ -67,6 +67,8 @@ export const RPC_METHODS = {
   WORKTREE_ADD_TO_WORKSPACE: 'worktree.addToWorkspace',
   WORKTREE_REMOVE_FROM_WORKSPACE: 'worktree.removeFromWorkspace',
   WORKTREE_GET_DIFF: 'worktree.getDiff',
+  WORKTREE_ENABLE_COLLABORATION: 'worktree.enableCollaboration',
+  WORKTREE_DISABLE_COLLABORATION: 'worktree.disableCollaboration',
   // Sessions
   SESSION_LIST: 'session.list',
   SESSION_CREATE: 'session.create',
@@ -93,6 +95,12 @@ export const RPC_METHODS = {
   // Filesystem
   FS_READ_DIRECTORY: 'fs.readDirectory',
   FS_READ_FILE: 'fs.readFile',
+  // Activity feed
+  ACTIVITY_CREATE: 'activity.create',
+  ACTIVITY_LIST: 'activity.list',
+  ACTIVITY_MARK_READ: 'activity.markRead',
+  ACTIVITY_UNREAD_COUNT: 'activity.unreadCount',
+  ACTIVITY_GET_WORKSPACES_WITH_STATUS: 'activity.getWorkspacesWithStatus',
 } as const
 
 /**
@@ -177,6 +185,7 @@ export interface Worktree {
   activeSessionId?: string | null
   bigTerminalMode?: boolean
   intendedTargetBranch?: string | null
+  collaborative?: boolean // Opt-in Liveblocks collaboration
   createdAt?: string
   updatedAt?: string
   // Extra field from handler
@@ -573,4 +582,53 @@ export interface ReadDirectoryParams {
 
 export interface ReadFileParams {
   path: string
+}
+
+/**
+ * Activity types (Agent Overview & Activity Feed)
+ */
+export type ActivityType = 'file_change' | 'agent_complete' | 'agent_error' | 'checkpoint'
+
+export interface Activity {
+  id: string
+  workspaceId: string
+  type: ActivityType
+  title: string
+  description?: string | null
+  navigateTo?: { view: string; params?: Record<string, string> } | null
+  read: boolean
+  createdAt: number
+}
+
+export interface CreateActivityParams {
+  workspaceId: string
+  type: ActivityType
+  title: string
+  description?: string
+  navigateTo?: { view: string; params?: Record<string, string> }
+}
+
+export interface ListActivityParams {
+  workspaceId: string
+  limit?: number
+  unreadOnly?: boolean
+}
+
+export interface MarkReadParams {
+  workspaceId: string
+  ids?: string[]
+}
+
+export interface UnreadCountParams {
+  workspaceId: string
+}
+
+export type AgentStatus = 'idle' | 'thinking' | 'writing' | 'error'
+
+export interface WorkspaceWithStatus {
+  id: string
+  name: string
+  status: AgentStatus
+  worktreeCount: number
+  activeSessionCount: number
 }

@@ -291,6 +291,7 @@ export async function createWorktree(
     activeSessionId: null,
     bigTerminalMode: false,
     intendedTargetBranch: null,
+    collaborative: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -785,4 +786,75 @@ export async function getWorktreeDiff(
   result.targetBranch = targetBranch;
 
   return result;
+}
+
+// ============================================================================
+// Collaboration Toggle
+// ============================================================================
+
+export const EnableCollaborationSchema = z.object({
+  worktreeId: z.string().uuid(),
+});
+
+export const DisableCollaborationSchema = z.object({
+  worktreeId: z.string().uuid(),
+});
+
+export type EnableCollaborationInput = z.input<typeof EnableCollaborationSchema>;
+export type DisableCollaborationInput = z.input<typeof DisableCollaborationSchema>;
+
+/**
+ * Enable collaboration for a worktree (opt-in to Liveblocks)
+ */
+export async function enableCollaboration(
+  input: EnableCollaborationInput,
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree> {
+  const database = db ?? getDb();
+
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
+  });
+
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
+  }
+
+  await database
+    .update(worktrees)
+    .set({
+      collaborative: true,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(worktrees.id, input.worktreeId));
+
+  return { ...worktree, collaborative: true };
+}
+
+/**
+ * Disable collaboration for a worktree
+ */
+export async function disableCollaboration(
+  input: DisableCollaborationInput,
+  db?: ReturnType<typeof getDb>
+): Promise<Worktree> {
+  const database = db ?? getDb();
+
+  const worktree = await database.query.worktrees.findFirst({
+    where: eq(worktrees.id, input.worktreeId),
+  });
+
+  if (!worktree) {
+    throw new Error(`Worktree not found: ${input.worktreeId}`);
+  }
+
+  await database
+    .update(worktrees)
+    .set({
+      collaborative: false,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(worktrees.id, input.worktreeId));
+
+  return { ...worktree, collaborative: false };
 }

@@ -85,8 +85,10 @@ export default defineConfig({
   // NOTE: There is no "skip webserver" mode - tests MUST use isolated database
   webServer: {
     command: 'pnpm --filter desktop tauri dev --config src-tauri/tauri.test.conf.json',
-    url: `http://localhost:${TEST_VITE_PORT}`,
-    reuseExistingServer: false, // Always start fresh for test isolation
+    // Check the sidecar's HTTP RPC port (3848) instead of Vite (1421)
+    // This ensures the full stack (Tauri + sidecar) is ready before tests start
+    url: `http://localhost:${TEST_HTTP_RPC_PORT}/rpc`,
+    reuseExistingServer: false, // ALWAYS start fresh - test isolation requires separate database
     timeout: 120000, // 2 minutes for Tauri to build and start
     stdout: 'pipe',
     stderr: 'pipe',

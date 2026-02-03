@@ -343,6 +343,38 @@ export function useDeleteWorktree() {
   })
 }
 
+/**
+ * Enable collaboration for a worktree (opt-in to Liveblocks)
+ */
+export function useEnableCollaboration() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (worktreeId: string) =>
+      rpcRequest<Worktree>(RPC_METHODS.WORKTREE_ENABLE_COLLABORATION, { worktreeId }),
+    onSuccess: (_, worktreeId) => {
+      void queryClient.invalidateQueries({ queryKey: ['worktree', worktreeId] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+    },
+  })
+}
+
+/**
+ * Disable collaboration for a worktree
+ */
+export function useDisableCollaboration() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (worktreeId: string) =>
+      rpcRequest<Worktree>(RPC_METHODS.WORKTREE_DISABLE_COLLABORATION, { worktreeId }),
+    onSuccess: (_, worktreeId) => {
+      void queryClient.invalidateQueries({ queryKey: ['worktree', worktreeId] })
+      void queryClient.invalidateQueries({ queryKey: ['worktrees'] })
+    },
+  })
+}
+
 // ============================================================================
 // Workspace Repo Hooks (Multi-repo support)
 // ============================================================================

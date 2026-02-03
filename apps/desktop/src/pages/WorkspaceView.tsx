@@ -11,6 +11,7 @@ import { Scratchpad } from '@/components/Scratchpad'
 import { RightSidebar } from '@/components/RightSidebar'
 import { Editor } from '@/components/Editor'
 import { CollaborativeWorkspaceProvider } from '@/components/CollaborativeWorkspaceProvider'
+import { ActivityFeedPanel } from '@/components/ActivityFeed'
 import {
   InterviewMode,
   SpecDrivenView,
@@ -19,7 +20,7 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { openFilesAtom } from '@/store/fileExplorer'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree } from '@/hooks/useRpc'
+import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree, useEnableCollaboration, useDisableCollaboration } from '@/hooks/useRpc'
 import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
@@ -84,6 +85,10 @@ export function WorkspaceView() {
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
 
+  // Collaboration toggle
+  const enableCollaboration = useEnableCollaboration()
+  const disableCollaboration = useDisableCollaboration()
+
   // Connect repository flow state
   const [connectStep, setConnectStep] = useState<ConnectStep>('idle')
   const [selectedRepoId, setSelectedRepoId] = useState<string>('')
@@ -138,6 +143,7 @@ export function WorkspaceView() {
   // State for showing/hiding panels
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [showTerminal, setShowTerminal] = useState(true)
+  const [showActivityFeed, setShowActivityFeed] = useState(false)
 
   // Update tab when mode changes
   useEffect(() => {
@@ -257,8 +263,8 @@ export function WorkspaceView() {
   const hasRepos = repos && repos.length > 0
 
   return (
-    <CollaborativeWorkspaceProvider workspaceId={worktreeId}>
-      <div className="h-full flex">
+    <CollaborativeWorkspaceProvider workspaceId={worktreeId} collaborative={worktree?.collaborative ?? false}>
+      <div data-testid="workspace-view" className="h-full flex">
         {/* Command Palette (global) */}
         <CommandPalette />
 
@@ -270,11 +276,17 @@ export function WorkspaceView() {
         {/* TopBar is INSIDE main-content */}
         <TopBar
           workspace={worktree}
+          worktreeId={worktreeId}
           activeTab={activeTab}
           onTabChange={(tab) => { setActiveTab(tab as Tab) }}
           sessions={sessions?.map(s => ({ id: s.id, name: s.title ?? 'Chat' })) ?? []}
           activeSessionId={activeSessionId}
           onSessionChange={setActiveSessionId}
+          onEnableCollaboration={() => { enableCollaboration.mutate(worktreeId) }}
+          onDisableCollaboration={() => { disableCollaboration.mutate(worktreeId) }}
+          isCollaborationPending={enableCollaboration.isPending || disableCollaboration.isPending}
+          showActivityFeed={showActivityFeed}
+          onToggleActivityFeed={() => { setShowActivityFeed((prev) => !prev) }}
         />
 
         {/* Content area - fills remaining space */}
@@ -502,6 +514,13 @@ export function WorkspaceView() {
             )}
 
           {activeTab === 'scratchpad' && <Scratchpad workspaceId={worktreeId} />}
+
+          {/* Activity Feed Panel - shown when activity tab is active */}
+          {showActivityFeed && (
+            <div className="absolute inset-0 z-10 bg-surface-messages">
+              <ActivityFeedPanel workspaceId={worktreeId} worktreeId={worktreeId} />
+            </div>
+          )}
         </div>
       </div>
 

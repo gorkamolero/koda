@@ -65,7 +65,7 @@ function PresenceAvatarsInner({
   const sizeClass = SIZE_CLASSES[size]
 
   return (
-    <div className={cn('flex -space-x-2', className)}>
+    <div data-testid="presence-avatars" className={cn('flex -space-x-2', className)}>
       {visibleUsers.map((user, i) => (
         <div
           key={i}

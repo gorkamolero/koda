@@ -19,7 +19,24 @@ export class HttpRpcServer {
     this.port = port
   }
 
-  async start(): Promise<void> {
+  async start(maxRetries = 5, retryDelayMs = 1000): Promise<void> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await this.tryStart()
+        return
+      } catch (err) {
+        const error = err as NodeJS.ErrnoException
+        if (error.code === 'EADDRINUSE' && attempt < maxRetries - 1) {
+          console.log(`[HttpRpcServer] Port ${this.port} in use, retrying in ${retryDelayMs}ms... (attempt ${attempt + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, retryDelayMs))
+        } else {
+          throw err
+        }
+      }
+    }
+  }
+
+  private async tryStart(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer(async (req, res) => {
         // Handle CORS for browser requests
@@ -30,6 +47,13 @@ export class HttpRpcServer {
         if (req.method === 'OPTIONS') {
           res.writeHead(204)
           res.end()
+          return
+        }
+
+        // Health check endpoint for Playwright webServer URL check
+        if (req.method === 'GET' && req.url === '/rpc') {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'ok', message: 'HTTP RPC server ready. Use POST for RPC calls.' }))
           return
         }
 

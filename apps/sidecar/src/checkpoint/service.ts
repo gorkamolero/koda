@@ -212,7 +212,13 @@ export function restoreCheckpoint(
   git(repoPath, `read-tree ${worktreeTree}`);
   git(repoPath, 'checkout-index -a -f');
 
-  // 3. Restore the index to the checkpoint's staged state
+  // 3. Clean up any files that aren't in the checkpoint
+  // checkout-index only writes files from the index; it doesn't delete
+  // files that exist in the worktree but not in the tree
+  // Use -x to also remove ignored files, -ff for nested git repos
+  git(repoPath, 'clean -fdx');
+
+  // 4. Restore the index to the checkpoint's staged state
   git(repoPath, `read-tree ${indexTree}`);
 }
 

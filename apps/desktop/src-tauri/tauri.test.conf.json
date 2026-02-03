@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.koda.app.test",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "VITE_PORT=1421 pnpm dev",
     "devUrl": "http://localhost:1421",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"

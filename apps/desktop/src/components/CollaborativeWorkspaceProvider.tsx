@@ -24,6 +24,8 @@ import { RemoteMessageRelay } from '@/hooks/useRemoteMessageRelay'
 interface CollaborativeWorkspaceProviderProps {
   /** Workspace ID */
   workspaceId: string
+  /** Whether collaboration is enabled for this workspace (opt-in) */
+  collaborative?: boolean
   /** User's display name (optional, defaults to machine name) */
   userName?: string
   /** Children to render inside the room */
@@ -32,10 +34,12 @@ interface CollaborativeWorkspaceProviderProps {
 
 /**
  * Provider that enables collaboration features for a workspace.
- * If Liveblocks is not configured (no API key), renders children without collaboration.
+ * Collaboration is opt-in per workspace. If not enabled, or if Liveblocks
+ * is not configured, renders children without collaboration.
  */
 export function CollaborativeWorkspaceProvider({
   workspaceId,
+  collaborative = false,
   userName,
   children,
 }: CollaborativeWorkspaceProviderProps) {
@@ -57,8 +61,10 @@ export function CollaborativeWorkspaceProvider({
   // Check if Liveblocks is configured
   const isLiveblocksConfigured = Boolean(import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY)
 
-  // If not configured, just render children without collaboration
-  if (!isLiveblocksConfigured) {
+  // Only enable collaboration if:
+  // 1. The workspace has collaboration enabled (opt-in)
+  // 2. Liveblocks is configured (has API key)
+  if (!collaborative || !isLiveblocksConfigured) {
     return <>{children}</>
   }
 

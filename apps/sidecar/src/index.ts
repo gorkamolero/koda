@@ -86,6 +86,8 @@ import {
   addWorktreeToWorkspace,
   removeWorktreeFromWorkspace,
   getWorktreeDiff,
+  enableCollaboration,
+  disableCollaboration,
   CreateWorktreeSchema,
   DeleteWorktreeSchema,
   GetWorktreeSchema,
@@ -95,6 +97,8 @@ import {
   AddWorktreeToWorkspaceSchema,
   RemoveWorktreeFromWorkspaceSchema,
   GetWorktreeDiffSchema,
+  EnableCollaborationSchema,
+  DisableCollaborationSchema,
 } from './handlers/worktree.js';
 
 // Import workspace repo handlers
@@ -175,6 +179,23 @@ import {
   ReadDirectoryInputSchema,
   ReadFileInputSchema,
 } from './handlers/fs.js';
+
+// Import activity handlers
+import {
+  createActivity,
+  listActivity,
+  markRead,
+  unreadCount,
+  getWorkspacesWithStatus,
+  CreateActivitySchema,
+  ListActivitySchema,
+  MarkReadSchema,
+  UnreadCountSchema,
+  GetWorkspacesWithStatusSchema,
+} from './handlers/activity.js';
+
+// Import file watcher
+import { startFileWatching, stopFileWatching } from './handlers/fileWatcher.js';
 
 /**
  * Get the Unix socket path based on platform
@@ -263,6 +284,8 @@ function registerMethods() {
   router.register('worktree.addToWorkspace', addWorktreeToWorkspace, AddWorktreeToWorkspaceSchema);
   router.register('worktree.removeFromWorkspace', removeWorktreeFromWorkspace, RemoveWorktreeFromWorkspaceSchema);
   router.register('worktree.getDiff', getWorktreeDiff, GetWorktreeDiffSchema);
+  router.register('worktree.enableCollaboration', enableCollaboration, EnableCollaborationSchema);
+  router.register('worktree.disableCollaboration', disableCollaboration, DisableCollaborationSchema);
 
   // Workspace repo management (multi-repo support)
   router.register('workspaceRepo.attach', attachRepo, AttachRepoSchema);
@@ -301,6 +324,13 @@ function registerMethods() {
   // Filesystem operations
   router.register('fs.readDirectory', readDirectory, ReadDirectoryInputSchema);
   router.register('fs.readFile', readFile, ReadFileInputSchema);
+
+  // Activity feed (Agent Overview & Activity Feed)
+  router.register('activity.create', createActivity, CreateActivitySchema);
+  router.register('activity.list', listActivity, ListActivitySchema);
+  router.register('activity.markRead', markRead, MarkReadSchema);
+  router.register('activity.unreadCount', unreadCount, UnreadCountSchema);
+  router.register('activity.getWorkspacesWithStatus', getWorkspacesWithStatus, GetWorkspacesWithStatusSchema);
 
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);
@@ -384,6 +414,9 @@ async function main() {
       }
     }
 
+    // Start file watching for activity feed
+    startFileWatching();
+
     console.log('Koda sidecar ready');
 
     // Graceful shutdown
@@ -393,6 +426,7 @@ async function main() {
       isShuttingDown = true;
       
       console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
+      stopFileWatching(); // Stop file watching
       cleanupAllSessions(); // Close all PTY sessions
       await getPulseManager().stopAll(); // Stop all pulse processes
       if (httpServer) {

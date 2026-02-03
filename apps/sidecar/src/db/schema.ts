@@ -136,6 +136,7 @@ export const worktrees = sqliteTable('worktrees', {
   activeSessionId: text('active_session_id'), // Currently active session
   bigTerminalMode: integer('big_terminal_mode', { mode: 'boolean' }).default(false),
   intendedTargetBranch: text('intended_target_branch'), // For PR creation
+  collaborative: integer('collaborative', { mode: 'boolean' }).default(false), // Opt-in Liveblocks collaboration
   createdAt: timestamp(),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -436,3 +437,28 @@ export type NewSessionRecording = typeof sessionRecordings.$inferInsert;
 
 export type RecordingFrame = typeof recordingFrames.$inferSelect;
 export type NewRecordingFrame = typeof recordingFrames.$inferInsert;
+
+/**
+ * Activity - Event stream for workspaces (file changes, agent events, etc.)
+ * Solves Theo's "which terminal tab was that?" problem.
+ */
+export const activity = sqliteTable(
+  'activity',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id').references(() => workspaces.id).notNull(),
+    type: text('type').notNull(), // 'file_change', 'agent_complete', 'agent_error', 'checkpoint'
+    title: text('title').notNull(),
+    description: text('description'),
+    navigateTo: text('navigate_to'), // JSON: { view: string, params?: Record<string, string> }
+    read: integer('read', { mode: 'boolean' }).default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
+  },
+  (table) => [
+    index('activity_workspace_id_idx').on(table.workspaceId),
+    index('activity_workspace_read_idx').on(table.workspaceId, table.read),
+  ]
+);
+
+export type Activity = typeof activity.$inferSelect;
+export type NewActivity = typeof activity.$inferInsert;

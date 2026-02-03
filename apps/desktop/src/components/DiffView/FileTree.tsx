@@ -345,6 +345,8 @@ interface FileItemProps {
 function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
   const statusColor = STATUS_COLORS[file.status]
   const statusLabel = STATUS_LABELS[file.status]
+  // Generate a testid-safe version of the file path (replace . and / with -)
+  const fileTestId = `diff-file-${file.path.replace(/[./]/g, '-')}`
 
   return (
     <button
@@ -357,8 +359,9 @@ function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
       )}
       style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
       onClick={onClick}
-      data-testid="diff-file-item"
+      data-testid={fileTestId}
       data-selected={isSelected}
+      data-file-status={file.status}
       role="treeitem"
       aria-selected={isSelected}
     >
