@@ -48,6 +48,7 @@ describe('Database Schema', () => {
       const tableNames = tables.map((t) => t.name).sort();
 
       expect(tableNames).toEqual([
+        'activity',
         'attachments',
         'diff_comments',
         'git_checkpoints',
