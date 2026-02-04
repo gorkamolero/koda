@@ -26,6 +26,7 @@
     "playwright": "^1.58.1",
     "superjson": "^2.2.1",
     "uuid": "^13.0.0",
+    "ws": "^8.19.0",
     "yjs": "^13.6.29",
     "zod": "^4.0.0"
   },
@@ -35,6 +36,7 @@
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^20.11.5",
     "@types/uuid": "^11.0.0",
+    "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.31.8",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",

@@ -1,11 +1,9 @@
-import * as path from 'node:path';
-import * as os from 'node:os';
-import * as fs from 'node:fs';
 import { RpcServer } from './server.js';
 import { router } from './rpc/router.js';
 import { HttpRpcServer } from './httpServer.js';
 import { getDbPath, initDbWithMigrations } from './db/index.js';
 import { runMigrations } from './db/migrate.js';
+import { config, logConfig } from './config.js';
 
 // Import handlers
 import { ping, getStatus } from './handlers/health.js';
@@ -198,35 +196,10 @@ import {
 import { startFileWatching, stopFileWatching } from './handlers/fileWatcher.js';
 
 /**
- * Get the Unix socket path based on platform
+ * Get the Unix socket path from config
  */
 function getSocketPath(): string {
-  const envPath = process.env.KODA_SOCKET;
-  if (envPath) {
-    return envPath;
-  }
-
-  const platform = os.platform();
-
-  if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/com.koda.app/koda.sock
-    const appSupport = path.join(
-      os.homedir(),
-      'Library',
-      'Application Support',
-      'com.koda.app'
-    );
-    fs.mkdirSync(appSupport, { recursive: true });
-    return path.join(appSupport, 'koda.sock');
-  } else if (platform === 'linux') {
-    // Linux: /tmp/koda-{uid}.sock
-    return `/tmp/koda-${process.getuid?.() ?? 'unknown'}.sock`;
-  } else if (platform === 'win32') {
-    // Windows: \\.\pipe\koda
-    return '\\\\.\\pipe\\koda';
-  }
-
-  throw new Error(`Unsupported platform: ${platform}`);
+  return config.socketPath;
 }
 
 /**
@@ -361,6 +334,9 @@ async function main() {
   try {
     console.log('Starting Koda sidecar...');
 
+    // Log configuration
+    logConfig();
+
     // Initialize database
     await initDatabase();
 
@@ -376,40 +352,33 @@ async function main() {
       notificationEmitter.emitPtyExit(sessionId, exitCode);
     });
 
-    // Start Unix socket server
-    const socketPath = getSocketPath();
-    const server = new RpcServer(socketPath);
-    await server.start();
+    // Start Unix socket server (local mode only)
+    let server: RpcServer | null = null;
+    if (config.socketServerEnabled) {
+      const socketPath = getSocketPath();
+      server = new RpcServer(socketPath);
+      await server.start();
+    } else {
+      console.log('[Server] Unix socket server disabled (remote mode)');
+    }
 
-    // Start HTTP server for E2E testing and development
-    // - Skip in test mode (NODE_ENV=test) unless explicitly requested
-    // - In production, only start if KODA_HTTP_PORT is explicitly set
-    // - In development, start on default port with graceful fallback
+    // Start HTTP server
+    // - Remote mode: Always enabled, required for communication
+    // - Local mode: Optional, for E2E testing and development
     let httpServer: HttpRpcServer | null = null;
-    const isProduction = process.env.NODE_ENV === 'production';
     const isTest = process.env.NODE_ENV === 'test';
-    const httpPort = process.env.KODA_HTTP_PORT;
-    const defaultDevPort = 3847;
 
-    if (httpPort && httpPort !== '0') {
-      // Explicit port specified - use it
-      const port = parseInt(httpPort, 10);
-      if (!isNaN(port)) {
-        httpServer = new HttpRpcServer(port);
-        try {
-          await httpServer.start();
-        } catch (err) {
-          console.warn('Failed to start HTTP server on port', port, '-', err);
-          httpServer = null;
-        }
-      }
-    } else if (!isProduction && !isTest) {
+    if (config.httpServerEnabled || config.mode === 'remote') {
+      // HTTP server is required
+      httpServer = new HttpRpcServer(config.httpPort, config.httpHost);
+      await httpServer.start();
+    } else if (!isTest && process.env.NODE_ENV !== 'production') {
       // Development mode - start HTTP server on default port (non-fatal if fails)
-      httpServer = new HttpRpcServer(defaultDevPort);
+      httpServer = new HttpRpcServer();
       try {
         await httpServer.start();
       } catch (err) {
-        console.warn('Failed to start HTTP server on default port -', err);
+        console.warn('Failed to start HTTP server -', err);
         httpServer = null;
       }
     }
@@ -417,7 +386,7 @@ async function main() {
     // Start file watching for activity feed
     startFileWatching();
 
-    console.log('Koda sidecar ready');
+    console.log(`Koda sidecar ready (${config.mode} mode)`);
 
     // Graceful shutdown
     let isShuttingDown = false;
@@ -432,7 +401,9 @@ async function main() {
       if (httpServer) {
         await httpServer.stop();
       }
-      await server.stop();
+      if (server) {
+        await server.stop();
+      }
       process.exit(0);
     };
 
