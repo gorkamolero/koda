@@ -6,6 +6,8 @@
 
 Koda is a desktop IDE for the agentic era. Traditional IDEs are for writing code. Koda is for **orchestrating agents and reviewing their work**.
 
+Koda's first milestone was deliberate: match the interface quality bar Conductor set before diverging. Conductor proved what an agent-orchestration UI should feel like; Koda builds from that bar toward review-first workflows, collaboration, shared workspaces, and richer proof surfaces for agent output.
+
 ---
 
 ## Quick Start
@@ -147,4 +149,4 @@ MIT
 
 ---
 
-*Built by [Gorka](https://github.com/gorkamolero) *
+Built by [Gorka](https://github.com/gorkamolero).

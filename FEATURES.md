@@ -1,6 +1,6 @@
 # Koda Feature Roadmap
 
-Living document for planned features. 
+Living document for planned features.
 
 ---
 
@@ -45,7 +45,7 @@ git subtree pull --prefix=apps/desktop/src/crabwalk crabwalk master --squash
 
 **Status:** Researched  
 **Priority:** High  
-**Research:** `remote-development notes` (48KB)
+**Research:** remote-development notes and architecture sketches
 
 ### Description
 SSH into home machine, agents run there, but Koda UI feels native. "Set up at home, control from anywhere."
@@ -207,7 +207,7 @@ Currently Koda is worktree-based — every workspace is an isolated branch. Add 
 
 ## Notes
 
-*Add new feature ideas below. *
+*Add new feature ideas below.*
 
 ### Ideas Backlog
 - Migrate to `@anthropic-ai/claude-agent-sdk` (proper SDK vs CLI binary spawning)
@@ -217,4 +217,3 @@ Currently Koda is worktree-based — every workspace is an isolated branch. Add 
 ---
 
 *Last updated: 2026-02-01*
-**

@@ -57,7 +57,9 @@ Koda is a **review-first IDE** for the agentic era. Traditional IDEs are for wri
 
 ## MVP Features (Phase 1)
 
-### 1. Feature Parity with Conductor/Superset
+### 1. Design Lineage
+
+Koda's first milestone was deliberate: match the interface quality bar Conductor set before diverging. Conductor proved what an agent-orchestration UI should feel like; parity with that bar was the entry ticket. Everything after that point — collaboration features, shared workspaces, richer proof surfaces, and review-first workflows — is where Koda diverges.
 
 - **Parallel workspaces** with git worktrees
 - **Multi-agent sessions** (Claude, Codex, Kimi Code as first-class citizens)
