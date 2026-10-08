@@ -55,19 +55,26 @@ import {
 // Import Claude agent handlers
 import {
   claudeStart,
+  claudeSend,
   claudeResume,
   claudeCancel,
   claudeGetSession,
-  claudeGetSettings,
+  claudeList,
   claudeGetMessages,
   claudeContinue,
   claudeUpdateSettings,
+  getClaudeHandler,
+  ClaudeSendParamsSchema,
+  ClaudeListParamsSchema,
+  ClaudeContinueParamsSchema,
+  ClaudeUpdateSettingsParamsSchema,
   ClaudeStartParamsSchema,
   ClaudeResumeParamsSchema,
   ClaudeCancelParamsSchema,
   ClaudeGetSessionParamsSchema,
   ClaudeGetMessagesParamsSchema,
 } from './agents/claude.js';
+import { getClaudeStatus, listClaudeModels } from './agents/claudeModels.js';
 
 // Import Kimi agent handlers
 import {
@@ -245,13 +252,17 @@ function registerMethods() {
 
   // Claude agent
   router.register('claude.start', claudeStart, ClaudeStartParamsSchema);
+  router.register('claude.send', claudeSend, ClaudeSendParamsSchema);
   router.register('claude.resume', claudeResume, ClaudeResumeParamsSchema);
   router.register('claude.cancel', claudeCancel, ClaudeCancelParamsSchema);
   router.register('claude.getSession', claudeGetSession, ClaudeGetSessionParamsSchema);
-  router.register('claude.getSettings', claudeGetSettings);
+  router.register('claude.get', claudeGetSession, ClaudeGetSessionParamsSchema);
+  router.register('claude.list', claudeList, ClaudeListParamsSchema);
+  router.register('claude.models', listClaudeModels);
+  router.register('claude.status', getClaudeStatus);
   router.register('claude.getMessages', claudeGetMessages, ClaudeGetMessagesParamsSchema);
-  router.register('claude.continue', claudeContinue);
-  router.register('claude.updateSettings', claudeUpdateSettings);
+  router.register('claude.continue', claudeContinue, ClaudeContinueParamsSchema);
+  router.register('claude.updateSettings', claudeUpdateSettings, ClaudeUpdateSettingsParamsSchema);
 
   // Kimi agent
   router.register('kimi.session.create', createKimiSession, CreateKimiSessionSchema);
@@ -411,6 +422,7 @@ async function main() {
       console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
       stopFileWatching(); // Stop file watching
       getCodexHandler().cleanup();
+      await getClaudeHandler().dispose();
       cleanupAllSessions(); // Close all PTY sessions
       await getPulseManager().stopAll(); // Stop all pulse processes
       if (httpServer) {
