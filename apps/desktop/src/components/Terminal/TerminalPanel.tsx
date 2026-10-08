@@ -22,6 +22,29 @@ interface TerminalPanelProps {
   workingDirectory?: string
 }
 
+interface OwnedTerminal extends TerminalTab {
+  disposeListeners: (() => void)[]
+}
+
+interface TerminalScope {
+  workingDirectory?: string
+  nextNumber: number
+  tabs: Map<string, OwnedTerminal>
+}
+
+function closePty(sessionId: string) {
+  void rpcRequest('pty.close', { sessionId }).catch(err => {
+    console.error('[Terminal] Failed to close PTY:', err)
+  })
+}
+
+function disposeTab(tab: OwnedTerminal) {
+  for (const dispose of tab.disposeListeners) dispose()
+  tab.disposeListeners = []
+  tab.terminal.dispose()
+  if (tab.ptySessionId) closePty(tab.ptySessionId)
+}
+
 /**
  * Terminal panel with tabbed xterm.js instances connected to real PTY sessions.
  *
@@ -30,30 +53,35 @@ interface TerminalPanelProps {
  * - Auto-resize with FitAddon
  * - Real shell via node-pty in sidecar
  */
-export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: TerminalPanelProps) {
-  void _workspaceId
+export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
-  // Keep track of PTY data handlers per session
-  const ptyDataUnsubscribers = useRef<Map<string, () => void>>(new Map())
+  const scopeRef = useRef<TerminalScope | null>(null)
 
   // Create initial terminal on mount
   useEffect(() => {
-    void createNewTerminal()
-    const unsubscribersMap = ptyDataUnsubscribers.current
+    const scope: TerminalScope = { workingDirectory, nextNumber: 0, tabs: new Map() }
+    scopeRef.current = scope
+    setTabs([])
+    setActiveTabId(null)
+
+    // Defer startup until the effect owns the panel. StrictMode's discarded
+    // setup must not start a second shell, even if pty.create replies slowly.
+    queueMicrotask(() => {
+      if (scopeRef.current === scope && scope.tabs.size === 0) void createNewTerminal()
+    })
 
     // Cleanup all PTY sessions on unmount
     return () => {
-      for (const unsubscribe of unsubscribersMap.values()) {
-        unsubscribe()
-      }
-      unsubscribersMap.clear()
+      if (scopeRef.current === scope) scopeRef.current = null
+      for (const tab of scope.tabs.values()) disposeTab(tab)
+      scope.tabs.clear()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [workspaceId, workingDirectory])
 
   // Handle resize
   useEffect(() => {
@@ -80,54 +108,19 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
     return () => { window.removeEventListener('resize', handleResize); }
   }, [tabs, activeTabId])
 
-  // Mount active terminal to container
+  const activeTerminal = tabs.find(t => t.id === activeTabId)
+
+  // Reattach an existing xterm element when switching tabs; open each once.
   useEffect(() => {
-    const activeTab = tabs.find(t => t.id === activeTabId)
-    if (activeTab && containerRef.current) {
-      // Clear container
-      containerRef.current.innerHTML = ''
-
-      // Mount terminal
-      activeTab.terminal.open(containerRef.current)
-      activeTab.fitAddon.fit()
-      activeTab.terminal.scrollToTop()
-
-      // Focus terminal
-      activeTab.terminal.focus()
-    }
-  }, [activeTabId, tabs])
-
-  // Subscribe to PTY data for a session
-  const subscribeToPtyData = useCallback((ptySessionId: string, terminal: Terminal) => {
-    // Unsubscribe from any existing handler for this session
-    const existing = ptyDataUnsubscribers.current.get(ptySessionId)
-    if (existing) existing()
-
-    // Subscribe to PTY data notifications
-    const unsubscribeData = onPtyData((payload) => {
-      if (payload.sessionId === ptySessionId) {
-        terminal.write(payload.data)
-      }
-    })
-
-    // Subscribe to PTY exit notifications
-    const unsubscribeExit = onPtyExit((payload) => {
-      if (payload.sessionId === ptySessionId) {
-        terminal.writeln(`\r\n\x1b[1;33m[Process exited with code ${payload.exitCode}]\x1b[0m`)
-        setTabs(prev => prev.map(t =>
-          t.ptySessionId === ptySessionId
-            ? { ...t, ptySessionId: null, pid: null }
-            : t
-        ))
-      }
-    })
-
-    // Store combined unsubscriber
-    ptyDataUnsubscribers.current.set(ptySessionId, () => {
-      unsubscribeData()
-      unsubscribeExit()
-    })
-  }, [])
+    const container = containerRef.current
+    if (!container) return
+    container.replaceChildren()
+    if (!activeTerminal) return
+    if (activeTerminal.terminal.element) container.appendChild(activeTerminal.terminal.element)
+    else activeTerminal.terminal.open(container)
+    activeTerminal.fitAddon.fit()
+    activeTerminal.terminal.focus()
+  }, [activeTerminal?.terminal, activeTerminal?.fitAddon])
 
   // Navigation helpers
   const navigateToNextTab = useCallback(() => {
@@ -194,7 +187,9 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
   }, [activeTabId, navigateToNextTab, navigateToPrevTab])
 
   const createNewTerminal = async () => {
-    const id = `term-${Date.now()}`
+    const scope = scopeRef.current
+    if (!scope) return
+    const id = `term-${crypto.randomUUID()}`
     const terminal = new Terminal({
       theme: {
         background: '#000000',
@@ -230,17 +225,20 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
 
-    const newTab: TerminalTab = {
+    const newTab: OwnedTerminal = {
       id,
-      title: `Terminal ${tabs.length + 1}`,
+      title: `Terminal ${++scope.nextNumber}`,
       terminal,
       fitAddon,
       ptySessionId: null,
       pid: null,
       connecting: true,
+      disposeListeners: [],
     }
 
-    setTabs(prev => [...prev, newTab])
+    scope.tabs.set(id, newTab)
+    const isOwned = () => scopeRef.current === scope && scope.tabs.get(id) === newTab
+    setTabs([...scope.tabs.values()])
     setActiveTabId(id)
 
     // Create PTY session
@@ -251,81 +249,69 @@ export function TerminalPanel({ workspaceId: _workspaceId, workingDirectory }: T
         cols: number
         rows: number
       }>('pty.create', {
-        workingDirectory: workingDirectory || undefined,
+        workingDirectory: scope.workingDirectory || undefined,
         cols: terminal.cols,
         rows: terminal.rows,
       })
 
-      // Clear terminal and subscribe to PTY data
+      // A closed tab or previous workspace must not acquire a late session.
+      if (!isOwned()) {
+        closePty(result.sessionId)
+        return
+      }
+      newTab.ptySessionId = result.sessionId
+      newTab.pid = result.pid
+      newTab.connecting = false
       terminal.clear()
-      subscribeToPtyData(result.sessionId, terminal)
-
-      // Update tab with PTY session info
-      setTabs(prev => prev.map(t =>
-        t.id === id
-          ? { ...t, ptySessionId: result.sessionId, pid: result.pid, connecting: false }
-          : t
-      ))
+      newTab.disposeListeners.push(
+        onPtyData(payload => {
+          if (isOwned() && payload.sessionId === newTab.ptySessionId) terminal.write(payload.data)
+        }),
+        onPtyExit(payload => {
+          if (!isOwned() || payload.sessionId !== newTab.ptySessionId) return
+          terminal.writeln(`\r\n\x1b[1;33m[Process exited with code ${payload.exitCode}]\x1b[0m`)
+          newTab.ptySessionId = null
+          newTab.pid = null
+          setTabs([...scope.tabs.values()])
+        }),
+      )
+      setTabs([...scope.tabs.values()])
 
       // Handle user input - send to PTY
-      terminal.onData((data: string) => {
+      const input = terminal.onData((data: string) => {
+        if (!isOwned() || !newTab.ptySessionId) return
         rpcRequest('pty.write', {
-          sessionId: result.sessionId,
+          sessionId: newTab.ptySessionId,
           data,
         }).catch(err => {
           console.error('[Terminal] Failed to write to PTY:', err)
         })
       })
-
+      newTab.disposeListeners.push(() => input.dispose())
 
       console.log(`[Terminal] Created PTY session ${result.sessionId} (PID: ${result.pid})`)
     } catch (err) {
+      if (!isOwned()) return
       console.error('[Terminal] Failed to create PTY session:', err)
 
       // Show error in terminal
       terminal.writeln('\x1b[1;31mFailed to connect to shell\x1b[0m')
       terminal.writeln(`\x1b[90m${err instanceof Error ? err.message : String(err)}\x1b[0m`)
 
-      setTabs(prev => prev.map(t =>
-        t.id === id ? { ...t, connecting: false } : t
-      ))
+      newTab.connecting = false
+      setTabs([...scope.tabs.values()])
     }
   }
 
-  const closeTerminal = async (id: string) => {
-    const tab = tabs.find(t => t.id === id)
-    if (tab) {
-      // Close PTY session
-      if (tab.ptySessionId) {
-        try {
-          await rpcRequest('pty.close', { sessionId: tab.ptySessionId })
-        } catch (err) {
-          console.error('[Terminal] Failed to close PTY:', err)
-        }
-
-        // Unsubscribe from PTY data
-        const unsubscribe = ptyDataUnsubscribers.current.get(tab.ptySessionId)
-        if (unsubscribe) {
-          unsubscribe()
-          ptyDataUnsubscribers.current.delete(tab.ptySessionId)
-        }
-      }
-
-      tab.terminal.dispose()
-    }
-
-    setTabs(prev => {
-      const newTabs = prev.filter(t => t.id !== id)
-      if (activeTabId === id && newTabs.length > 0) {
-        const lastTab = newTabs[newTabs.length - 1]
-        if (lastTab) {
-          setActiveTabId(lastTab.id)
-        }
-      } else if (newTabs.length === 0) {
-        setActiveTabId(null)
-      }
-      return newTabs
-    })
+  const closeTerminal = (id: string) => {
+    const scope = scopeRef.current
+    const tab = scope?.tabs.get(id)
+    if (!scope || !tab) return
+    scope.tabs.delete(id)
+    disposeTab(tab)
+    const remaining = [...scope.tabs.values()]
+    setTabs(remaining)
+    setActiveTabId(current => current === id ? remaining[remaining.length - 1]?.id ?? null : current)
   }
 
   return (

@@ -174,6 +174,10 @@ export async function createWorkspace(page: Page, instance: KodaInstance, testIn
   const worktree = await instance.rpc<{ worktreePath: string; repoId: string }>('worktree.get', { worktreeId })
   expect(worktree.worktreePath).not.toBe(instance.repoPath)
   expect(existsSync(join(worktree.worktreePath, '.git'))).toBe(true)
+  // A fresh worktree owns one automatic shell, including under StrictMode.
+  await expect(page.getByTestId(/^terminal-tab-term-/)).toHaveCount(1)
+  await expect(page.getByTestId('terminal-pid')).toHaveCount(1)
+  await expect.poll(() => instance.rpc<unknown[]>('pty.list')).toHaveLength(1)
   if (screenshots) await screenshot(page, testInfo, '02-isolated-worktree')
   return { workspaceId, worktreeId, ...worktree }
 }
