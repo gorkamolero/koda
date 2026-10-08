@@ -14,10 +14,11 @@ Koda's first milestone was deliberate: match the interface quality bar Conductor
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24 recommended (22.12+ required)
 - pnpm 9+
 - Rust toolchain (for Tauri)
 - macOS (Windows/Linux support planned)
+- An installed Codex CLI, signed in with `codex login`
 
 ### Install
 
@@ -37,6 +38,12 @@ pnpm app
 pnpm desktop   # Tauri desktop shell
 pnpm sidecar   # Node.js orchestration layer
 ```
+
+Codex is the default agent. Choose a model from the installed Codex model catalog in the chat UI; sessions and model choices survive restarts. Koda uses the installed Codex CLI through the TypeScript SDK and does not execute the legacy SDK's bundled binary.
+
+For collaboration, copy `.env.example` to `.env.local` and set `LIVEBLOCKS_SECRET_KEY` to a Liveblocks development secret. It stays on the sidecar and is ignored by git. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**.
+
+See [VERIFY.md](./VERIFY.md) for the real-service proofs, screenshots, separate-instance setup, and clean-clone verification.
 
 ### Test
 
@@ -124,6 +131,7 @@ Not just code diffs — before/after screenshots of your running app. See what c
 |-----|-------------|
 | [SPEC.md](./SPEC.md) | Full architecture and design spec |
 | [FEATURES.md](./FEATURES.md) | Feature roadmap and status |
+| [VERIFY.md](./VERIFY.md) | Reproduce the Codex and collaboration proofs |
 | [API.md](./API.md) | JSON-RPC method reference |
 | [docs/koda-collaboration.md](./docs/koda-collaboration.md) | Collaboration architecture |
 

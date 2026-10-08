@@ -2,7 +2,17 @@
 
 Living document for planned features.
 
-> **Status, 2026-10-07:** paused since Claude removed the third-party access path Koda relied on. The sidecar also runs Codex (`@openai/codex-sdk`), which is the agent to use now. Collaboration below is built but not yet proven end to end.
+> **Status, 2026-10-07:** The real Codex and two-instance Liveblocks proofs pass. Codex is the default agent, models are selectable in the UI, sessions survive process restarts, and host-side checks enforce view/control invitations. See `VERIFY.md` for reproduction commands, native-versus-browser verification scope, and the clean-clone evidence manifest.
+
+## Codex desktop flow
+
+- [x] Add a local repository and create an isolated git worktree through the UI.
+- [x] Choose from the installed Codex model catalog and stream real agent messages.
+- [x] See modified and untracked files with diffs.
+- [x] Save a checkpoint without changing the working files or staging index.
+- [x] Restart both app processes, restore workspace/session/model, and continue the saved Codex thread.
+- [x] Native macOS build/launch, independent instance profiles, terminal startup, and notification-safe native RPC.
+- [x] Automated real-service Playwright proof with per-step screenshots; `pnpm verify:clean` reproduces both proofs from committed source.
 
 ---
 
@@ -71,7 +81,7 @@ SSH into home machine, agents run there, but Koda UI feels native. "Set up at ho
 
 ## 👥 Multi-Host Collaboration
 
-**Status:** Built on Liveblocks (2026-02-01), not yet proven end to end  
+**Status:** Same-machine, two-user Liveblocks proof passes
 **Priority:** High  
 **Research:** `collaboration architecture notes` (41KB)
 
@@ -90,16 +100,20 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] `session_recordings` + `recording_frames` — playback
 - [x] Conversation forking via `forked_from_session_id`
 
-### Already Built (Sync Layer, commit "Add Liveblocks collaboration and workspace-repo linking")
-- [x] Real-time sync on Liveblocks: `apps/desktop/src/lib/liveblocks.ts`, `components/CollaborativeWorkspaceProvider.tsx`, `hooks/useCollaboration.ts`
-- [x] Sessions and messages synced from the sidecar: `apps/sidecar/src/sync/LiveblocksClient.ts`
-- [x] Presence: `components/PresenceAvatars.tsx`
-- [x] Sending messages to a collaborator's agent: `hooks/useRemoteMessageRelay.ts`
+### Sync Layer
+- [x] Sidecar publishes sessions and streaming transcripts through Liveblocks.
+- [x] Both users see presence; a guest can view the host's sessions and messages.
+- [x] Share/join controls issue signed view or control invitations.
+- [x] Control messages reach the host's real Codex session and both users see its live reply.
+- [x] View access is enforced by the host as well as the UI; replacing an invitation revokes the previous grant.
+- [x] Relay broadcasts do not expose invitation tokens, and signed requests cannot be modified or replayed to execute twice.
 
 ### Still Needed
-- [ ] Prove it end to end: two instances (two users) sharing a workspace, live sessions and messages, presence, relay
-- [ ] Check that `view` and `control` permissions are enforced (view can watch, only control can send)
+- [x] Two isolated instances (two users), live sessions/messages, presence, and relay proved with real Codex and Liveblocks.
+- [x] View/control checks and revoked-control rejection proved at the host's authorization boundary.
 - [ ] Cross-machine test (two Macs), after the same-machine proof
+
+The development proof uses a backend `LIVEBLOCKS_SECRET_KEY` in an ignored env file on each sidecar. It is not production authentication for mutually untrusted machines. Playwright captures Chromium windows; native WKWebView automation is not claimed.
 
 ### Sync Technology Options
 1. **Liveblocks** — Managed real-time sync, presence, shared state
