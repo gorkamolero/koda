@@ -127,12 +127,16 @@ describe('shared workspaces in the sidebar', () => {
       if (method === 'collaboration.join') return { roomId: 'workspace:w2', worktreeId: 'w2', permission: 'view' }
       return {}
     })
-    render(wrap(<SharedWorkspacesSection />))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    render(<Provider store={createStore()}><QueryClientProvider client={client}><SharedWorkspacesSection /></QueryClientProvider></Provider>)
     fireEvent.click(screen.getByTestId('join-workspace'))
     fireEvent.change(screen.getByTestId('join-invitation'), { target: { value: 'invitation-token' } })
     fireEvent.click(screen.getByTestId('join-confirm'))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId: 'shared', worktreeId: 'w2' } }))
     expect(rpcRequest).toHaveBeenCalledWith('collaboration.join', { invitation: 'invitation-token' })
+    // A replacement invitation can change the permission of the workspace on screen.
+    expect(invalidate).toHaveBeenCalledWith()
   })
 })
 

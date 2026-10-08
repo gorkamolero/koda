@@ -248,13 +248,13 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
       )
       setTabs([...scope.tabs.values()])
 
-      // Handle user input - send to PTY
+      // Handle user input - send to PTY, one write at a time: separate
+      // requests can overtake each other and reorder the keystrokes.
+      let writes = Promise.resolve()
       const input = terminal.onData((data: string) => {
         if (!isOwned() || !newTab.ptySessionId) return
-        rpcRequest('pty.write', {
-          sessionId: newTab.ptySessionId,
-          data,
-        }).catch(err => {
+        const sessionId = newTab.ptySessionId
+        writes = writes.then(() => rpcRequest('pty.write', { sessionId, data })).then(() => {}, err => {
           console.error('[Terminal] Failed to write to PTY:', err)
         })
       })

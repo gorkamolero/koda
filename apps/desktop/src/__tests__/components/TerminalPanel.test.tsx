@@ -108,4 +108,23 @@ describe('terminal lifecycle ownership', () => {
     for (const number of [1, 2, 3]) expect(screen.getByText(`Terminal ${number}`)).toBeInTheDocument()
     expect(new Set(terminalTabs().map(tab => tab.dataset.testid)).size).toBe(3)
   })
+
+  it('sends keystrokes one write at a time, in order', async () => {
+    const writes: Array<{ data: string; done: () => void }> = []
+    rpcRequest.mockImplementation((method: string, params?: { data: string }) => {
+      if (method === 'pty.create') return Promise.resolve(session('shell-1'))
+      if (method !== 'pty.write') return Promise.resolve({ success: true })
+      return new Promise(resolve => writes.push({ data: params!.data, done: () => resolve({ success: true }) }))
+    })
+    render(<TerminalPanel workspaceId="w1" workingDirectory="/repo" />)
+    await waitFor(() => expect((terminals[0] as unknown as { onData: ReturnType<typeof vi.fn> }).onData).toHaveBeenCalled())
+    const type = ((terminals[0] as unknown as { onData: ReturnType<typeof vi.fn> }).onData.mock.calls[0] as [(data: string) => void])[0]
+    for (const key of ['e', 'c', 'h', 'o']) type(key)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    for (let i = 0; i < 4; i++) {
+      await act(async () => { writes[i]!.done() })
+      if (i < 3) await waitFor(() => expect(writes).toHaveLength(i + 2))
+    }
+    expect(writes.map(write => write.data).join('')).toBe('echo')
+  })
 })

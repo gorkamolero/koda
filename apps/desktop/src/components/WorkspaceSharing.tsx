@@ -124,7 +124,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
 
 export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
-  const { refetch } = useSharedWorkspaces()
+  const queryClient = useQueryClient()
   const [invitation, setInvitation] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
@@ -132,7 +132,8 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
     setError(''); setPending(true)
     try {
       const share = await rpcRequest<Share>('collaboration.join', { invitation })
-      await refetch()
+      // A new invitation can change the permission of a workspace already on screen.
+      await queryClient.invalidateQueries()
       onClose()
       void navigate({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId: 'shared', worktreeId: share.worktreeId } })
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
