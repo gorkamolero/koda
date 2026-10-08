@@ -34,7 +34,9 @@ describe('Tauri → Sidecar Integration (Full Pipeline)', () => {
     // Spawn the sidecar process
     const sidecarPath = path.join(__dirname, '../src/index.ts');
 
-    sidecarProcess = spawn('npx', ['tsx', sidecarPath], {
+    // Spawn Node directly so teardown terminates the actual sidecar, not an
+    // npx wrapper that can leave its child and file watchers orphaned.
+    sidecarProcess = spawn(process.execPath, ['--import', 'tsx', sidecarPath], {
       env: {
         ...process.env,
         KODA_SOCKET: socketPath,

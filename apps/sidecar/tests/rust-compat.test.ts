@@ -35,7 +35,7 @@ describe('Rust/Tauri Compatibility', () => {
 
     const sidecarPath = path.join(__dirname, '../src/index.ts');
 
-    sidecarProcess = spawn('npx', ['tsx', sidecarPath], {
+    sidecarProcess = spawn(process.execPath, ['--import', 'tsx', sidecarPath], {
       env: {
         ...process.env,
         KODA_SOCKET: socketPath,

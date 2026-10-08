@@ -28,6 +28,8 @@ describe('Worktree Manager', () => {
   let db: ReturnType<typeof drizzle<typeof schema>>;
   let testRepoPath: string;
   let testRepoId: string;
+  let testDataDir: string;
+  let previousDataDir: string | undefined;
 
   /**
    * Initialize a test git repository with some content
@@ -45,6 +47,9 @@ describe('Worktree Manager', () => {
   }
 
   beforeAll(() => {
+    previousDataDir = process.env.KODA_DATA_DIR;
+    testDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'koda-worktree-data-'));
+    process.env.KODA_DATA_DIR = testDataDir;
     // Create temporary database for testing
     dbPath = path.join(os.tmpdir(), `koda-worktree-test-${Date.now()}.db`);
     runMigrations(dbPath);
@@ -59,6 +64,9 @@ describe('Worktree Manager', () => {
     if (fs.existsSync(dbPath)) {
       fs.unlinkSync(dbPath);
     }
+    fs.rmSync(testDataDir, { recursive: true, force: true });
+    if (previousDataDir === undefined) delete process.env.KODA_DATA_DIR;
+    else process.env.KODA_DATA_DIR = previousDataDir;
   });
 
   beforeEach(() => {
@@ -141,7 +149,8 @@ describe('Worktree Manager', () => {
       expect(workspace.repoId).toBe(testRepoId);
 
       // Verify worktree directory was created
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'feature-test-worktree');
+      const worktreePath = workspace.worktreePath!;
+      expect(worktreePath).toContain(path.join(testDataDir, 'worktrees'));
       expect(fs.existsSync(worktreePath)).toBe(true);
 
       // Verify it's a valid git worktree (has .git file)
@@ -161,7 +170,7 @@ describe('Worktree Manager', () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'existing-branch' }, db);
 
       expect(workspace.branch).toBe('existing-branch');
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'existing-branch');
+      const worktreePath = workspace.worktreePath!;
       expect(fs.existsSync(worktreePath)).toBe(true);
     });
 
@@ -173,7 +182,7 @@ describe('Worktree Manager', () => {
       // Worktree path should use sanitized branch name
       expect(worktree.worktreePath).toContain('feature-complex-branch-name_with.dots');
 
-      const expectedPath = path.join(testRepoPath, '.worktrees', 'feature-complex-branch-name_with.dots');
+      const expectedPath = worktree.worktreePath!;
       expect(fs.existsSync(expectedPath)).toBe(true);
     });
 
@@ -200,7 +209,7 @@ describe('Worktree Manager', () => {
     it('should remove git worktree and soft delete workspace', async () => {
       // Create a worktree first
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'to-delete' }, db);
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'to-delete');
+      const worktreePath = workspace.worktreePath!;
       expect(fs.existsSync(worktreePath)).toBe(true);
 
       // Delete the worktree
@@ -341,7 +350,7 @@ describe('Worktree Manager', () => {
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'setup-test' }, db);
 
       // Verify setup script ran in worktree directory
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'setup-test');
+      const worktreePath = workspace.worktreePath!;
       expect(fs.existsSync(path.join(worktreePath, 'setup-marker.txt'))).toBe(true);
     });
 
@@ -392,7 +401,7 @@ describe('Worktree Manager', () => {
 
       const workspace = await createWorktree({ repoId: testRepoId, branch: 'multi-setup' }, db);
 
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'multi-setup');
+      const worktreePath = workspace.worktreePath!;
       const content = fs.readFileSync(path.join(worktreePath, 'order.txt'), 'utf-8');
       expect(content.trim()).toBe('first\nsecond');
     });
@@ -409,7 +418,7 @@ describe('Worktree Manager', () => {
 
       const worktree = await createWorktree({ repoId: testRepoId, branch: 'env-test' }, db);
 
-      const worktreePath = path.join(testRepoPath, '.worktrees', 'env-test');
+      const worktreePath = worktree.worktreePath!;
       const content = fs.readFileSync(path.join(worktreePath, 'worktree-id.txt'), 'utf-8').trim();
       expect(content).toBe(worktree.id);
     });

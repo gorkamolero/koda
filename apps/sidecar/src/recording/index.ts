@@ -71,6 +71,11 @@ export interface GetFramesOptions {
 // Recording Operations
 // ============================================================================
 
+/** SQLite datetime('now') values are UTC even though their text omits a zone. */
+function parseTimestamp(value: string): number {
+  return Date.parse(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? value.replace(' ', 'T') + 'Z' : value);
+}
+
 /**
  * Start a new recording for a session
  * Captures any existing messages as initial frames
@@ -87,6 +92,7 @@ export function startRecording(db: Db, input: StartRecordingInput): Recording {
       name: input.name ?? null,
       description: input.description ?? null,
       status: 'recording',
+      startedAt,
     })
     .run();
 
@@ -102,7 +108,7 @@ export function startRecording(db: Db, input: StartRecordingInput): Recording {
   const recordingStart = new Date(startedAt).getTime();
 
   for (const message of existingMessages) {
-    const messageTime = new Date(message.createdAt).getTime();
+    const messageTime = parseTimestamp(message.createdAt);
     const offsetMs = Math.max(0, messageTime - recordingStart);
 
     db.insert(recordingFrames)
@@ -139,7 +145,7 @@ export function stopRecording(db: Db, recordingId: string): Recording | undefine
   }
 
   const endedAt = new Date().toISOString();
-  const startTime = new Date(recording.startedAt).getTime();
+  const startTime = parseTimestamp(recording.startedAt);
   const endTime = new Date(endedAt).getTime();
   const durationMs = endTime - startTime;
 
@@ -172,7 +178,7 @@ export function stopRecording(db: Db, recordingId: string): Recording | undefine
 
   // Add new messages as frames
   for (const message of newMessages) {
-    const messageTime = new Date(message.createdAt).getTime();
+    const messageTime = parseTimestamp(message.createdAt);
     const offsetMs = Math.max(0, messageTime - startTime);
 
     db.insert(recordingFrames)
