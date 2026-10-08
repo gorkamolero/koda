@@ -2,6 +2,8 @@
 
 Living document for planned features.
 
+> **Status, 2026-10-07:** paused since Claude removed the third-party access path Koda relied on. The sidecar also runs Codex (`@openai/codex-sdk`), which is the agent to use now. Collaboration below is built but not yet proven end to end.
+
 ---
 
 ## 🦀 Crabwalk Integration
@@ -69,7 +71,7 @@ SSH into home machine, agents run there, but Koda UI feels native. "Set up at ho
 
 ## 👥 Multi-Host Collaboration
 
-**Status:** Schema Built, Sync Layer Needed  
+**Status:** Built on Liveblocks (2026-02-01), not yet proven end to end  
 **Priority:** High  
 **Research:** `collaboration architecture notes` (41KB)
 
@@ -88,11 +90,16 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] `session_recordings` + `recording_frames` — playback
 - [x] Conversation forking via `forked_from_session_id`
 
+### Already Built (Sync Layer, commit "Add Liveblocks collaboration and workspace-repo linking")
+- [x] Real-time sync on Liveblocks: `apps/desktop/src/lib/liveblocks.ts`, `components/CollaborativeWorkspaceProvider.tsx`, `hooks/useCollaboration.ts`
+- [x] Sessions and messages synced from the sidecar: `apps/sidecar/src/sync/LiveblocksClient.ts`
+- [x] Presence: `components/PresenceAvatars.tsx`
+- [x] Sending messages to a collaborator's agent: `hooks/useRemoteMessageRelay.ts`
+
 ### Still Needed
-- [ ] Real-time sync layer (Liveblocks/Yjs/WebSocket)
-- [ ] Cross-machine agent visibility
-- [ ] Presence (who's online, cursors)
-- [ ] Agent-to-agent message routing
+- [ ] Prove it end to end: two instances (two users) sharing a workspace, live sessions and messages, presence, relay
+- [ ] Check that `view` and `control` permissions are enforced (view can watch, only control can send)
+- [ ] Cross-machine test (two Macs), after the same-machine proof
 
 ### Sync Technology Options
 1. **Liveblocks** — Managed real-time sync, presence, shared state
@@ -210,10 +217,11 @@ Currently Koda is worktree-based — every workspace is an isolated branch. Add 
 *Add new feature ideas below.*
 
 ### Ideas Backlog
-- Migrate to `@anthropic-ai/claude-agent-sdk` (proper SDK vs CLI binary spawning)
+- [x] Migrate to `@anthropic-ai/claude-agent-sdk` (done: the sidecar uses it)
+- [x] Codex through `@openai/codex-sdk` in the sidecar
 - Subagent view — visualize spawned subagents, hierarchy, status (ties into Crabwalk integration)
 - **Rive-based agent UI** — Tobi-endorsed Tensorlake style. Smooth state machine animations for agent thinking/correcting/executing. Reference: https://x.com/tobi/status/2017795986966335853 
 
 ---
 
-*Last updated: 2026-02-01*
+*Last updated: 2026-10-07*
