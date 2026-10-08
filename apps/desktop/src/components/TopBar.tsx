@@ -25,6 +25,7 @@ import {
   closeFileAtom,
 } from '@/store/fileExplorer'
 import { CollaborationStatus } from '@/components/CollaborationStatus'
+import { ShareWorkspaceButton } from '@/components/WorkspaceSharing'
 import { PresenceAvatars } from '@/components/PresenceAvatars'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
@@ -169,6 +170,8 @@ export function TopBar({
             <ChevronDown className="size-3" />
             <span>]</span>
           </button>
+
+          {worktreeId && <ShareWorkspaceButton worktreeId={worktreeId} />}
 
           {/* Collaboration toggle */}
           <button

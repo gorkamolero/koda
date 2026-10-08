@@ -1,89 +1,29 @@
-/**
- * CollaborativeWorkspaceProvider
- *
- * Wraps workspace content with Liveblocks RoomProvider for real-time collaboration.
- * Each workspace gets its own Liveblocks room.
- *
- * Features:
- * - Automatic room creation/joining when entering a workspace
- * - Presence awareness (who else is in the workspace)
- * - Session and message sync via CRDT
- * - Graceful degradation when Liveblocks is not configured
- */
+import { createContext, useContext, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { RoomProvider, createInitialStorage, getWorkspaceRoomId } from '@/lib/liveblocks'
+import { getMachineName, getUserColor } from '@/lib/machineId'
+import { rpcRequest } from '@/lib/tauri'
 
-import { ReactNode, useMemo } from 'react'
-import {
-  RoomProvider,
-  getWorkspaceRoomId,
-  createInitialStorage,
-  type LiveblocksPresence,
-} from '@/lib/liveblocks'
-import { getMachineId, getMachineName, getUserColor } from '@/lib/machineId'
-import { RemoteMessageRelay } from '@/hooks/useRemoteMessageRelay'
+const CollaborationContext = createContext(false)
 
-interface CollaborativeWorkspaceProviderProps {
-  /** Workspace ID */
-  workspaceId: string
-  /** Whether collaboration is enabled for this workspace (opt-in) */
-  collaborative?: boolean
-  /** User's display name (optional, defaults to machine name) */
-  userName?: string
-  /** Children to render inside the room */
-  children: ReactNode
-}
-
-/**
- * Provider that enables collaboration features for a workspace.
- * Collaboration is opt-in per workspace. If not enabled, or if Liveblocks
- * is not configured, renders children without collaboration.
- */
-export function CollaborativeWorkspaceProvider({
-  workspaceId,
-  collaborative = false,
-  userName,
-  children,
-}: CollaborativeWorkspaceProviderProps) {
-  // Generate room ID from workspace ID
-  const roomId = useMemo(() => getWorkspaceRoomId(workspaceId), [workspaceId])
-
-  // Generate initial presence
-  const initialPresence = useMemo((): LiveblocksPresence => {
-    return {
-      name: userName ?? getMachineName(),
-      color: getUserColor(),
-      machineId: getMachineId(),
-      activeSessionId: null,
-      cursorFile: null,
-      cursorLine: null,
-    }
-  }, [userName])
-
-  // Check if Liveblocks is configured
-  const isLiveblocksConfigured = Boolean(import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY)
-
-  // Only enable collaboration if:
-  // 1. The workspace has collaboration enabled (opt-in)
-  // 2. Liveblocks is configured (has API key)
-  if (!collaborative || !isLiveblocksConfigured) {
-    return <>{children}</>
-  }
-
+export function CollaborativeWorkspaceProvider({ workspaceId, collaborative = false, userName, children }: {
+  workspaceId: string; collaborative?: boolean; userName?: string; children: ReactNode
+}) {
+  const { data: identity } = useQuery({
+    queryKey: ['collaboration', 'identity'],
+    queryFn: () => rpcRequest<{ enabled: boolean; machineId: string; name: string }>('collaboration.status'),
+    enabled: collaborative,
+    retry: false,
+  })
+  if (!collaborative || !identity?.enabled) return <>{children}</>
   return (
-    <RoomProvider
-      id={roomId}
-      initialPresence={initialPresence}
-      initialStorage={createInitialStorage}
-    >
-      {/* Relay remote messages to local sidecar */}
-      <RemoteMessageRelay />
-      {children}
-    </RoomProvider>
+    <CollaborationContext.Provider value={true}>
+      <RoomProvider id={getWorkspaceRoomId(workspaceId)} initialStorage={createInitialStorage}
+        initialPresence={{ name: userName || identity.name || getMachineName(), color: getUserColor(), machineId: identity.machineId, activeSessionId: null, cursorFile: null, cursorLine: null }}>
+        {children}
+      </RoomProvider>
+    </CollaborationContext.Provider>
   )
 }
 
-/**
- * Hook to check if collaboration is available in the current context
- */
-export function useIsCollaborationAvailable(): boolean {
-  return Boolean(import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY)
-}
+export function useIsCollaborationAvailable() { return useContext(CollaborationContext) }

@@ -76,7 +76,7 @@ export function usePresence() {
   const localMachineId = useMemo(() => getMachineId(), [])
 
   const peers = useMemo((): Peer[] => {
-    return others.map((other) => ({
+    return others.filter((other) => !other.presence.service).map((other) => ({
       connectionId: other.connectionId,
       name: other.presence.name,
       color: other.presence.color,

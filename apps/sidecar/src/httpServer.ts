@@ -171,7 +171,7 @@ export class HttpRpcServer {
       ws.on('message', (data) => {
         try {
           const message = JSON.parse(data.toString());
-          console.log('[WebSocket] Received message:', message);
+          console.log('[WebSocket] Received message type:', typeof message.method === 'string' ? message.method : 'unknown');
           // Future: Handle WebSocket RPC requests
         } catch (err) {
           console.error('[WebSocket] Failed to parse message:', err);
@@ -333,6 +333,7 @@ export class HttpRpcServer {
     return new Promise((resolve) => {
       // Close WebSocket server first
       if (this.wss) {
+        for (const client of this.wss.clients) client.terminate();
         this.wss.close(() => {
           console.log('[HttpRpcServer] WebSocket server closed');
         });

@@ -14,6 +14,8 @@
 import { createClient, LiveList, LiveMap, LiveObject } from '@liveblocks/client'
 import { createRoomContext, createLiveblocksContext } from '@liveblocks/react'
 import type { Presence } from '@/types/collaboration'
+import { rpcRequest } from '@/lib/tauri'
+import { getMachineName } from '@/lib/machineId'
 
 // =============================================================================
 // Liveblocks Client
@@ -23,20 +25,13 @@ import type { Presence } from '@/types/collaboration'
  * Check if Liveblocks is configured
  * In E2E tests and local dev without key, this will be false
  */
-const LIVEBLOCKS_PUBLIC_KEY = import.meta.env.VITE_LIVEBLOCKS_PUBLIC_KEY as string | undefined
-
-/**
- * Create the Liveblocks client lazily
- * Only creates client if a valid public key is configured
- * This prevents errors in E2E tests and local dev without Liveblocks
- */
-const client = LIVEBLOCKS_PUBLIC_KEY
-  ? createClient({
-      publicApiKey: LIVEBLOCKS_PUBLIC_KEY,
-      // Throttle presence updates (avoid spamming)
-      throttle: 100,
-    })
-  : null
+const client = createClient({
+  authEndpoint: async (room) => {
+    if (!room) throw new Error('A workspace room is required')
+    return rpcRequest<{ token: string }>('collaboration.auth', { roomId: room, name: getMachineName() })
+  },
+  throttle: 100,
+})
 
 // =============================================================================
 // Type Definitions for Liveblocks
@@ -53,6 +48,7 @@ type LiveblocksPresence = {
   activeSessionId: string | null
   cursorFile: string | null
   cursorLine: number | null
+  service?: boolean
 }
 
 /**
@@ -128,6 +124,8 @@ type LiveblocksStorage = {
   sessions: LiveMap<string, LiveObject<SessionData>>
   /** Messages per session stored as LiveMap<sessionId, LiveList<LiveObject<MessageData>>> */
   messages: LiveMap<string, LiveList<LiveObject<MessageData>>>
+  /** Authoritative host transcript snapshots, updated during each streamed turn. */
+  transcripts: LiveMap<string, string>
   /** Diff comments stored as LiveList */
   comments: LiveList<LiveObject<CommentData>>
 }
@@ -150,6 +148,8 @@ type UserMeta = {
 type RoomEvent =
   | { type: 'cursor'; data: { file: string; line: number } }
   | { type: 'notification'; data: { message: string } }
+  | { type: 'relay'; authorName?: string; authorMachineId?: string; roomId: string; grantId: string; signature: string; requestId: string; sessionId: string; content: string }
+  | { type: 'relay-result'; requestId: string; error: string | null }
 
 /**
  * Thread metadata (for comments)
@@ -258,6 +258,7 @@ export function createInitialStorage(): LiveblocksStorage {
     }),
     sessions: new LiveMap([]),
     messages: new LiveMap([]),
+    transcripts: new LiveMap([]),
     comments: new LiveList([]),
   }
 }

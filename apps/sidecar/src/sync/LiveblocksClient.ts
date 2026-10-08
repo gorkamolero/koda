@@ -1,278 +1,289 @@
-/**
- * Liveblocks Server-Side Client
- *
- * Provides server-side access to Liveblocks rooms for:
- * - Syncing session state when sessions are created/updated
- * - Watching for remote messages targeting local sessions
- * - Pushing agent responses to the room
- */
-
+/** Host-authoritative Liveblocks synchronization and signed workspace invitations. */
 import { Liveblocks } from '@liveblocks/node'
-import { v4 as uuidv4 } from 'uuid'
-import os from 'node:os'
+import { createClient, LiveList, LiveMap, LiveObject, type Room } from '@liveblocks/client'
+import WebSocket from 'ws'
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { eq } from 'drizzle-orm'
+import { getDb } from '../db/index.js'
+import { sessions, worktrees } from '../db/schema.js'
+import { router } from '../rpc/router.js'
+import { getNotificationEmitter } from '../rpc/notifications.js'
+import { config } from '../config.js'
+import { authorizeRelay, signCapability, verifyCapability, signRelay, verifyRelay, type RelayCommand, type Capability } from './capabilities.js'
 
-// =============================================================================
-// Types
-// =============================================================================
-
-/**
- * Session data stored in Liveblocks
- */
-export interface SessionData {
-  id: string
-  workspaceId: string | null
-  agentType: string | null
-  model: string | null
-  status: string | null
-  hostMachineId: string
-  hostMachineName: string | null
-  createdByUserId: string | null
-  title: string | null
-  createdAt: string | null
-  updatedAt: string | null
+export type SessionData = {
+  id: string; worktreeId: string | null; agentType: string | null; model: string | null;
+  status: string | null; hostMachineId: string; hostMachineName: string | null;
+  title: string | null; createdAt: string | null; updatedAt: string | null; createdByUserId: string | null
 }
-
-/**
- * Message data stored in Liveblocks
- */
-export interface MessageData {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  sourceMachineId: string
-  authorUserId: string | null
-  authorName: string | null
-  timestamp: number
-  toolUseJson: string | null
+export type MessageData = {
+  id: string; role: string; content: string; sourceMachineId: string;
+  authorUserId: string | null; authorName: string | null; timestamp: number; toolUseJson: string | null
 }
+type SharedStorage = {
+  workspace: LiveObject<{ id: string; name: string; createdByMachineId: string; createdByName: string }>;
+  sessions: LiveMap<string, LiveObject<SessionData>>;
+  messages: LiveMap<string, LiveList<LiveObject<MessageData>>>;
+  transcripts: LiveMap<string, string>;
+  comments: LiveList<LiveObject<{ id: string }>>;
+}
+type RelayEvent = RelayCommand
+type RelayResult = { type: 'relay-result'; requestId: string; error: string | null }
+type SyncEvent = RelayEvent | RelayResult
 
-// =============================================================================
-// Machine ID (Server-Side)
-// =============================================================================
-
-const MACHINE_ID_FILE = path.join(os.homedir(), '.koda', 'machine-id')
-
-/**
- * Get or create a persistent machine ID for the sidecar
- */
-export function getMachineId(): string {
-  try {
-    // Try to read existing ID
-    if (fs.existsSync(MACHINE_ID_FILE)) {
-      return fs.readFileSync(MACHINE_ID_FILE, 'utf-8').trim()
+type StoredState = { machineId: string; invitations: Record<string, string>; grants: Record<string, string>; receipts: Record<string, { error: string | null }> }
+let state: StoredState | undefined
+function stateFile() { return path.join(process.env.KODA_DATA_DIR || path.dirname(config.dbPath), 'collaboration.json') }
+function getState(): StoredState {
+  if (!state) {
+    try { state = JSON.parse(fs.readFileSync(stateFile(), 'utf8')) as StoredState; state.grants ??= {} } catch {
+      state = { machineId: randomUUID(), invitations: {}, grants: {}, receipts: {} }
+      saveState(state)
     }
-  } catch {
-    // Ignore read errors
   }
-
-  // Generate new ID
-  const machineId = uuidv4()
-
-  try {
-    // Ensure directory exists
-    fs.mkdirSync(path.dirname(MACHINE_ID_FILE), { recursive: true })
-    fs.writeFileSync(MACHINE_ID_FILE, machineId)
-  } catch {
-    // Continue without persisting - will generate new ID next time
-    console.warn('[Sync] Could not persist machine ID')
-  }
-
-  return machineId
+  return state
 }
-
-/**
- * Get a human-readable machine name
- */
-export function getMachineName(): string {
-  return os.hostname() || getMachineId().slice(0, 6)
+function saveState(value = getState()) {
+  fs.mkdirSync(path.dirname(stateFile()), { recursive: true })
+  const temporary = `${stateFile()}.tmp`
+  fs.writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 })
+  fs.renameSync(temporary, stateFile())
 }
+export function getMachineId(): string { return getState().machineId }
+export function getMachineName(): string { return process.env.KODA_USER_NAME || os.hostname() || getMachineId().slice(0, 6) }
+function secret(): string {
+  const key = process.env.LIVEBLOCKS_SECRET_KEY
+  if (!key) throw new Error('Collaboration requires LIVEBLOCKS_SECRET_KEY in the local env file')
+  return key
+}
+let api: Liveblocks | undefined
+function getApi() { return api ??= new Liveblocks({ secret: secret() }) }
+export function isCollaborationEnabled() { return Boolean(process.env.LIVEBLOCKS_SECRET_KEY) }
 
-// =============================================================================
-// Liveblocks Client
-// =============================================================================
-
-let liveblocksClient: Liveblocks | null = null
-
-/**
- * Get or create the Liveblocks client
- */
-function getLiveblocksClient(): Liveblocks | null {
-  if (liveblocksClient) {
-    return liveblocksClient
-  }
-
-  const secretKey = process.env.LIVEBLOCKS_SECRET_KEY
-  if (!secretKey) {
-    console.warn('[Sync] LIVEBLOCKS_SECRET_KEY not set - collaboration disabled')
-    return null
-  }
-
-  liveblocksClient = new Liveblocks({
-    secret: secretKey,
+async function token(roomId: string, host = false, name = getMachineName()) {
+  const session = getApi().prepareSession(`${getMachineId()}${host ? ':host' : ':ui'}`, {
+    userInfo: { name, machineId: getMachineId(), color: '#22c55e' },
   })
-
-  return liveblocksClient
+  session.allow(roomId, host ? session.FULL_ACCESS : session.READ_ACCESS)
+  const response = await session.authorize()
+  if (response.status !== 200) throw new Error(`Liveblocks authorization failed (${response.status})`)
+  return JSON.parse(response.body) as { token: string }
 }
 
-// =============================================================================
-// SyncManager
-// =============================================================================
+export async function authorizeRoom(roomId: string, name?: string) {
+  const id = roomId.replace(/^workspace:/, '')
+  const worktree = getDb().select().from(worktrees).where(eq(worktrees.id, id)).get()
+  if (worktree?.collaborative) await getSyncManager(id).connect()
+  else {
+    const invitation = getState().invitations[roomId]
+    if (!invitation || verifyCapability(invitation, secret()).roomId !== roomId) throw new Error('Join this shared workspace first')
+  }
+  // UI clients, including the owner's, never mutate the authoritative transcript.
+  return token(roomId, false, name)
+}
+
+export async function shareWorkspace(worktreeId: string, permission: 'view' | 'control') {
+  secret()
+  const db = getDb()
+  const worktree = db.select().from(worktrees).where(eq(worktrees.id, worktreeId)).get()
+  if (!worktree) throw new Error('Workspace not found')
+  db.update(worktrees).set({ collaborative: true }).where(eq(worktrees.id, worktreeId)).run()
+  try { await getSyncManager(worktreeId).connect() } catch (error) {
+    if (!worktree.collaborative) db.update(worktrees).set({ collaborative: false }).where(eq(worktrees.id, worktreeId)).run()
+    throw error
+  }
+  const capability: Capability = { version: 1, roomId: `workspace:${worktreeId}`, worktreeId, hostMachineId: getMachineId(), permission, nonce: randomUUID() }
+  const invitation = signCapability(capability, secret())
+  // Sharing has one current invitation per workspace. Replacing it revokes old
+  // control grants at the host, including requests saved before a downgrade.
+  for (const [nonce, previous] of Object.entries(getState().grants)) {
+    if (verifyCapability(previous, secret()).worktreeId === worktreeId) delete getState().grants[nonce]
+  }
+  getState().grants[capability.nonce] = invitation
+  saveState()
+  return { invitation, ...capability }
+}
+
+export function joinWorkspace(invitation: string) {
+  const capability = verifyCapability(invitation.trim(), secret())
+  getState().invitations[capability.roomId] = invitation.trim()
+  saveState()
+  return capability
+}
+export function listSharedWorkspaces() {
+  return Object.values(getState().invitations).map((invitation) => ({ ...verifyCapability(invitation, secret()), invitation }))
+}
+export function getInvitation(roomId: string) {
+  const invitation = getState().invitations[roomId]
+  if (!invitation) throw new Error('Join this shared workspace first')
+  return { invitation, ...verifyCapability(invitation, secret()) }
+}
+
+export function prepareRelay(roomId: string, sessionId: string, content: string, requestId: string) {
+  const { invitation, nonce } = getInvitation(roomId)
+  return signRelay({ type: 'relay', roomId, grantId: nonce, requestId, sessionId, content, authorName: getMachineName(), authorMachineId: getMachineId() }, invitation)
+}
 
 export class SyncManager {
-  private workspaceId: string
-  private roomId: string
-  private machineId: string
-  private machineName: string
+  readonly roomId: string
+  private room: Room<any, SharedStorage, any, SyncEvent> | undefined
+  private leave: (() => void) | undefined
+  private connecting: Promise<void> | undefined
+  private syncTimer: NodeJS.Timeout | undefined
+  private syncing = false
+  private syncAgain = false
+  private cache = new Map<string, string>()
+  private generation = 0
 
-  constructor(workspaceId: string) {
-    this.workspaceId = workspaceId
-    this.roomId = `workspace:${workspaceId}`
-    this.machineId = getMachineId()
-    this.machineName = getMachineName()
+  constructor(readonly workspaceId: string) { this.roomId = `workspace:${workspaceId}` }
+  isEnabled() { return isCollaborationEnabled() }
+  connect(): Promise<void> {
+    if (!this.connecting) this.connecting = this.open().catch((error) => { this.connecting = undefined; throw error })
+    return this.connecting
   }
-
-  /**
-   * Check if Liveblocks is configured and available
-   */
-  isEnabled(): boolean {
-    return getLiveblocksClient() !== null
-  }
-
-  /**
-   * Sync a session to Liveblocks storage
-   */
-  async syncSession(session: {
-    id: string
-    workspaceId?: string | null
-    agentType?: string | null
-    model?: string | null
-    status?: string | null
-    title?: string | null
-    createdAt?: string | null
-    updatedAt?: string | null
-  }): Promise<void> {
-    const client = getLiveblocksClient()
-    if (!client) return
-
-    const sessionData: SessionData = {
-      id: session.id,
-      workspaceId: session.workspaceId ?? this.workspaceId,
-      agentType: session.agentType ?? null,
-      model: session.model ?? null,
-      status: session.status ?? 'idle',
-      hostMachineId: this.machineId,
-      hostMachineName: this.machineName,
-      createdByUserId: null, // Set by caller if known
-      title: session.title ?? null,
-      createdAt: session.createdAt ?? new Date().toISOString(),
-      updatedAt: session.updatedAt ?? new Date().toISOString(),
-    }
-
+  private async open() {
+    const worktree = getDb().select().from(worktrees).where(eq(worktrees.id, this.workspaceId)).get()
+    if (!worktree?.collaborative) throw new Error('Workspace sharing is disabled')
+    await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
+    const client = createClient({
+      authEndpoint: () => token(this.roomId, true),
+      polyfills: { WebSocket: WebSocket as never, fetch },
+      throttle: 100,
+    })
+    const { room, leave } = client.enterRoom<any, SharedStorage, SyncEvent>(this.roomId, {
+      initialPresence: { name: getMachineName(), machineId: getMachineId(), color: '#22c55e', service: true },
+      initialStorage: {
+        workspace: new LiveObject({ id: this.workspaceId, name: worktree.branch || 'Shared workspace', createdByMachineId: getMachineId(), createdByName: getMachineName() }),
+        sessions: new LiveMap(), messages: new LiveMap(), transcripts: new LiveMap(), comments: new LiveList([]),
+      },
+    })
+    this.room = room
+    this.leave = leave
+    room.subscribe('event', ({ event }) => {
+      if (event.type === 'relay') void this.receive(event)
+    })
+    room.subscribe('status', (status) => {
+      if (status === 'connected') {
+        this.cache.clear()
+        void this.sync().catch((error) => console.error('[Sync]', error.message))
+      }
+    })
+    room.subscribe('error', (error) => console.error('[Sync] Liveblocks connection error:', error.message))
+    // Time out visibly rather than leaving Share stuck forever on an invalid key/network.
+    let timeout: NodeJS.Timeout | undefined
     try {
-      // Use Liveblocks REST API to update storage
-      // Note: In production, we'd use the Yjs document API for proper CRDT merging
-      console.log(`[Sync] Syncing session ${session.id} to room ${this.roomId}`)
-
-      // For now, log the sync attempt - full implementation requires
-      // setting up Liveblocks webhook or polling mechanism
-      console.log(`[Sync] Session data:`, JSON.stringify(sessionData, null, 2))
-    } catch (error) {
-      console.error(`[Sync] Failed to sync session:`, error)
-    }
+      await Promise.race([room.getStorage(), new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Timed out connecting to Liveblocks')), 20000) })])
+    } catch (error) { leave(); this.room = undefined; throw error } finally { clearTimeout(timeout) }
+    await this.sync()
+    this.syncTimer = setInterval(() => { void this.sync().catch((error) => console.error('[Sync]', error.message)) }, 750)
+    this.syncTimer.unref()
   }
-
-  /**
-   * Add a message to Liveblocks storage
-   */
-  async addMessage(
-    sessionId: string,
-    message: {
-      role: 'user' | 'assistant' | 'system'
-      content: string
-      authorUserId?: string | null
-      authorName?: string | null
-      toolUseJson?: string | null
-    }
-  ): Promise<void> {
-    const client = getLiveblocksClient()
-    if (!client) return
-
-    const messageData: MessageData = {
-      id: uuidv4(),
-      role: message.role,
-      content: message.content,
-      sourceMachineId: this.machineId,
-      authorUserId: message.authorUserId ?? null,
-      authorName: message.authorName ?? null,
-      timestamp: Date.now(),
-      toolUseJson: message.toolUseJson ?? null,
-    }
-
+  async sync() {
+    if (!this.room) return
+    if (this.syncing) { this.syncAgain = true; return }
+    this.syncing = true
+    const room = this.room
+    const generation = this.generation
     try {
-      console.log(`[Sync] Adding message to session ${sessionId}`)
-      console.log(`[Sync] Message data:`, JSON.stringify(messageData, null, 2))
-    } catch (error) {
-      console.error(`[Sync] Failed to add message:`, error)
+      const db = getDb()
+      const worktree = db.select().from(worktrees).where(eq(worktrees.id, this.workspaceId)).get()
+      if (!worktree?.collaborative) { this.close(); return }
+      const { root } = await room.getStorage()
+      if (this.room !== room || this.generation !== generation) return
+      // Existing rooms from earlier versions may not have transcripts yet.
+      if (!root.get('transcripts')) root.set('transcripts', new LiveMap())
+      const all = db.select().from(sessions).where(eq(sessions.worktreeId, this.workspaceId)).all()
+      const sessionIds = new Set(all.map((session) => session.id))
+      for (const id of root.get('sessions').keys()) {
+        if (!sessionIds.has(id)) {
+          root.get('sessions').delete(id)
+          root.get('transcripts').delete(id)
+          root.get('messages').delete(id)
+          this.cache.delete(id)
+          this.cache.delete(`messages:${id}`)
+        }
+      }
+      for (const session of all) {
+        const data: SessionData = { id: session.id, worktreeId: session.worktreeId, agentType: session.agentType, model: session.model, status: session.status, title: session.title, createdAt: session.createdAt, updatedAt: session.updatedAt, hostMachineId: getMachineId(), hostMachineName: getMachineName(), createdByUserId: null }
+        const encoded = JSON.stringify(data)
+        if (this.cache.get(session.id) !== encoded) {
+          root.get('sessions').set(session.id, new LiveObject(data)); this.cache.set(session.id, encoded)
+        }
+        const handler = router.get(session.agentType === 'codex' ? 'codex.getMessages' : 'claude.getMessages')
+        if (!handler) continue
+        const transcript = JSON.stringify(await handler({ sessionId: session.id }))
+        if (this.room !== room || this.generation !== generation) return
+        if (this.cache.get(`messages:${session.id}`) !== transcript) {
+          root.get('transcripts').set(session.id, transcript); this.cache.set(`messages:${session.id}`, transcript)
+        }
+      }
+    } finally {
+      this.syncing = false
+      if (this.syncAgain) { this.syncAgain = false; void this.sync().catch((error) => console.error('[Sync]', error.message)) }
     }
   }
-
-  /**
-   * Update session status
-   */
-  async updateSessionStatus(
-    sessionId: string,
-    status: 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled'
-  ): Promise<void> {
-    const client = getLiveblocksClient()
-    if (!client) return
-
+  async receive(event: RelayEvent): Promise<RelayResult> {
+    let error: string | null = null
+    let claimed = false
+    const receiptKey = `${this.roomId}:${event.requestId}`
     try {
-      console.log(`[Sync] Updating session ${sessionId} status to ${status}`)
-    } catch (error) {
-      console.error(`[Sync] Failed to update session status:`, error)
+      const invitation = getState().grants[event.grantId]
+      if (!invitation) throw new Error('Unknown or revoked invitation')
+      verifyRelay(event, invitation)
+      const capability = verifyCapability(invitation, secret())
+      if (event.roomId !== this.roomId) throw new Error('Relay room mismatch')
+      const db = getDb()
+      const session = db.select().from(sessions).where(eq(sessions.id, event.sessionId)).get()
+      if (!session?.worktreeId) throw new Error('Session not found')
+      const worktree = db.select().from(worktrees).where(eq(worktrees.id, session.worktreeId)).get()
+      authorizeRelay(capability, { roomId: this.roomId, hostMachineId: getMachineId(), worktreeId: session.worktreeId, collaborative: Boolean(worktree?.collaborative) })
+      if (!event.content?.trim() || event.content.length > 32000) throw new Error('Message must contain 1–32000 characters')
+      if (!/^[\w-]{1,100}$/.test(event.requestId)) throw new Error('Invalid relay request ID')
+      const receipt = getState().receipts[receiptKey]
+      if (receipt) error = receipt.error
+      else {
+        if (session.agentType !== 'codex') throw new Error('Remote control currently supports Codex sessions')
+        // Persist before dispatch so reconnects/replayed requests cannot execute twice.
+        claimed = true
+        getState().receipts[receiptKey] = { error: 'Previous relay interrupted; send a new message to retry' }
+        saveState()
+        await router.get('codex.send')!({ sessionId: session.id, message: event.content, stream: true, ...(event.authorName ? { authorName: event.authorName } : {}), ...(event.authorMachineId ? { authorMachineId: event.authorMachineId } : {}) })
+        getState().receipts[receiptKey] = { error: null }
+        saveState()
+        await this.sync()
+      }
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : String(caught)
+      if (claimed) { getState().receipts[receiptKey] = { error }; saveState() }
     }
+    const result: RelayResult = { type: 'relay-result', requestId: event.requestId, error }
+    this.room?.broadcastEvent(result)
+    return result
   }
-
-  /**
-   * Get the Yjs document for this room (for advanced sync)
-   */
-  async getYjsDocument(): Promise<ArrayBuffer | null> {
-    const client = getLiveblocksClient()
-    if (!client) return null
-
-    try {
-      const doc = await client.getYjsDocumentAsBinaryUpdate(this.roomId)
-      return doc
-    } catch (error) {
-      console.error(`[Sync] Failed to get Yjs document:`, error)
-      return null
-    }
-  }
+  close() { this.generation++; clearInterval(this.syncTimer); this.leave?.(); this.room = undefined; this.connecting = undefined; this.cache.clear() }
+  async syncSession(_session?: unknown) { await this.connect(); await this.sync() }
+  async addMessage(_sessionId?: string, _message?: unknown) { await this.sync() }
+  async updateSessionStatus(_sessionId?: string, _status?: string) { await this.sync() }
 }
-
-// =============================================================================
-// Singleton access per workspace
-// =============================================================================
-
-const syncManagers = new Map<string, SyncManager>()
-
-/**
- * Get or create a SyncManager for a workspace
- */
-export function getSyncManager(workspaceId: string): SyncManager {
-  let manager = syncManagers.get(workspaceId)
-  if (!manager) {
-    manager = new SyncManager(workspaceId)
-    syncManagers.set(workspaceId, manager)
-  }
+const managers = new Map<string, SyncManager>()
+export function getSyncManager(workspaceId: string) {
+  let manager = managers.get(workspaceId)
+  if (!manager) { manager = new SyncManager(workspaceId); managers.set(workspaceId, manager) }
   return manager
 }
-
-/**
- * Check if collaboration is enabled (Liveblocks configured)
- */
-export function isCollaborationEnabled(): boolean {
-  return getLiveblocksClient() !== null
+export function initializeCollaboration() {
+  if (!isCollaborationEnabled()) return
+  for (const worktree of getDb().select().from(worktrees).where(eq(worktrees.collaborative, true)).all()) {
+    void getSyncManager(worktree.id).connect().catch((error) => console.error('[Sync]', error.message))
+  }
+  getNotificationEmitter().subscribe((method, params) => {
+    if (!['message', 'sessionStatus'].includes(method)) return
+    const sessionId = (params as { sessionId?: string })?.sessionId
+    if (!sessionId) return
+    const session = getDb().select().from(sessions).where(eq(sessions.id, sessionId)).get()
+    if (session?.worktreeId) void managers.get(session.worktreeId)?.sync().catch((error) => console.error('[Sync]', error.message))
+  })
 }

@@ -1,3 +1,4 @@
+import { registerCollaborationMethods } from './sync/register.js';
 import { RpcServer } from './server.js';
 import { router } from './rpc/router.js';
 import { HttpRpcServer } from './httpServer.js';
@@ -315,6 +316,8 @@ function registerMethods() {
   router.register('activity.markRead', markRead, MarkReadSchema);
   router.register('activity.unreadCount', unreadCount, UnreadCountSchema);
   router.register('activity.getWorkspacesWithStatus', getWorkspacesWithStatus, GetWorkspacesWithStatusSchema);
+
+  registerCollaborationMethods();
 
   const methodCount = router.methods().length;
   console.log(`Registered ${methodCount} RPC methods`);

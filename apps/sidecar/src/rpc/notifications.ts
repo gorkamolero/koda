@@ -142,6 +142,12 @@ export interface JsonRpcNotification<T = unknown> {
  */
 export class NotificationEmitter {
   private sockets: Set<net.Socket> = new Set()
+  private listeners = new Set<(method: string, params: unknown) => void>()
+
+  subscribe(listener: (method: string, params: unknown) => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
 
   /**
    * Register a socket to receive notifications
@@ -183,6 +189,7 @@ export class NotificationEmitter {
     }
 
     const message = JSON.stringify(notification) + '\n'
+    for (const listener of this.listeners) listener(method, params)
 
     for (const socket of this.sockets) {
       if (!socket.destroyed) {
