@@ -1,9 +1,11 @@
 import { RpcServer } from './server.js';
 import { router } from './rpc/router.js';
 import { HttpRpcServer } from './httpServer.js';
-import { getDbPath, initDbWithMigrations } from './db/index.js';
+import { getDb, getDbPath, initDbWithMigrations } from './db/index.js';
+import { getSessionsByWorktree } from './db/sessions.js';
 import { runMigrations } from './db/migrate.js';
 import { config, logConfig } from './config.js';
+import { listCodexModels } from './agents/codexModels.js';
 
 // Import handlers
 import { ping, getStatus } from './handlers/health.js';
@@ -37,6 +39,11 @@ import {
   cancelCodexSession,
   getCodexSession,
   sendCodexMessage,
+  listCodexSessions,
+  getCodexMessages,
+  getCodexHandler,
+  ListSessionsSchema,
+  GetMessagesSchema,
   StartSessionSchema,
   ResumeSessionSchema,
   CancelSessionSchema,
@@ -230,6 +237,10 @@ function registerMethods() {
   router.register('codex.cancel', cancelCodexSession, CancelSessionSchema);
   router.register('codex.get', getCodexSession, GetSessionSchema);
   router.register('codex.send', sendCodexMessage, SendMessageSchema);
+  router.register('codex.list', listCodexSessions, ListSessionsSchema);
+  router.register('codex.getMessages', getCodexMessages, GetMessagesSchema);
+  router.register('codex.models', listCodexModels);
+  router.register('session.list', async (input: { worktreeId: string }) => getSessionsByWorktree(getDb(), input.worktreeId), ListSessionsSchema);
 
   // Claude agent
   router.register('claude.start', claudeStart, ClaudeStartParamsSchema);
@@ -396,6 +407,7 @@ async function main() {
       
       console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
       stopFileWatching(); // Stop file watching
+      getCodexHandler().cleanup();
       cleanupAllSessions(); // Close all PTY sessions
       await getPulseManager().stopAll(); // Stop all pulse processes
       if (httpServer) {

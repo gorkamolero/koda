@@ -21,6 +21,7 @@ export class RpcServer {
   private server: net.Server | null = null;
   private socketPath: string;
   private activeSocket: net.Socket | null = null;
+  private connections = new Set<net.Socket>();
 
   constructor(socketPath: string) {
     this.socketPath = socketPath;
@@ -30,9 +31,20 @@ export class RpcServer {
    * Start the server
    */
   async start(): Promise<void> {
-    // Remove existing socket file if it exists
+    // Never unlink an active instance's socket. Only reclaim a refused, stale
+    // socket; permission errors and timeouts are not evidence it is unused.
     if (fs.existsSync(this.socketPath)) {
-      fs.unlinkSync(this.socketPath);
+      const active = await new Promise<boolean>((resolve, reject) => {
+        const probe = net.createConnection(this.socketPath);
+        probe.once('connect', () => { probe.destroy(); resolve(true); });
+        probe.once('error', (error: NodeJS.ErrnoException) => {
+          if (error.code === 'ECONNREFUSED' || error.code === 'ENOENT') resolve(false);
+          else reject(error);
+        });
+        probe.setTimeout(1000, () => { probe.destroy(); reject(new Error('Timed out checking existing Koda socket')); });
+      });
+      if (active) throw new Error('Another Koda instance is using this socket. Set a separate KODA_DATA_DIR.');
+      if (fs.existsSync(this.socketPath)) fs.unlinkSync(this.socketPath);
     }
 
     return new Promise((resolve, reject) => {
@@ -62,6 +74,7 @@ export class RpcServer {
         return;
       }
 
+      for (const socket of this.connections) socket.destroy();
       this.server.close((err) => {
         if (err) {
           reject(err);
@@ -83,6 +96,8 @@ export class RpcServer {
    * Handle incoming socket connection
    */
   private handleConnection(socket: net.Socket): void {
+    this.connections.add(socket);
+    socket.once('close', () => this.connections.delete(socket));
     let buffer = '';
 
     // Store as active socket for bidirectional communication

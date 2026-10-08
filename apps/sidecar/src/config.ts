@@ -9,6 +9,7 @@
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+import { getDbPath } from './db/index.js';
 
 export type KodaMode = 'local' | 'remote';
 
@@ -46,6 +47,10 @@ export interface KodaConfig {
  * Get the default Unix socket path based on platform
  */
 function getDefaultSocketPath(): string {
+  if (process.env.KODA_DATA_DIR) {
+    fs.mkdirSync(process.env.KODA_DATA_DIR, { recursive: true });
+    return path.join(process.env.KODA_DATA_DIR, 'koda.sock');
+  }
   const platform = os.platform();
 
   if (platform === 'darwin') {
@@ -69,12 +74,6 @@ function getDefaultSocketPath(): string {
 /**
  * Get the default database path
  */
-function getDefaultDbPath(): string {
-  const kodaDir = path.join(os.homedir(), '.koda');
-  fs.mkdirSync(kodaDir, { recursive: true });
-  return path.join(kodaDir, 'koda.db');
-}
-
 /**
  * Parse CORS origins from environment variable
  */
@@ -124,7 +123,7 @@ function buildConfig(): KodaConfig {
     socketPath: process.env.KODA_SOCKET || getDefaultSocketPath(),
 
     // Database
-    dbPath: process.env.KODA_DB_PATH || process.env.KODA_TEST_DB || getDefaultDbPath(),
+    dbPath: getDbPath(),
 
     // CORS
     corsOrigins: parseCorsOrigins(process.env.KODA_CORS_ORIGINS),

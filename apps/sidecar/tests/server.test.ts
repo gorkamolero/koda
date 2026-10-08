@@ -62,6 +62,14 @@ describe('RPC Server', () => {
     }
   });
 
+  it('rejects a second instance without unlinking the first instance socket', async () => {
+    const duplicate = new RpcServer(socketPath);
+    await expect(duplicate.start()).rejects.toThrow('Another Koda instance');
+    expect(fs.existsSync(socketPath)).toBe(true);
+    const response = await sendRpcRequest({ jsonrpc: '2.0', method: 'ping', id: 99 });
+    expect(response).toMatchObject({ result: 'pong', id: 99 });
+  });
+
   it('should handle getStatus method', async () => {
     const response = await sendRpcRequest({
       jsonrpc: '2.0',
