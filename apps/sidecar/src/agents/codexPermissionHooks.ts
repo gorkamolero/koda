@@ -76,6 +76,8 @@ export function runPermissionHooks(hooks: PermissionHook[], input: Wire, signal:
       const done = (code: number | null) => {
         clearTimeout(timer);
         const decision = settled ? undefined : hookDecision(stdout, code);
+        // The decision a hook printed, so an unrecognized answer can be diagnosed.
+        console.log(`[Codex hooks] ${hook.key} exited ${code}${settled ? ' after the request was answered' : ''}; decision ${decision ?? 'none'}; output ${JSON.stringify(stdout.slice(0, 500))}`);
         if (decision) finish(decision);
         else if (--open === 0) finish(undefined);
       };
