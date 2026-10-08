@@ -22,6 +22,7 @@ test('Claude: select agent/model → live task → diff → checkpoint → proce
     await expect(page.getByTestId('active-agent')).toHaveText('Codex')
     await page.getByTestId('agent-select').selectOption('claude')
     await expect(page.getByTestId('active-agent')).toHaveText('Claude')
+    await page.getByTestId('permission-mode-select').selectOption('bypassPermissions')
     const availableModels = await instance.rpc<Array<{ model: string; isDefault?: boolean }>>('claude.models')
     expect(availableModels.length).toBeGreaterThan(0)
     const explicitModels = availableModels.filter(model => model.model !== 'default')
@@ -57,9 +58,10 @@ test('Claude: select agent/model → live task → diff → checkpoint → proce
     await page.getByTestId('save-checkpoint').click()
     await expect(page.getByTestId('checkpoint-saved')).toBeVisible()
     const checkpointId = await page.getByTestId('checkpoint-saved').getAttribute('data-checkpoint-id')
-    const original = await instance.rpc<{ agentType: string; model: string; threadId: string }>('claude.get', { sessionId })
+    const original = await instance.rpc<{ agentType: string; model: string; threadId: string; permissionMode: string }>('claude.get', { sessionId })
     expect(original.agentType).toBe('claude')
     expect(original.model).toBe(selectedModel)
+    expect(original.permissionMode).toBe('bypassPermissions')
     expect(original.threadId).toBeTruthy()
     expect((await instance.rpc<Array<{ id: string }>>('checkpoint.list', { worktreeId: workspace.worktreeId })).some(checkpoint => checkpoint.id === checkpointId)).toBe(true)
     await screenshot(page, testInfo, '06-claude-checkpoint-saved')
@@ -88,6 +90,7 @@ test('Claude: select agent/model → live task → diff → checkpoint → proce
     await expect(page.getByTestId('agent-select')).toBeDisabled()
     await expect(page.locator('[data-message-role="assistant"]').filter({ hasText: 'KODA_CLAUDE_PROOF_DONE' })).toBeVisible()
     await expect(page.getByTestId('claude-model-select')).toHaveValue(selectedModel)
+    await expect(page.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions')
     expect((await instance.rpc<{ threadId: string }>('claude.get', { sessionId })).threadId).toBe(original.threadId)
     expect((await instance.rpc<Array<{ id: string }>>('checkpoint.list', { worktreeId: workspace.worktreeId })).some(checkpoint => checkpoint.id === checkpointId)).toBe(true)
     await screenshot(page, testInfo, '07-restarted-claude-workspace-session')
@@ -102,7 +105,7 @@ test('Claude: select agent/model → live task → diff → checkpoint → proce
     expect((await instance.rpc<{ threadId: string }>('claude.get', { sessionId })).threadId).toBe(original.threadId)
     await screenshot(page, testInfo, '08-resumed-claude-session')
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
-      selectedModel, originalThreadId: original.threadId, workspaceId: workspace.workspaceId, worktreeId: workspace.worktreeId,
+      selectedModel, permissionMode: original.permissionMode, originalThreadId: original.threadId, workspaceId: workspace.workspaceId, worktreeId: workspace.worktreeId,
       sessionId, checkpointId, oldPids, restartedPids: instance.pids, notifications,
       proof: 'Real Claude Agent SDK with installed Claude CLI authentication, real git worktree, HTTP/WebSocket sidecar, React UI, full frontend and sidecar process restart. Chromium is not the macOS Tauri webview.',
     }, null, 2))

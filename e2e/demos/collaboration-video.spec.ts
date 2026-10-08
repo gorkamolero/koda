@@ -66,9 +66,11 @@ test('record real Claude collaboration between two independent Koda instances', 
     await prepare.getByTestId('create-branch-button').click()
     await expect(prepare.getByTestId('agent-chat-container')).toBeVisible()
     await prepare.getByTestId('agent-select').selectOption('claude')
+    await prepare.getByTestId('permission-mode-select').selectOption('bypassPermissions')
     await prepare.getByTestId('start-chat-button').click()
     await expect(prepare.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', /.+/)
     const sessionId = (await prepare.getByTestId('agent-chat-container').getAttribute('data-session-id'))!
+    expect((await host.rpc<{ permissionMode: string }>('claude.get', { sessionId })).permissionMode).toBe('bypassPermissions')
     const workspaceUrl = prepare.url()
     const worktreeId = new URL(workspaceUrl).pathname.split('/').at(-1)!
     const worktree = await host.rpc<{ worktreePath: string }>('worktree.get', { worktreeId })

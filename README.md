@@ -40,7 +40,11 @@ pnpm desktop   # Tauri desktop shell
 pnpm sidecar   # Node.js orchestration layer
 ```
 
-Codex is the default agent. New chats can select Codex or Claude, with a separate model picker for each. Koda uses the official agent SDKs with the installed CLIs; saved sessions retain their agent and model across restarts. Claude authentication stays with the local Claude CLI. See the dated authentication research in [VERIFY.md](./VERIFY.md).
+Codex is the default agent. New chats can select Codex or Claude, with a separate model picker for each. Koda uses the installed Codex CLI app-server and the official Claude Agent SDK; saved sessions retain their agent, model, and permissions across restarts. Claude authentication stays with the local Claude CLI. See the dated authentication research in [VERIFY.md](./VERIFY.md).
+
+Choose the default for new conversations in **Settings → Agent → New conversation permissions**. This setup defaults to **Bypass permissions**, with **Ask when needed** also available. Each new chat starts with that preference and can override it; existing chats retain their saved mode. Requests needing permission show **Approve once** and **Deny**. Bypass lets tools run outside the worktree without asking and also applies to collaborators with control. Provider-enforced restrictions still apply.
+
+Settings also recommends [Destructive Command Guard](https://github.com/Dicklesworthstone/destructive_command_guard), an optional hook that blocks known destructive commands. It requires separate installation; its Codex coverage is incomplete and it is not a sandbox.
 
 For collaboration, copy `.env.example` to `.env.local` and set `LIVEBLOCKS_SECRET_KEY` to a Liveblocks development secret. It stays on the sidecar and is ignored by git. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**.
 
