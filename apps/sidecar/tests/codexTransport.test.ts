@@ -13,6 +13,7 @@ describe('Codex app-server turn transport', () => {
   let onTurn: () => void;
   let onReply: (message: any) => void;
   let threadOverrides: Record<string, unknown>;
+  let hooksList: unknown;
   let holdInitialize: boolean;
   let controller: AbortController;
   let options: CodexTurnOptions;
@@ -36,6 +37,7 @@ describe('Codex app-server turn transport', () => {
     onTurn = finish;
     onReply = () => {};
     threadOverrides = {};
+    hooksList = { data: [] };
     holdInitialize = false;
     child = Object.assign(new EventEmitter(), { pid: 1234, stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null });
     child.stdin = new Writable({ write(chunk, _encoding, callback) {
@@ -48,6 +50,10 @@ describe('Codex app-server turn transport', () => {
         let result: unknown;
         if (message.method === 'initialize') result = {};
         if (message.method === 'model/list') result = { data: [{ model: 'configured-default', isDefault: true }] };
+        if (message.method === 'hooks/list') {
+          if (hooksList instanceof Error) { write({ id: message.id, error: { code: -32601, message: hooksList.message } }); return; }
+          result = hooksList;
+        }
         if (message.method === 'thread/start' || message.method === 'thread/resume') result = {
           thread: { id: 'thread-1' }, approvalPolicy: message.params.approvalPolicy,
           approvalsReviewer: message.params.approvalsReviewer,
@@ -71,6 +77,22 @@ describe('Codex app-server turn transport', () => {
   });
   afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
+  it("switches off the user's own permission hooks for the chat, keeping managed and other hooks", async () => {
+    hooksList = { data: [{ cwd: '/workspace', errors: [], warnings: [], hooks: [
+      { key: '/Users/me/.codex/hooks.json:permission_request:0:0', eventName: 'permissionRequest', isManaged: false, enabled: true },
+      { key: '/Library/managed.toml:permission_request:0:0', eventName: 'permissionRequest', isManaged: true, enabled: true },
+      { key: '/Users/me/.codex/hooks.json:pre_tool_use:0:0', eventName: 'preToolUse', isManaged: false, enabled: true },
+    ] }] };
+    await collect();
+    expect(sent.find(message => message.method === 'hooks/list').params).toEqual({ cwds: ['/workspace'] });
+    expect(sent.find(message => message.method === 'thread/start').params.config).toEqual({ hooks: { state: { '/Users/me/.codex/hooks.json:permission_request:0:0': { enabled: false } } } });
+  });
+  it('starts normally when the installed Codex cannot list hooks', async () => {
+    hooksList = new Error('Method not found');
+    const events = await collect();
+    expect(events.at(-1)).toEqual(expect.objectContaining({ type: 'turn.completed' }));
+    expect(sent.find(message => message.method === 'thread/start').params).not.toHaveProperty('config');
+  });
   it('streams real delta notifications and selects the discovered default with workspace approvals', async () => {
     const events = await collect();
     expect(mocks.spawn).toHaveBeenCalledWith('/trusted/codex', ['app-server', '--disable', 'shell_snapshot', '--disable', 'shell_snapshot_v2', '--enable', 'default_mode_request_user_input'], expect.objectContaining({ cwd: '/workspace' }));

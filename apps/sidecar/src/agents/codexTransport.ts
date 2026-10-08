@@ -169,6 +169,20 @@ export function codexPermissionOptions(mode: CodexPermissionMode, cwd: string) {
     } };
 }
 
+/**
+ * Koda answers a chat's permission requests itself. A user's own PermissionRequest
+ * hooks (approval apps such as Vibe Island) would otherwise hold each request,
+ * for hours, where Koda never sees it. Managed hooks and every other hook still run.
+ */
+export async function userPermissionHookOverrides(server: Pick<CodexAppServer, 'request'>, cwd: string): Promise<{ config?: Wire }> {
+  let listed: Wire | undefined;
+  try { listed = await server.request('hooks/list', { cwds: [cwd] }); } catch { return {}; }
+  const keys = (Array.isArray(listed?.data) ? listed.data : []).flatMap((entry: Wire) => Array.isArray(entry.hooks) ? entry.hooks : [])
+    .filter((hook: Wire) => hook.eventName === 'permissionRequest' && !hook.isManaged && hook.enabled !== false && typeof hook.key === 'string')
+    .map((hook: Wire) => hook.key as string);
+  return keys.length ? { config: { hooks: { state: Object.fromEntries(keys.map((key: string) => [key, { enabled: false }])) } } } : {};
+}
+
 function normalizeItem(item: Wire): CodexItem {
   if (item.type === 'agentMessage') {
     // Question forms and direct answers are host-local; ordinary assistant text
@@ -293,8 +307,9 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
       if (!model) throw new Error('Codex did not report its default model');
     }
     const permissions = codexPermissionOptions(options.permissionMode, options.workingDirectory);
+    const hookOverrides = await userPermissionHookOverrides(server, options.workingDirectory);
     const thread = await server.request(options.threadId ? 'thread/resume' : 'thread/start', {
-      ...(options.threadId ? { threadId: options.threadId, excludeTurns: true } : {}),
+      ...(options.threadId ? { threadId: options.threadId, excludeTurns: true } : {}), ...hookOverrides,
       cwd: options.workingDirectory, model, approvalPolicy: permissions.approvalPolicy,
       approvalsReviewer: permissions.approvalsReviewer, sandbox: permissions.sandbox,
     });
