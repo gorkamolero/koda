@@ -15,7 +15,7 @@ interface ToolCallSummaryProps {
 interface ToolSummaryItem {
   id: string
   name: string
-  status: 'pending' | 'running' | 'success' | 'error'
+  status: 'pending' | 'running' | 'success' | 'error' | 'cancelled'
   durationMs?: number
   hasResult: boolean
 }
@@ -40,6 +40,8 @@ function getToolItems(blocks: ContentBlock[]): ToolSummaryItem[] {
       status = 'error'
     } else if (result) {
       status = 'success'
+    } else if (tool.status === 'cancelled') {
+      status = 'cancelled'
     } else if (tool.status === 'running') {
       status = 'running'
     }
@@ -68,6 +70,8 @@ function getStatusIndicator(status: ToolSummaryItem['status']): { symbol: string
       return { symbol: '✗', color: 'text-status-error' }
     case 'running':
       return { symbol: '◉', color: 'text-status-warning' }
+    case 'cancelled':
+      return { symbol: 'Stopped', color: 'text-text-muted' }
     case 'pending':
     default:
       return { symbol: '○', color: 'text-text-faint' }
@@ -92,12 +96,14 @@ export const ToolCallSummary = memo(function ToolCallSummary({
   const completedCount = toolItems.filter(t => t.status === 'success').length
   const errorCount = toolItems.filter(t => t.status === 'error').length
   const runningCount = toolItems.filter(t => t.status === 'running').length
+  const stoppedCount = toolItems.filter(t => t.status === 'cancelled').length
 
   // Terminal-style summary
   const statusParts: string[] = []
   if (completedCount > 0) statusParts.push(`${completedCount}✓`)
   if (runningCount > 0) statusParts.push(`${runningCount}◉`)
   if (errorCount > 0) statusParts.push(`${errorCount}✗`)
+  if (stoppedCount > 0) statusParts.push(`${stoppedCount} stopped`)
 
   return (
     <div className={cn('font-mono text-xs', className)}>

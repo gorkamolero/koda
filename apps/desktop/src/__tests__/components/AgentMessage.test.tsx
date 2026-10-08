@@ -15,4 +15,15 @@ describe('agent messages with tool events', () => {
     expect(screen.getByText('The isolated worktree is ready.')).toBeVisible()
     expect(screen.getByTestId('message-assistant-1')).toHaveAttribute('data-message-status', 'streaming')
   })
+
+  it('labels an interrupted tool Stopped without a running badge', () => {
+    render(<MessageItem turnIndex={1} message={{
+      id: 'stopped', role: 'assistant', model: 'claude', timestamp: 1000,
+      status: 'complete', content: 'Stopped.',
+      contentBlocks: [{ type: 'tool_use', id: 'waiting', name: 'Bash', input: {}, status: 'cancelled' }],
+    }} />)
+    expect(screen.getByText('Stopped')).toBeVisible()
+    expect(screen.getByText(/1 stopped/)).toBeVisible()
+    expect(screen.queryByText('Running')).not.toBeInTheDocument()
+  })
 })

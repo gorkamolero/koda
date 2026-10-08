@@ -380,9 +380,21 @@ export interface RemoveWorktreeFromWorkspaceParams {
  * Claude session types
  */
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'compacting' | 'completed' | 'error' | 'cancelled'
-export type PermissionMode = 'default' | 'plan' | 'auto-approve'
+export type PermissionMode = 'default' | 'bypassPermissions'
 export type CodingAgent = 'codex' | 'claude'
 export type AgentType = CodingAgent | 'kimi' | 'other'
+
+export interface ApprovalRequest {
+  id: string
+  sessionId: string
+  agentType: CodingAgent
+  toolName: string
+  input: Record<string, unknown>
+  reason?: string
+  toolUseId?: string
+  createdAt: string
+  expiresAt: string
+}
 
 /**
  * Session - Conductor-style with all fields

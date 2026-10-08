@@ -40,4 +40,17 @@ describe('durable agent transcript', () => {
   it('displays durable execution errors after restart', () => {
     expect(agentEventsToMessages(rows({ type: 'error', error: 'Authentication failed' }))[0]).toMatchObject({ role: 'assistant', status: 'error', content: 'Authentication failed' })
   })
+
+  it('stops unfinished tools on cancellation while preserving completed results', () => {
+    const messages = agentEventsToMessages(rows(
+      { type: 'text_delta', text: 'Preparing the write.' },
+      { type: 'tool_use', id: 'complete', tool: 'Bash', input: {} },
+      { type: 'tool_result', tool_use_id: 'complete', output: 'Done' },
+      { type: 'tool_use', id: 'waiting', tool: 'Bash', input: {} },
+      { type: 'result', result: 'Cancelled', cancelled: true },
+    ))
+    expect(messages[0]).toMatchObject({ content: 'Preparing the write.\n\nStopped.', status: 'complete' })
+    expect(messages[0]?.contentBlocks?.[0]).toMatchObject({ id: 'complete', status: 'success' })
+    expect(messages[0]?.contentBlocks?.[2]).toMatchObject({ id: 'waiting', status: 'cancelled' })
+  })
 })

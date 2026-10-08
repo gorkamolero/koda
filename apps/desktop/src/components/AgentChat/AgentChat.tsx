@@ -7,11 +7,12 @@ import {
 } from '@/store/chat'
 import { rpcRequest, onNotification } from '@/lib/tauri'
 import { agentEventsToMessages, type AgentEvent } from '@/lib/agentMessages'
-import type { CodingAgent, Session } from '@/lib/rpc'
+import type { CodingAgent, PermissionMode, Session } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { PlanModeIndicator } from './PlanModeIndicator'
 import { useNotifications } from '@/hooks/useNotifications'
+import { ApprovalRequests } from './ApprovalRequests'
 
 interface AgentChatProps {
   worktreeId: string
@@ -45,6 +46,13 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
   const agentName = agentNames[agent]
   const [model, setModel] = useState(() => preferredModel(agent))
   const [customModel, setCustomModel] = useState(false)
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default')
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [operationError, setOperationError] = useState<string | null>(null)
+  const savedSettingsRef = useRef({ model, permissionMode })
+  const settingsRequestRef = useRef<object | null>(null)
+  const stopRequestRef = useRef<object | null>(null)
   const { data: models = [], error: modelsError, isPending: modelsPending } = useQuery({
     queryKey: [agent, 'models'],
     queryFn: () => rpcRequest<Array<{ id: string; model: string; displayName: string; isDefault?: boolean }>>(`${agent}.models`),
@@ -74,6 +82,13 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     activeAgentRef.current = agent
     loadedModelSession.current = undefined
     setLoadedSession(null)
+    setPermissionMode('default')
+    savedSettingsRef.current = { model: preferredModel(agent), permissionMode: 'default' }
+    settingsRequestRef.current = null
+    stopRequestRef.current = null
+    setSettingsSaving(false)
+    setStopping(false)
+    setOperationError(null)
     if (!sessionId) { setModel(preferredModel(agent)); setCustomModel(false) }
     setCurrentWorkspaceId(`${worktreeId}:${sessionId ?? `new:${agent}`}`)
     setMessages([])
@@ -103,6 +118,9 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
       if (loadedModelSession.current !== id) {
         loadedModelSession.current = id
         setModel(session.model || 'default')
+        const savedMode = session.permissionMode === 'bypassPermissions' ? 'bypassPermissions' : 'default'
+        setPermissionMode(savedMode)
+        savedSettingsRef.current = { model: session.model || 'default', permissionMode: savedMode }
         setCustomModel(false)
       }
       setLoadedSession(id)
@@ -126,18 +144,77 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
 
   useEffect(() => {
     let disposed = false
-    let unlisten: (() => void) | undefined
+    const unlisteners: Array<() => void> = []
     void refresh()
     // Recover missed notifications and reconnects from the durable event log.
     const timer = setInterval(() => void refresh(), 1000)
-    void onNotification<{ sessionId: string }>('message', payload => {
-      if (payload.sessionId === activeSessionRef.current) void refresh()
-    }).then(stop => { if (disposed) stop(); else unlisten = stop })
-    return () => { disposed = true; clearInterval(timer); unlisten?.() }
+    for (const method of ['message', 'sessionStatus', 'approvalChanged']) {
+      void onNotification<{ sessionId: string }>(method, payload => {
+        if (payload.sessionId === activeSessionRef.current) void refresh()
+      }).then(stop => { if (disposed) stop(); else unlisteners.push(stop) })
+    }
+    return () => { disposed = true; clearInterval(timer); for (const stop of unlisteners) stop() }
   }, [refresh, sessionId])
 
+  const updateSettings = useCallback(async (update: { model?: string; permissionMode?: PermissionMode }) => {
+    if (isStreaming || stopping || settingsRequestRef.current || (sessionId && loadedSession !== sessionId)) return
+    const id = activeSessionRef.current
+    const version = scopeVersionRef.current
+    const previous = savedSettingsRef.current
+    const next = { ...previous, ...update }
+    if (update.model !== undefined) setModel(next.model)
+    if (update.permissionMode !== undefined) setPermissionMode(next.permissionMode)
+    setOperationError(null)
+    if (!id) {
+      savedSettingsRef.current = next
+      if (update.model !== undefined) localStorage.setItem(`settings:${agent}Model`, next.model)
+      return
+    }
+    const request = {}
+    settingsRequestRef.current = request
+    setSettingsSaving(true)
+    const isCurrent = () => mountedRef.current && scopeVersionRef.current === version && activeSessionRef.current === id && activeAgentRef.current === agent
+    try {
+      await rpcRequest(`${agent}.updateSettings`, { sessionId: id, ...update })
+      if (isCurrent()) {
+        savedSettingsRef.current = next
+        if (update.model !== undefined) localStorage.setItem(`settings:${agent}Model`, next.model)
+      }
+      void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
+    } catch (caught) {
+      if (isCurrent()) {
+        setModel(previous.model)
+        setPermissionMode(previous.permissionMode)
+        setOperationError(caught instanceof Error ? caught.message : 'Unable to save chat settings')
+      }
+    } finally {
+      if (settingsRequestRef.current === request) settingsRequestRef.current = null
+      if (isCurrent()) setSettingsSaving(false)
+    }
+  }, [agent, isStreaming, stopping, sessionId, loadedSession, queryClient, worktreeId])
+
+  const stopTurn = async () => {
+    const id = activeSessionRef.current
+    if (!id || stopRequestRef.current) return
+    const version = scopeVersionRef.current
+    const request = {}
+    stopRequestRef.current = request
+    setStopping(true)
+    setOperationError(null)
+    try {
+      await rpcRequest(`${agent}.cancel`, { sessionId: id })
+      void queryClient.invalidateQueries({ queryKey: ['approvals', id] })
+      await refresh()
+    } catch (caught) {
+      if (mountedRef.current && scopeVersionRef.current === version) setOperationError(caught instanceof Error ? caught.message : 'Unable to stop this task')
+    } finally {
+      if (stopRequestRef.current === request) stopRequestRef.current = null
+      if (mountedRef.current && scopeVersionRef.current === version) setStopping(false)
+    }
+  }
+
   const handleSendMessage = useCallback(async (content?: string) => {
-    if (sessionId && loadedSession !== sessionId) return
+    if (settingsRequestRef.current || stopping || (sessionId && loadedSession !== sessionId)) return
     if (sendingRef.current && sendingRef.current.sessionId === activeSessionRef.current && sendingRef.current.agent === agent) return
     const request = { sessionId: activeSessionRef.current, agent, version: scopeVersionRef.current }
     sendingRef.current = request
@@ -146,7 +223,7 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     try {
       let id = activeSessionRef.current
       if (!id) {
-        const created = await rpcRequest<{ id: string; sessionId: string }>(`${agent}.start`, { worktreeId, model: model.trim() || 'default' })
+        const created = await rpcRequest<{ id: string; sessionId: string }>(`${agent}.start`, { worktreeId, model: model.trim() || 'default', permissionMode })
         id = created.sessionId ?? created.id
         // Navigation does not cancel an already submitted task, but its result
         // must never select a conversation in the newly opened workspace.
@@ -170,14 +247,14 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
       if (sendingRef.current === request) sendingRef.current = null
       void refresh()
     }
-  }, [worktreeId, sessionId, loadedSession, agent, agentName, model, onSessionChange, queryClient, refresh, setIsStreaming, showToast])
+  }, [worktreeId, sessionId, loadedSession, agent, agentName, model, permissionMode, stopping, onSessionChange, queryClient, refresh, setIsStreaming, showToast])
 
   useEffect(() => {
-    if (pendingPrompt && (!sessionId || loadedSession === sessionId)) {
+    if (pendingPrompt && !settingsSaving && !stopping && (!sessionId || loadedSession === sessionId)) {
       setPendingPrompt(null)
       void handleSendMessage(pendingPrompt)
     }
-  }, [pendingPrompt, sessionId, loadedSession, handleSendMessage, setPendingPrompt])
+  }, [pendingPrompt, settingsSaving, stopping, sessionId, loadedSession, handleSendMessage, setPendingPrompt])
 
   const saveCheckpoint = async () => {
     if (!workingDirectory) return
@@ -196,36 +273,50 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
   return (
     <div data-testid="agent-chat-container" data-session-id={sessionId ?? ''} data-agent-type={agent} className="h-full flex flex-col">
       <PlanModeIndicator isActive={planMode.isActive} planTitle={planMode.planTitle} steps={planMode.steps} currentStepIndex={planMode.currentStepIndex} onExitPlanMode={exitPlanMode} />
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-dashed border-border-subtle text-xs text-text-muted">
+      <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 border-b border-dashed border-border-subtle text-xs text-text-muted">
         <span data-testid="active-agent">{agentName}</span>
         <label className="flex items-center gap-1">Agent
-          <select aria-label="Agent" data-testid="agent-select" value={agent} disabled={Boolean(sessionId) || isStreaming} className="bg-surface-card border border-border-subtle p-1" onChange={event => setDraftAgent(event.target.value as CodingAgent)}>
+          <select aria-label="Agent" data-testid="agent-select" value={agent} disabled={Boolean(sessionId) || isStreaming || settingsSaving} className="bg-surface-card border border-border-subtle p-1" onChange={event => setDraftAgent(event.target.value as CodingAgent)}>
             <option value="codex">Codex</option>
             <option value="claude">Claude</option>
           </select>
         </label>
         <label className="flex items-center gap-1">Model
-          <select aria-label={`${agentName} model`} data-testid={`${agent}-model-select`} value={isCustomModel ? 'custom' : model} disabled={isStreaming || modelsPending || Boolean(sessionId && loadedSession !== sessionId)} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
+          <select aria-label={`${agentName} model`} data-testid={`${agent}-model-select`} value={isCustomModel ? 'custom' : model} disabled={isStreaming || stopping || settingsSaving || modelsPending || Boolean(sessionId && loadedSession !== sessionId)} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
             const custom = event.target.value === 'custom'
             setCustomModel(custom)
-            if (!custom) { setModel(event.target.value); localStorage.setItem(`settings:${agent}Model`, event.target.value) }
+            if (!custom) void updateSettings({ model: event.target.value })
           }}>
             <option value="default">{agentName} default</option>
             {models.filter(option => option.model !== 'default').map(option => <option key={option.id} value={option.model}>{option.displayName}{option.isDefault ? ' (default)' : ''}</option>)}
             <option value="custom">Custom model…</option>
           </select>
         </label>
-        {isCustomModel && <input aria-label={`${agentName} model ID`} data-testid={`${agent}-model-input`} value={model === 'default' ? '' : model} disabled={isStreaming || Boolean(sessionId && loadedSession !== sessionId)} placeholder="Model ID" className="w-40 bg-transparent border border-border-subtle p-1" onChange={event => { setModel(event.target.value); localStorage.setItem(`settings:${agent}Model`, event.target.value) }} />}
+        {isCustomModel && <input aria-label={`${agentName} model ID`} data-testid={`${agent}-model-input`} value={model === 'default' ? '' : model} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId)} placeholder="Model ID" className="w-40 bg-transparent border border-border-subtle p-1" onChange={event => setModel(event.target.value)} onBlur={() => {
+          const next = model.trim() || 'default'
+          if (next !== savedSettingsRef.current.model) void updateSettings({ model: next })
+        }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />}
+        <label className="flex items-center gap-1">Permissions
+          <select aria-label="Permissions" data-testid="permission-mode-select" value={permissionMode} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId)} onChange={event => void updateSettings({ permissionMode: event.target.value as PermissionMode })} className="bg-surface-card border border-border-subtle p-1">
+            <option value="default">Ask when needed</option>
+            <option value="bypassPermissions">Bypass permissions</option>
+          </select>
+        </label>
+        {settingsSaving && <span role="status">Saving settings…</span>}
         {!sessionId && <button data-testid="start-chat-button" disabled={isStreaming} onClick={() => void handleSendMessage()} className="hover:text-text-primary disabled:opacity-40">Start chat</button>}
+        {sessionId && (isStreaming || stopping) && <button data-testid="stop-agent-button" disabled={stopping} onClick={() => void stopTurn()} className="border border-border-subtle px-2 py-1 text-status-error disabled:opacity-40">{stopping ? 'Stopping…' : 'Stop'}</button>}
         <button data-testid="save-checkpoint" disabled={saving || isStreaming || !workingDirectory} onClick={() => void saveCheckpoint()} className="hover:text-text-primary disabled:opacity-40">
           {saving ? 'Saving…' : 'Save checkpoint'}
         </button>
         {checkpointId && <span data-testid="checkpoint-saved" data-checkpoint-id={checkpointId}>Checkpoint saved</span>}
       </div>
+      {permissionMode === 'bypassPermissions' && <p data-testid="bypass-permissions-notice" className="shrink-0 px-4 py-2 text-xs text-text-accent">Tools can run outside this worktree without asking. This also applies to collaborators with control.</p>}
       {modelsError && <div role="alert" data-testid="agent-model-error" className="px-4 py-2 text-xs text-status-error">{agentName} models: {modelsError.message}</div>}
       {error && <div role="alert" className="px-4 py-2 text-xs text-status-error">{error}</div>}
+      {operationError && <div role="alert" className="px-4 py-2 text-xs text-status-error">{operationError}</div>}
+      {sessionId && <ApprovalRequests key={sessionId} sessionId={sessionId} />}
       <div className="flex-1 overflow-hidden"><MessageList /></div>
-      <InputArea disabled={Boolean(sessionId && loadedSession !== sessionId)} onSendMessage={(message) => void handleSendMessage(message)} />
+      <InputArea disabled={settingsSaving || stopping || Boolean(sessionId && loadedSession !== sessionId)} onSendMessage={(message) => void handleSendMessage(message)} />
     </div>
   )
 }
