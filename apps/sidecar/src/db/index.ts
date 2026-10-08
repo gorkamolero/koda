@@ -82,7 +82,14 @@ export function initDbWithMigrations(dbPath?: string) {
   }
 
   // Run migrations on this connection
-  runMigrationsOnConnection(sqlite);
+  try {
+    runMigrationsOnConnection(sqlite);
+  } catch (error) {
+    sqlite.close();
+    sqlite = null;
+    db = null;
+    throw error;
+  }
 
   db = drizzle(sqlite, { schema });
   return db;
