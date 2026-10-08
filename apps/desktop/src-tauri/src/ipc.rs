@@ -89,15 +89,25 @@ impl SocketClient {
         writer.write_all(request_bytes.as_bytes()).await?;
         writer.flush().await?;
 
-        // Read response line (server sends newline-delimited JSON)
+        // The sidecar broadcasts streaming notifications on every connected
+        // socket, including this request socket. The persistent listener forwards
+        // those to the UI; wait here for this request's matching response.
         let mut buf_reader = BufReader::new(reader);
         let mut response_line = String::new();
-        buf_reader.read_line(&mut response_line).await?;
-
-        // Parse response
-        let response: JsonRpcResponse = serde_json::from_str(response_line.trim())?;
-
-        Ok(response)
+        loop {
+            response_line.clear();
+            if buf_reader.read_line(&mut response_line).await? == 0 {
+                return Err(IpcError::InvalidResponse("Sidecar closed before responding".into()));
+            }
+            let message: serde_json::Value = serde_json::from_str(response_line.trim())?;
+            if message.get("method").is_some() {
+                continue;
+            }
+            if message.get("id").and_then(serde_json::Value::as_u64) != Some(request_id) {
+                continue;
+            }
+            return Ok(serde_json::from_value(message)?);
+        }
     }
 
     /// Check if socket exists and is accessible
@@ -109,6 +119,24 @@ impl SocketClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn notifications_before_response_do_not_break_native_rpc() {
+        let socket_path = std::env::temp_dir().join(format!("koda-ipc-native-{}.sock", std::process::id()));
+        let listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let (reader, mut writer) = socket.split();
+            let mut request = String::new();
+            BufReader::new(reader).read_line(&mut request).await.unwrap();
+            writer.write_all(b"{\"jsonrpc\":\"2.0\",\"method\":\"sessionStatus\",\"params\":{\"status\":\"running\"}}\n{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{\"accepted\":true}}\n").await.unwrap();
+        });
+        let result = SocketClient::new(&socket_path)
+            .send_request("codex.send".into(), serde_json::json!({}), 42).await.unwrap();
+        assert_eq!(result.result.unwrap()["accepted"], true);
+        server.await.unwrap();
+        std::fs::remove_file(socket_path).unwrap();
+    }
 
     #[test]
     fn test_socket_client_creation() {
