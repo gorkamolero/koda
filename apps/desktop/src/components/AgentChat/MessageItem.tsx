@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type {
   ChatMessage,
@@ -41,16 +41,18 @@ function mapStatusToToolState(status?: string, hasResult?: boolean): AIElementsT
 // Tool Block Renderer
 // ============================================================================
 
-function renderToolBlock(
-  block: ToolUseContentBlock,
-  result?: ToolResultContentBlock
-): React.ReactNode {
+/** Open while the tool runs, collapsed once it finishes, unless the reader toggled it. */
+function ToolBlock({ block, result }: { block: ToolUseContentBlock; result?: ToolResultContentBlock }): React.ReactElement {
   const toolState = mapStatusToToolState(block.status, !!result)
   const toolName = block.name
   const isCodeOutput = ['Read', 'Grep', 'Glob'].includes(toolName) && result?.output
+  const finished = toolState === 'output-available'
+  const [open, setOpen] = useState(!finished)
+  const [toggled, setToggled] = useState(false)
+  useEffect(() => { if (finished && !toggled) setOpen(false) }, [finished, toggled])
 
   return (
-    <Tool key={block.id} defaultOpen={toolState !== 'output-available'}>
+    <Tool open={open} onOpenChange={(next) => { setToggled(true); setOpen(next) }}>
       <ToolHeader
         type="dynamic-tool"
         toolName={toolName}
@@ -150,7 +152,7 @@ function renderContentBlock(
         (b): b is ToolResultContentBlock =>
           b.type === 'tool_result' && b.toolUseId === block.id
       )
-      return renderToolBlock(block, result)
+      return <ToolBlock key={block.id} block={block} result={result} />
     }
 
     case 'tool_result':
