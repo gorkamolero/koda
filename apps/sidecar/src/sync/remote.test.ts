@@ -114,6 +114,15 @@ describe('guest reads answered by the host', () => {
     expect(send).toHaveBeenCalledTimes(1)
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ sessionId, message: 'Ship it', authorName: sync.getMachineName() }))
   })
+  it('signs relays locally even for a session learned from the host', async () => {
+    await joinAs('control')
+    await call('session.list', { worktreeId })
+    const roomId = `workspace:${worktreeId}`
+    router.register('collaboration.prepareRelay', async ({ sessionId, content }: { sessionId: string; content: string }) => sync.prepareRelay(roomId, sessionId, content, randomUUID()))
+    const relay = await call('collaboration.prepareRelay', { roomId, sessionId, content: 'Signed here' }) as { sessionId: string; signature: string }
+    expect(relay).toMatchObject({ sessionId, content: 'Signed here' })
+    expect(relay.signature).toBeTruthy()
+  })
   it('keeps every other action with the host', async () => {
     await joinAs('control')
     await call('worktree.get', { worktreeId })

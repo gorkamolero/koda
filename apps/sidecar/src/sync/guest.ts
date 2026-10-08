@@ -143,7 +143,8 @@ function learn(method: string, result: unknown, roomId: string) {
 }
 
 export async function routeRemoteCall(method: string, params: unknown): Promise<{ result: unknown } | undefined> {
-  if (!isCollaborationEnabled()) return undefined
+  // Joining, signing and authorizing are this machine's own business.
+  if (!isCollaborationEnabled() || method.startsWith('collaboration.')) return undefined
   const shares = listSharedWorkspaces()
   const roomId = roomFor(method, params, shares)
   const share = roomId && shares.find((item) => item.roomId === roomId)
