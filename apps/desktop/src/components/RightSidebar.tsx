@@ -40,6 +40,8 @@ interface RightSidebarProps {
   onToggleTerminal?: () => void
   onToggleSidebar?: () => void
   showTerminal?: boolean
+  /** A view-only collaborator cannot ask the agent for a PR. */
+  readOnly?: boolean
 }
 
 interface TabConfig {
@@ -56,6 +58,7 @@ export function RightSidebar({
   onToggleTerminal,
   onToggleSidebar,
   showTerminal = true,
+  readOnly = false,
 }: RightSidebarProps) {
   // Silence unused variable warnings - these props are for parent compatibility
   void onToggleTerminal
@@ -88,7 +91,7 @@ export function RightSidebar({
   return (
     <div
       data-testid="right-sidebar"
-      className="h-full flex flex-col font-mono bg-[#000000]"
+      className="h-full flex flex-col font-mono bg-surface-messages"
     >
       {/* Row 1: PR Actions header */}
       <div
@@ -104,8 +107,8 @@ export function RightSidebar({
         {/* Right: Create PR button */}
         <div className="flex items-center">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors">
+            <DropdownMenuTrigger asChild disabled={readOnly}>
+              <button className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors disabled:opacity-40 disabled:pointer-events-none">
                 <GitPullRequestCreate className="size-3" />
                 <span>[CREATE PR</span>
                 <ChevronDown className="size-3" />

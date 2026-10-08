@@ -190,6 +190,15 @@ export interface Worktree {
   updatedAt?: string
   // Extra field from handler
   setupError?: string
+  /** Set when another machine hosts this worktree and shared it with this one. */
+  remote?: RemoteWorktree
+}
+
+export interface RemoteWorktree {
+  roomId: string
+  permission: 'view' | 'control'
+  hostName: string | null
+  hostMachineId: string
 }
 
 // Backwards-compat alias - the old code used "WorktreeResult"

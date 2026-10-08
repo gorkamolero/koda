@@ -6,7 +6,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { AgentChat } from '@/components/AgentChat'
 import { CommandPalette } from '@/components/CommandPalette'
 import { TopBar } from '@/components/TopBar'
-import { TerminalPanel } from '@/components/Terminal'
+import { TerminalPanel, RemoteTerminalPanel } from '@/components/Terminal'
 import { Scratchpad } from '@/components/Scratchpad'
 import { RightSidebar } from '@/components/RightSidebar'
 import { Editor } from '@/components/Editor'
@@ -56,17 +56,21 @@ export function WorkspaceView() {
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const openFiles = useAtomValue(openFilesAtom)
 
+  // A workspace someone shared lives on their machine; the sidebar keeps this user's own projects.
+  const isSharedRoute = workspaceId === 'shared'
+
   // Sync atom from URL (for sidebar compatibility during transition)
   const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
   useEffect(() => {
-    setSelectedWorkspaceId(workspaceId)
-  }, [workspaceId, setSelectedWorkspaceId])
+    if (!isSharedRoute) setSelectedWorkspaceId(workspaceId)
+  }, [workspaceId, isSharedRoute, setSelectedWorkspaceId])
 
   // Fetch worktree data
   const { data: worktree, isLoading: isLoadingWorktree, error: worktreeError } = useWorktree(worktreeId)
+  const remote = worktree?.remote
 
   // If worktree not found, try fetching workspace directly (standalone workspace case)
-  const shouldTryWorkspace = !isLoadingWorktree && (worktreeError || !worktree)
+  const shouldTryWorkspace = !isSharedRoute && !isLoadingWorktree && (worktreeError || !worktree)
   const { data: standaloneWorkspace, isLoading: isLoadingWorkspace } = useWorkspace(
     shouldTryWorkspace ? workspaceId : ''
   )
@@ -299,7 +303,7 @@ export function WorkspaceView() {
           sessions={sessions?.map(s => ({ id: s.id, name: s.title ?? 'Chat', agentType: s.agentType })) ?? []}
           activeSessionId={activeSessionId}
           onSessionChange={handleSelectSession}
-          onNewSession={worktree ? () => { setChatSelection({ worktreeId }); setActiveTab('chat') } : undefined}
+          onNewSession={worktree && !remote ? () => { setChatSelection({ worktreeId }); setActiveTab('chat') } : undefined}
           onEnableCollaboration={() => { enableCollaboration.mutate(worktreeId) }}
           onDisableCollaboration={() => { disableCollaboration.mutate(worktreeId) }}
           isCollaborationPending={enableCollaboration.isPending || disableCollaboration.isPending}
@@ -487,8 +491,20 @@ export function WorkspaceView() {
             </div>
           )}
 
+          {/* Shared workspace whose host cannot be reached */}
+          {!isLoading && notFound && isSharedRoute && (
+            <div data-testid="shared-workspace-unavailable" className="h-full flex flex-col items-center justify-center px-8 text-xs">
+              <div className="text-center text-text-faint">
+                <div>┌────────────────────────────┐</div>
+                <div>│   <span className="text-status-error">[HOST UNREACHABLE]</span>       │</div>
+                <div>└────────────────────────────┘</div>
+              </div>
+              <p className="mt-4 max-w-sm text-center text-text-muted">{worktreeError instanceof Error ? worktreeError.message : 'The host is offline or stopped sharing this workspace.'}</p>
+            </div>
+          )}
+
           {/* Error state - truly not found */}
-          {!isLoading && notFound && activeTab === 'chat' && (
+          {!isLoading && notFound && !isSharedRoute && activeTab === 'chat' && (
             <div className="h-full flex flex-col items-center justify-center px-8 text-xs">
               <div className="text-center text-text-faint">
                 <div>┌────────────────────────────┐</div>
@@ -520,7 +536,7 @@ export function WorkspaceView() {
             isLoadingSessions ? <div className="p-4 text-xs text-text-muted">Loading conversations…</div> :
             activeSession && activeSession.agentType !== 'codex' && activeSession.agentType !== 'claude' ?
               <div role="alert" className="p-4 text-xs text-status-error">The {activeSession.agentType} agent is not available. Start a new Codex or Claude chat.</div> :
-              <AgentChat key={`${worktreeId}:${activeSessionId ?? 'new'}`} worktreeId={worktreeId} sessionId={activeSessionId} agentType={activeSession?.agentType as CodingAgent | undefined} workingDirectory={rootPath} onSessionChange={handleSelectSession} />
+              <AgentChat key={`${worktreeId}:${activeSessionId ?? 'new'}`} worktreeId={worktreeId} sessionId={activeSessionId} agentType={activeSession?.agentType as CodingAgent | undefined} workingDirectory={rootPath} onSessionChange={handleSelectSession} remote={remote} collaborative={worktree.collaborative ?? false} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (
@@ -580,6 +596,7 @@ export function WorkspaceView() {
                 onToggleTerminal={() => { setShowTerminal((prev) => !prev) }}
                 onToggleSidebar={() => { setShowRightPanel(false) }}
                 showTerminal={showTerminal}
+                readOnly={remote?.permission === 'view'}
               />
             </div>
 
@@ -600,7 +617,9 @@ export function WorkspaceView() {
                   style={{ height: `${String(terminalResize.size)}px` }}
                   className="flex-shrink-0 border-t border-border"
                 >
-                  <TerminalPanel workspaceId={worktreeId} workingDirectory={rootPath} />
+                  {remote
+                    ? <RemoteTerminalPanel worktreeId={worktreeId} hostName={remote.hostName} />
+                    : <TerminalPanel workspaceId={worktreeId} workingDirectory={rootPath} />}
                 </div>
               </>
             )}

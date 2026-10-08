@@ -20,6 +20,7 @@ interface InputAreaProps {
   onSendMessage?: (message: string, mentions?: MessageMention[]) => void
   onSwitchTab?: (tab: string) => void
   disabled?: boolean
+  placeholder?: string
 }
 
 /**
@@ -31,7 +32,7 @@ interface InputAreaProps {
  * │ [MODEL:opus] [THINK] [PLAN]           [+] [SEND] │
  * └──────────────────────────────────────────────────┘
  */
-export function InputArea({ onSendMessage, onSwitchTab, disabled = false }: InputAreaProps): React.ReactElement {
+export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeholder = 'type message, @mention files, use /commands...' }: InputAreaProps): React.ReactElement {
   const [inputValue, setInputValue] = useAtom(inputValueAtom)
   const isStreaming = useAtomValue(isStreamingAtom)
   const addMessage = useSetAtom(addMessageAtom)
@@ -259,7 +260,7 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false }: Inpu
   const canSend = inputValue.trim().length > 0 && !isStreaming && !disabled
 
   return (
-    <div className="px-4 py-3 font-mono bg-[#000000]">
+    <div className="px-4 py-3 font-mono bg-surface-messages">
       <div
         className="relative"
         onDragOver={handleDragOver}
@@ -303,7 +304,7 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false }: Inpu
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               onSelect={(e) => { setCursorPosition(e.currentTarget.selectionStart) }}
-              placeholder="type message, @mention files, use /commands..."
+              placeholder={placeholder}
               disabled={isStreaming || disabled}
               spellCheck={false}
               autoComplete="off"

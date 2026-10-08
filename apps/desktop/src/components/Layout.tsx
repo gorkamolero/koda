@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { useSetAtom } from 'jotai'
-import { SharedWorkspaceLauncher } from './WorkspaceSharing'
 import { Sidebar } from './Sidebar'
 import { NotificationProvider } from './Toast'
 import { useSidecar } from '@/hooks/useRpc'
@@ -159,7 +158,6 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Status indicator */}
         <SidecarStatus />
-        <SharedWorkspaceLauncher />
       </div>
     </NotificationProvider>
   )

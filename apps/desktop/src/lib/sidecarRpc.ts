@@ -218,8 +218,12 @@ let notificationUnlisten: UnlistenFn | null = null
  */
 export async function startSidecarRpcListener(): Promise<void> {
   if (!isTauriContext()) {
-    // In E2E tests, we don't have Tauri events
-    console.log('[SidecarRpc] Skipping listener setup in non-Tauri context')
+    // The browser build has no sidecar requests, but terminals still stream over the WebSocket.
+    const { onNotification } = await import('@/lib/tauri')
+    const methods = [SIDECAR_NOTIFICATION_METHODS.PTY_DATA, SIDECAR_NOTIFICATION_METHODS.PTY_EXIT]
+    const stops = await Promise.all(methods.map((method) =>
+      onNotification(method, (params) => handleNotification({ jsonrpc: '2.0', method, params } as SidecarNotification))))
+    notificationUnlisten = () => { for (const stop of stops) stop() }
     return
   }
 

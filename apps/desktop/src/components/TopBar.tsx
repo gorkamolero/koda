@@ -74,6 +74,7 @@ export function TopBar({
   const openDropdownRef = useRef<HTMLDivElement>(null)
   
   const isCollaborative = workspace?.collaborative ?? false
+  const remote = workspace?.remote
 
   // Editor file tabs
   const openFiles = useAtomValue(openFilesAtom)
@@ -117,7 +118,7 @@ export function TopBar({
   }, [workspacePath])
 
   return (
-    <div className="flex flex-col font-mono bg-[#000000]">
+    <div className="flex flex-col font-mono bg-surface-messages">
       {/* Row 1: Branch info and workspace name */}
       <div
         className="flex items-center justify-between h-10 px-3 border-b border-dashed border-border-subtle"
@@ -162,6 +163,17 @@ export function TopBar({
             <span>{workspaceName}</span>
           </Link>
           
+          {remote ? (
+            <span
+              data-testid="shared-workspace-badge"
+              data-permission={remote.permission}
+              className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-[--git-green] text-[--git-green]"
+              title={remote.permission === 'control' ? 'You can message this agent' : 'You can watch this workspace'}
+            >
+              <Users className="size-3" />
+              <span>[SHARED BY {(remote.hostName || 'HOST').toUpperCase()} · {remote.permission === 'control' ? 'CONTROL' : 'VIEW'}]</span>
+            </span>
+          ) : (<>
           <button
             onClick={() => { setOpenDropdownVisible(!openDropdownVisible) }}
             className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
@@ -204,6 +216,7 @@ export function TopBar({
               </>
             )}
           </button>
+          </>)}
 
           {/* Collaboration status and presence avatars - only show when collaborative */}
           {isCollaborative && (

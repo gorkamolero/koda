@@ -9,6 +9,7 @@ import { selectedWorkspaceIdAtom, setWorkspaceContainersAtom } from '@/store/wor
 import { KodaSpinner } from '@/components/KodaSpinner'
 import { open } from '@tauri-apps/plugin-dialog'
 import { AgentOverviewButton, AgentOverviewPanel } from '@/components/AgentOverview'
+import { SharedWorkspacesSection } from '@/components/WorkspaceSharing'
 
 // ============================================================================
 // Terminal-style Status Labels
@@ -1051,6 +1052,7 @@ export function Sidebar(): React.ReactElement {
 
       <div className="flex-1 overflow-y-auto py-1 flex flex-col">
         <WorkspaceContent onAddRepo={handleOpenAddRepo} onCreateWorkspace={handleCreateWorkspace} />
+        <SharedWorkspacesSection />
       </div>
 
       <SidebarFooter onAddRepo={handleOpenAddRepo} hasWorkspace={!!selectedWorkspaceId} />
