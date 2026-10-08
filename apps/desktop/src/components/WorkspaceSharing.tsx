@@ -12,6 +12,7 @@ import { PresenceAvatars } from './PresenceAvatars'
 type Share = { roomId: string; worktreeId: string; permission: 'view' | 'control'; invitation: string }
 const button = 'px-3 py-1.5 text-xs border border-border-subtle rounded hover:bg-surface-hover disabled:opacity-40'
 const field = 'w-full p-2 bg-surface-messages border border-border-subtle rounded text-sm'
+const agentLabel = (type?: string | null) => type === 'claude' ? 'Claude' : type === 'codex' ? 'Codex' : 'Agent'
 
 type ShareDialogState = { open: boolean; permission: 'view' | 'control'; invitation: string; error: string; pending: boolean }
 const defaultShareDialog: ShareDialogState = { open: false, permission: 'view', invitation: '', error: '', pending: false }
@@ -47,7 +48,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
         <label className="block text-sm">Permission
           <select data-testid="share-permission" className={field} value={permission} onChange={(e) => { setPermission(e.target.value as 'view' | 'control'); setInvitation('') }}>
             <option value="view">View — watch the conversation</option>
-            <option value="control">Control — send messages to Codex</option>
+            <option value="control">Control — send messages to the agent</option>
           </select>
         </label>
         <button className={button} data-testid="create-invitation" disabled={pending} onClick={() => void create()}>{pending ? 'Connecting…' : 'Create invitation'}</button>
@@ -112,13 +113,15 @@ function SharedWorkspace({ share, close }: { share: Share; close: () => void }) 
   const sessionId = sessions.some((session) => session.id === selectedId) ? selectedId : sessions[0]?.id || ''
   useEffect(() => { setActiveSession(sessionId || null) }, [sessionId, setActiveSession])
   const session = sessions.find((item) => item.id === sessionId)
+  const agentName = agentLabel(session?.agentType)
   const messages = useMemo(() => {
     try {
       const rows = JSON.parse(transcripts?.get(sessionId) || '[]') as SharedTranscriptRow[]
       return readSharedTranscript(rows)
     } catch { return [] }
   }, [transcripts, sessionId])
-  const canSend = share.permission === 'control' && status === 'connected' && !!sessionId && session?.status !== 'running' && !pending
+  const supportedAgent = session?.agentType === 'codex' || session?.agentType === 'claude'
+  const canSend = share.permission === 'control' && status === 'connected' && supportedAgent && !!sessionId && session?.status !== 'running' && !pending
   async function submit() {
     if (!canSend || !prompt.trim()) return
     try { setSendError(''); await send(sessionId, prompt); setPrompt('') } catch (e) { setSendError(e instanceof Error ? e.message : String(e)) }
@@ -135,16 +138,16 @@ function SharedWorkspace({ share, close }: { share: Share; close: () => void }) 
     <div className="flex flex-1 min-h-0">
       <nav className="w-56 p-4 border-r border-border-subtle space-y-2" aria-label="Shared sessions">
         <h2 className="text-xs text-text-muted">Sessions</h2>
-        {sessions.map((item) => <button data-testid="shared-session" key={item.id} className={`${button} block w-full text-left ${sessionId === item.id ? 'text-text-accent' : ''}`} onClick={() => selectId(item.id)}>{item.title || 'Codex session'} <span className="block text-text-muted">{item.agentType} · {item.status}</span></button>)}
+        {sessions.map((item) => <button data-testid="shared-session" key={item.id} className={`${button} block w-full text-left ${sessionId === item.id ? 'text-text-accent' : ''}`} onClick={() => selectId(item.id)}>{item.title || `${agentLabel(item.agentType)} session`} <span className="block text-text-muted">{item.agentType} · {item.status}</span></button>)}
       </nav>
       <section className="flex flex-col flex-1 min-w-0">
         <div data-testid="shared-messages" className="flex-1 overflow-auto p-6 space-y-5">
-          {messages.map((message) => <article key={message.id} data-testid={`shared-message-${message.role}`} className="max-w-3xl mx-auto whitespace-pre-wrap text-sm"><div className="text-xs text-text-muted mb-1">{message.role === 'user' ? message.authorName || 'User' : message.role === 'error' ? 'Error' : 'Codex'}</div>{message.text}</article>)}
-          {session?.status === 'running' && <p data-testid="shared-running" className="text-text-accent text-sm">Codex is working…</p>}
+          {messages.map((message) => <article key={message.id} data-testid={`shared-message-${message.role}`} className="max-w-3xl mx-auto whitespace-pre-wrap text-sm"><div className="text-xs text-text-muted mb-1">{message.role === 'user' ? message.authorName || 'User' : message.role === 'error' ? 'Error' : agentName}</div>{message.text}</article>)}
+          {session?.status === 'running' && <p data-testid="shared-running" className="text-text-accent text-sm">{agentName} is working…</p>}
         </div>
         <form className="p-4 border-t border-border-subtle space-y-2" onSubmit={(event) => { event.preventDefault(); void submit() }}>
           {share.permission === 'view' && <p data-testid="view-only-notice" className="text-sm text-text-muted">View only — you can watch this workspace, but cannot send messages.</p>}
-          <textarea data-testid="shared-composer" aria-label="Message shared Codex session" className={field} disabled={!canSend} rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Send a task to the host’s Codex session" />
+          <textarea data-testid="shared-composer" aria-label={`Message shared ${agentName} session`} className={field} disabled={!canSend} rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={`Send a task to the host’s ${agentName} session`} />
           <button data-testid="shared-send" className={button} disabled={!canSend || !prompt.trim()} type="submit">{pending ? 'Sending…' : 'Send'}</button>
           {(error || sendError) && <p role="alert" className="text-red-400 text-sm">{error || sendError}</p>}
         </form>

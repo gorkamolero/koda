@@ -14,12 +14,14 @@ let directory: string
 let worktreeId: string
 let sessionId: string
 const dispatch = vi.fn(async () => ({ status: 'running' }))
+const claudeDispatch = vi.fn(async () => ({ status: 'running' }))
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-receiver-'))
   vi.stubEnv('KODA_DATA_DIR', directory)
   vi.stubEnv('LIVEBLOCKS_SECRET_KEY', 'unit-test-only')
   sync = await import('./LiveblocksClient.js')
   router.register('codex.send', dispatch)
+  router.register('claude.send', claudeDispatch)
 })
 beforeEach(() => {
   initDbWithMigrations(':memory:')
@@ -30,6 +32,7 @@ beforeEach(() => {
   getDb().insert(sessions).values({ id: sessionId, worktreeId, agentType: 'codex', status: 'idle' }).run()
   vi.spyOn(sync.SyncManager.prototype, 'connect').mockResolvedValue()
   dispatch.mockClear()
+  claudeDispatch.mockClear()
 })
 afterEach(() => { resetDb(); vi.restoreAllMocks() })
 afterAll(() => { vi.unstubAllEnvs(); rmSync(directory, { recursive: true, force: true }) })
@@ -40,6 +43,32 @@ async function command(permission: 'control' | 'view') {
 }
 
 describe('host relay receiver', () => {
+  it('routes Claude control to the stored session runtime once and preserves the signed author', async () => {
+    getDb().update(sessions).set({ agentType: 'claude' }).where(eq(sessions.id, sessionId)).run()
+    const share = await sync.shareWorkspace(worktreeId, 'control')
+    const request = signRelay({ type: 'relay', roomId: share.roomId, grantId: share.nonce, requestId: randomUUID(), sessionId, content: 'Continue with Claude', authorName: 'User B', authorMachineId: 'machine-b' }, share.invitation)
+    expect((await new sync.SyncManager(worktreeId).receive(request)).error).toBeNull()
+    expect((await new sync.SyncManager(worktreeId).receive(request)).error).toBeNull()
+    expect(claudeDispatch).toHaveBeenCalledTimes(1)
+    expect(claudeDispatch).toHaveBeenCalledWith({ sessionId, message: request.content, stream: true, authorName: 'User B', authorMachineId: 'machine-b' })
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+  it('enforces view permission and revoked control on Claude sessions before either runtime can execute', async () => {
+    getDb().update(sessions).set({ agentType: 'claude' }).where(eq(sessions.id, sessionId)).run()
+    const controlRequest = await command('control')
+    const viewRequest = await command('view')
+    expect((await new sync.SyncManager(worktreeId).receive(viewRequest)).error).toBe('View permission cannot send messages')
+    expect((await new sync.SyncManager(worktreeId).receive(controlRequest)).error).toBe('Unknown or revoked invitation')
+    expect(claudeDispatch).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+  it('does not fall back to Claude for an unsupported stored session type', async () => {
+    getDb().update(sessions).set({ agentType: 'unsupported' }).where(eq(sessions.id, sessionId)).run()
+    const request = await command('control')
+    expect((await new sync.SyncManager(worktreeId).receive(request)).error).toBe('Remote control is unavailable for this session type')
+    expect(claudeDispatch).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
   it('dispatches control once even if the same event is replayed or the manager reconnects', async () => {
     const request = await command('control')
     expect((await new sync.SyncManager(worktreeId).receive(request)).error).toBeNull()

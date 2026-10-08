@@ -10,6 +10,7 @@ import { router } from '../rpc/router.js'
 import { LiveObject } from '@liveblocks/client'
 
 const mock = vi.hoisted(() => ({ root: null as any, listeners: new Map<string, (value: any) => void>(), transcripts: new Map<string, unknown[]>() }))
+const claudeMessages = vi.fn(async () => [{ id: 'claude-delta', event: { type: 'text_delta', text: 'Claude is working' } }])
 vi.mock('@liveblocks/node', () => ({ Liveblocks: class { async getOrCreateRoom() { return {} } } }))
 vi.mock('@liveblocks/client', async (original) => {
   const actual = await original<typeof import('@liveblocks/client')>()
@@ -29,6 +30,7 @@ beforeAll(async () => {
   vi.stubEnv('LIVEBLOCKS_SECRET_KEY', 'unit-test-only')
   ;({ SyncManager } = await import('./LiveblocksClient.js'))
   router.register('codex.getMessages', async ({ sessionId }: { sessionId: string }) => mock.transcripts.get(sessionId) ?? [])
+  router.register('claude.getMessages', claudeMessages)
 })
 beforeEach(async () => {
   initDbWithMigrations(':memory:')
@@ -38,6 +40,7 @@ beforeEach(async () => {
   getDb().insert(worktrees).values({ id: worktreeId, repoId, collaborative: true }).run()
   getDb().insert(sessions).values({ id: sessionId, worktreeId, agentType: 'codex', status: 'idle' }).run()
   mock.transcripts.clear()
+  claudeMessages.mockClear()
   mock.transcripts.set(sessionId, [{ id: 'user', event: { type: 'user', message: { content: 'hello' } } }])
   manager = new SyncManager(worktreeId)
   await manager.connect()
@@ -46,6 +49,20 @@ afterEach(() => { manager.close(); resetDb() })
 afterAll(() => { vi.unstubAllEnvs(); rmSync(directory, { recursive: true, force: true }) })
 
 describe('authoritative room storage synchronization', () => {
+  it('publishes Claude transcripts from the Claude runtime alongside Codex', async () => {
+    const claudeSession = randomUUID()
+    getDb().insert(sessions).values({ id: claudeSession, worktreeId, agentType: 'claude', status: 'running' }).run()
+    await manager.sync()
+    expect(claudeMessages).toHaveBeenCalledWith({ sessionId: claudeSession })
+    expect(JSON.parse(mock.root.get('transcripts').get(claudeSession))[0].event.text).toBe('Claude is working')
+    expect(JSON.parse(mock.root.get('transcripts').get(sessionId))).toEqual(mock.transcripts.get(sessionId))
+    expect(mock.root.get('sessions').get(claudeSession).get('agentType')).toBe('claude')
+  })
+  it('does not read an unsupported session through the Claude runtime', async () => {
+    getDb().update(sessions).set({ agentType: 'unsupported' }).where(eq(sessions.id, sessionId)).run()
+    await manager.sync()
+    expect(claudeMessages).not.toHaveBeenCalled()
+  })
   it('publishes multiple sessions and incremental transcript snapshots', async () => {
     expect(mock.root.get('sessions').get(sessionId).get('status')).toBe('idle')
     expect(JSON.parse(mock.root.get('transcripts').get(sessionId))).toEqual(mock.transcripts.get(sessionId))

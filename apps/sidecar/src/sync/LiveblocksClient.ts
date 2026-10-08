@@ -34,6 +34,13 @@ type RelayEvent = RelayCommand
 type RelayResult = { type: 'relay-result'; requestId: string; error: string | null }
 type SyncEvent = RelayEvent | RelayResult
 
+// Choose the runtime from the host's persisted session, never guest input.
+function agentMethods(agentType: string | null) {
+  if (agentType === 'codex') return { messages: 'codex.getMessages', send: 'codex.send' }
+  if (agentType === 'claude') return { messages: 'claude.getMessages', send: 'claude.send' }
+  return undefined
+}
+
 type StoredState = { machineId: string; invitations: Record<string, string>; grants: Record<string, string>; receipts: Record<string, { error: string | null }> }
 let state: StoredState | undefined
 function stateFile() { return path.join(process.env.KODA_DATA_DIR || path.dirname(config.dbPath), 'collaboration.json') }
@@ -212,7 +219,8 @@ export class SyncManager {
         if (this.cache.get(session.id) !== encoded) {
           root.get('sessions').set(session.id, new LiveObject(data)); this.cache.set(session.id, encoded)
         }
-        const handler = router.get(session.agentType === 'codex' ? 'codex.getMessages' : 'claude.getMessages')
+        const methods = agentMethods(session.agentType)
+        const handler = methods && router.get(methods.messages)
         if (!handler) continue
         const transcript = JSON.stringify(await handler({ sessionId: session.id }))
         if (this.room !== room || this.generation !== generation) return
@@ -245,12 +253,14 @@ export class SyncManager {
       const receipt = getState().receipts[receiptKey]
       if (receipt) error = receipt.error
       else {
-        if (session.agentType !== 'codex') throw new Error('Remote control currently supports Codex sessions')
+        const methods = agentMethods(session.agentType)
+        const send = methods && router.get(methods.send)
+        if (!send) throw new Error('Remote control is unavailable for this session type')
         // Persist before dispatch so reconnects/replayed requests cannot execute twice.
         claimed = true
         getState().receipts[receiptKey] = { error: 'Previous relay interrupted; send a new message to retry' }
         saveState()
-        await router.get('codex.send')!({ sessionId: session.id, message: event.content, stream: true, ...(event.authorName ? { authorName: event.authorName } : {}), ...(event.authorMachineId ? { authorMachineId: event.authorMachineId } : {}) })
+        await send({ sessionId: session.id, message: event.content, stream: true, ...(event.authorName ? { authorName: event.authorName } : {}), ...(event.authorMachineId ? { authorMachineId: event.authorMachineId } : {}) })
         getState().receipts[receiptKey] = { error: null }
         saveState()
         await this.sync()
