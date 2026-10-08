@@ -41,20 +41,23 @@ fn kill_sidecar() {
 pub fn run() {
     let mut context = tauri::generate_context!();
     let mut window_state = tauri_plugin_window_state::Builder::default();
+    let mut isolated_profile = None;
+    let mut isolated_windows = Vec::new();
     if let Some(directory) = std::env::var_os("KODA_DATA_DIR") {
         let directory = PathBuf::from(directory);
         std::fs::create_dir_all(&directory).expect("failed to create KODA_DATA_DIR");
         let directory = directory.canonicalize().expect("invalid KODA_DATA_DIR");
         let identifier = webview_store_identifier(&directory).expect("failed to initialize isolated webview profile");
         for window in &mut context.config_mut().app.windows {
-            // WKWebView requires a distinct data-store identifier on macOS14+.
-            // A data directory alone would leave both users sharing localStorage.
-            #[cfg(target_os = "macos")]
-            { window.data_store_identifier = Some(identifier); }
-            #[cfg(not(target_os = "macos"))]
-            { window.data_directory = Some(directory.join("webview")); }
+            if window.create {
+                isolated_windows.push(window.clone());
+                // Tauri's config-to-webview conversion omits the data-store
+                // identifier. Build these windows explicitly below instead.
+                window.create = false;
+            }
         }
         window_state = window_state.with_filename(directory.join("window-state.json").to_string_lossy());
+        isolated_profile = Some((directory, identifier));
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -73,9 +76,22 @@ pub fn run() {
             commands::send_rpc_request,
             commands::stop_sidecar,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             setup_tracing();
             setup_app(app)?;
+            if let Some((directory, identifier)) = &isolated_profile {
+                for window in &isolated_windows {
+                    let builder = tauri::WebviewWindowBuilder::from_config(app, window)?;
+                    // WKWebView uses a distinct persistent data store on macOS14+;
+                    // data_directory alone is ignored by the platform.
+                    #[cfg(target_os = "macos")]
+                    let builder = builder.data_store_identifier(*identifier);
+                    #[cfg(not(target_os = "macos"))]
+                    let builder = builder.data_directory(directory.join("webview"));
+                    builder.build()?;
+                }
+                tracing::info!("Created isolated webview profile for {:?}", directory);
+            }
             Ok(())
         })
         .build(context)
