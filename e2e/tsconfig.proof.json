@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "lib": ["ES2022", "DOM"] },
-  "include": ["proof.config.ts", "video.config.ts", "proofs/**/*.ts", "demos/**/*.ts"]
+  "include": ["proof.config.ts", "two-machine.config.ts", "proofs/**/*.ts", "demos/**/*.ts"]
 }
