@@ -1,8 +1,9 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
-import { createWriteStream, existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync, type WriteStream } from 'node:fs'
+import { createWriteStream, existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync, realpathSync, type WriteStream } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { expect, type Browser, type Page, type TestInfo } from '@playwright/test'
 
@@ -30,6 +31,14 @@ export function requireLiveblocks() {
   if (!process.env.LIVEBLOCKS_SECRET_KEY) throw new Error('Real LIVEBLOCKS_SECRET_KEY required in .env.local for the collaboration proof. The test does not mock Liveblocks or skip.')
 }
 
+/** Ask the running app about its supported local Claude authentication. */
+export async function requireClaude(instance: KodaInstance) {
+  const status = await instance.rpc<{ available: boolean; authenticated: boolean; error?: string }>('claude.status')
+  if (!status.available || !status.authenticated) {
+    throw new Error(status.error || 'Real Claude authentication required: sign in with the installed Claude CLI, then rerun. Proofs never skip or use a fake agent.')
+  }
+}
+
 async function freePort(): Promise<number> {
   const server = createServer()
   return new Promise((resolvePort, reject) => {
@@ -43,6 +52,19 @@ async function freePort(): Promise<number> {
 }
 
 interface ManagedProcess { process: ChildProcess; log: WriteStream }
+interface ClaudeProofSession { sessionId: string; directory: string; threadId?: string }
+
+async function deleteClaudeProofSession(session: ClaudeProofSession) {
+  if (!session.threadId) return false // An idle chat never started a native session.
+  const require = createRequire(join(projectRoot, 'apps/sidecar/package.json'))
+  const sdk = await import(pathToFileURL(require.resolve('@anthropic-ai/claude-agent-sdk')).href) as {
+    deleteSession: (threadId: string, options: { dir: string }) => Promise<void>
+    getSessionInfo: (threadId: string, options: { dir: string }) => Promise<unknown>
+  }
+  await sdk.deleteSession(session.threadId, { dir: session.directory })
+  if (await sdk.getSessionInfo(session.threadId, { dir: session.directory })) throw new Error(`Temporary Claude SDK session cleanup failed: ${session.threadId}`)
+  return true
+}
 
 export class KodaInstance {
   readonly root = mkdtempSync(join(tmpdir(), 'koda-proof-'))
@@ -52,10 +74,16 @@ export class KodaInstance {
   rpcPort = 0
   vitePort = 0
   private children: ManagedProcess[] = []
+  private claudeSessions = new Map<string, ClaudeProofSession>()
   private generation = 0
   constructor(readonly label: string, readonly testInfo: TestInfo) { mkdirSync(this.dataDir, { recursive: true }) }
   get url() { return `http://localhost:${this.vitePort}` }
   get pids() { return this.children.map(child => child.process.pid) }
+
+  /** Register only the exact Claude session this fixture created. */
+  trackClaudeSession(sessionId: string, workingDirectory: string) {
+    this.claudeSessions.set(sessionId, { sessionId, directory: realpathSync(workingDirectory) })
+  }
 
   createRepo() {
     mkdirSync(this.repoPath, { recursive: true })
@@ -116,6 +144,11 @@ export class KodaInstance {
     })
     const data = await response.json() as { result: T; error?: { message: string } }
     if (data.error) throw new Error(`${method}: ${data.error.message}`)
+    if (method === 'claude.get') {
+      const session = data.result as { id?: string; threadId?: string }
+      const tracked = session.id ? this.claudeSessions.get(session.id) : undefined
+      if (tracked && session.threadId) tracked.threadId = session.threadId
+    }
     return data.result
   }
 
@@ -135,7 +168,22 @@ export class KodaInstance {
   }
 
   async cleanup() {
-    await this.stop()
+    let captureError: unknown
+    try {
+      for (const session of this.claudeSessions.values()) {
+        // Capture before stopping the app. Stop/restart alone must preserve it.
+        await this.rpc('claude.get', { sessionId: session.sessionId })
+      }
+    } catch (error) { captureError = error }
+    finally { await this.stop() }
+    if (captureError) throw captureError // Preserve this fixture if ownership is uncertain.
+    if (this.claudeSessions.size) {
+      const removed: string[] = []
+      for (const session of this.claudeSessions.values()) {
+        if (await deleteClaudeProofSession(session)) removed.push(session.threadId!)
+      }
+      writeFileSync(this.testInfo.outputPath(`${this.label}-claude-cleanup.json`), JSON.stringify({ temporarySdkSessionsRemoved: removed }, null, 2))
+    }
     // Only this test's mkdtemp tree; never a shared database or arbitrary port.
     rmSync(this.root, { recursive: true, force: true })
   }

@@ -78,9 +78,13 @@ test('Codex: repository → isolated worktree → live task → diff → checkpo
     await screenshot(page, testInfo, '07-restarted-workspace-session')
 
     // Continue the persisted Codex thread after restart, rather than merely reading SQLite.
+    const assistantCountBeforeResume = await page.locator('[data-message-role="assistant"]').count()
     await send(page, 'Without using tools, reply with the exact name of the new file you created in your previous turn.')
+    await expect(page.locator('[data-message-role="assistant"]')).toHaveCount(assistantCountBeforeResume + 1, { timeout: 120_000 })
     await expect(page.locator('[data-message-role="assistant"]').last()).toContainText('proof.txt', { timeout: 120_000 })
     await expect(page.locator('[data-message-role="assistant"]').last()).toHaveAttribute('data-message-status', 'complete')
+    await expect.poll(async () => (await instance.rpc<{ status: string }>('codex.get', { sessionId })).status).toBe('idle')
+    expect((await instance.rpc<{ threadId: string }>('codex.get', { sessionId })).threadId).toBe(originalThreadId)
     await screenshot(page, testInfo, '08-resumed-codex-thread')
     const evidence = { selectedModel, originalThreadId, workspaceId: workspace.workspaceId, worktreeId: workspace.worktreeId, sessionId, checkpointId, oldPids, restartedPids: instance.pids, notifications, proof: 'Real Codex SDK, real git worktree, real HTTP/WebSocket sidecar, React UI, full frontend and sidecar process restart. Chromium is not the macOS Tauri webview.' }
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify(evidence, null, 2))

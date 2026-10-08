@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
-import { KodaInstance, createWorkspace, pairScreenshot, requireCodex, requireLiveblocks, send } from './harness'
+import { KodaInstance, createWorkspace, pairScreenshot, requireClaude, requireCodex, requireLiveblocks, send } from './harness'
 
 async function share(page: Page, permission: 'control' | 'view') {
   await page.getByTestId('share-workspace').click()
@@ -20,8 +20,9 @@ async function join(page: Page, invitation: string) {
   await expect(page.getByTestId('shared-status')).toHaveText('connected', { timeout: 40_000 })
 }
 
-test('Liveblocks: two separate instances, live Codex/presence, control relay, enforced view access', async ({ browser }, testInfo) => {
-  requireCodex()
+for (const agent of ['codex', 'claude'] as const) {
+test(`Liveblocks ${agent}: two separate instances, live streaming/presence, control relay, enforced view access`, async ({ browser }, testInfo) => {
+  if (agent === 'codex') requireCodex()
   requireLiveblocks()
   const host = new KodaInstance('A', testInfo)
   const guest = new KodaInstance('B', testInfo)
@@ -33,13 +34,17 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
   try {
     host.createRepo()
     await Promise.all([host.start(), guest.start()])
+    if (agent === 'claude') await requireClaude(host)
     expect(host.dataDir).not.toBe(guest.dataDir)
     expect(host.rpcPort).not.toBe(guest.rpcPort)
     const workspace = await createWorkspace(a, host, testInfo, false)
     await b.goto(guest.url)
     await a.getByTestId('new-chat-button').click()
+    await a.getByTestId('agent-select').selectOption(agent)
+    await a.getByTestId('start-chat-button').click()
     await expect(a.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', /.+/)
     const sessionId = await a.getByTestId('agent-chat-container').getAttribute('data-session-id')
+    if (agent === 'claude') host.trackClaudeSession(sessionId!, workspace.worktreePath)
     roomId = `workspace:${workspace.worktreeId}`
     const controlInvitation = await share(a, 'control')
     await join(b, controlInvitation)
@@ -47,7 +52,7 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     expect(await guest.rpc('worktree.listAll')).toEqual([])
     await expect(b.getByTestId('shared-workspace-name')).toHaveText('codex/proof-A')
     await expect(b.getByTestId('shared-permission')).toHaveText('control')
-    await expect(b.getByTestId('shared-session')).toContainText('codex')
+    await expect(b.getByTestId('shared-session')).toContainText(agent)
     await expect(b.getByTestId('shared-presence')).toContainText('User A')
     await expect(a.getByTestId('presence-avatars').getByTitle('User B', { exact: true })).toBeVisible()
     await pairScreenshot(browser, a, b, testInfo, '01-two-instances-control-and-presence')
@@ -55,8 +60,8 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     await send(a, 'First announce A_STREAM_VISIBLE in an assistant message. Then run a shell command sleeping 5 seconds. Create collaboration.txt containing "HOST_TASK". Finish with A_TASK_FINISHED. Do not commit.')
     await expect(b.getByTestId('shared-running')).toBeVisible()
     await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'A_STREAM_VISIBLE' })).toBeVisible({ timeout: 120_000 })
-    expect((await host.rpc<{ status: string }>('codex.get', { sessionId })).status).toBe('running')
-    await pairScreenshot(browser, a, b, testInfo, '02-codex-messages-stream-to-b')
+    expect((await host.rpc<{ status: string }>(`${agent}.get`, { sessionId })).status).toBe('running')
+    await pairScreenshot(browser, a, b, testInfo, `02-${agent}-messages-stream-to-b`)
     await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'A_TASK_FINISHED' })).toBeVisible({ timeout: 150_000 })
     await expect(b.getByTestId('shared-composer')).toBeEnabled()
 
@@ -65,7 +70,7 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     await b.getByTestId('shared-send').click()
     await expect(a.locator('[data-message-role="user"]').filter({ hasText: 'B_RELAY_REQUEST' })).toBeVisible()
     await expect(a.locator('[data-message-role="assistant"]').filter({ hasText: 'B_STREAM_VISIBLE' })).toBeVisible({ timeout: 120_000 })
-    expect((await host.rpc<{ status: string }>('codex.get', { sessionId })).status).toBe('running')
+    expect((await host.rpc<{ status: string }>(`${agent}.get`, { sessionId })).status).toBe('running')
     await pairScreenshot(browser, a, b, testInfo, '03-b-message-and-live-reply-on-a')
     await expect(a.locator('[data-message-role="assistant"]').filter({ hasText: 'B_RELAY_FINISHED' })).toHaveAttribute('data-message-status', 'complete', { timeout: 150_000 })
     await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'B_RELAY_FINISHED' })).toBeVisible()
@@ -81,13 +86,13 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     await expect(b.getByTestId('shared-send')).toBeDisabled()
     const revoked = await host.rpc<{ error: string }>('collaboration.relay', { ...revokedCommand, worktreeId: workspace.worktreeId })
     expect(revoked.error).toContain('revoked')
-    const before = await host.rpc<Array<unknown>>('codex.getMessages', { sessionId })
+    const before = await host.rpc<Array<unknown>>(`${agent}.getMessages`, { sessionId })
     const joined = await guest.rpc<Array<{ roomId: string }>>('collaboration.list')
     expect(joined).toHaveLength(1)
     const signed = await guest.rpc<Record<string, unknown>>('collaboration.prepareRelay', { roomId: joined[0]!.roomId, sessionId, content: 'VIEW_MUST_NOT_RUN', requestId: randomUUID() })
     const rejection = await host.rpc<{ error: string }>('collaboration.relay', { ...signed, worktreeId: workspace.worktreeId })
     expect(rejection.error).toContain('View permission cannot send messages')
-    expect((await host.rpc<Array<unknown>>('codex.getMessages', { sessionId })).length).toBe(before.length)
+    expect((await host.rpc<Array<unknown>>(`${agent}.getMessages`, { sessionId })).length).toBe(before.length)
     await pairScreenshot(browser, a, b, testInfo, '05-view-permission-enforced')
 
     await send(a, 'Without tools, reply exactly VIEW_CAN_STILL_WATCH.')
@@ -95,8 +100,8 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     await pairScreenshot(browser, a, b, testInfo, '06-viewer-still-receives-live-messages')
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
       hostPids: host.pids, guestPids: guest.pids, separateDataDirectories: host.dataDir !== guest.dataDir,
-      sessionId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
-      proof: 'Two real sidecars, separate SQLite databases and browser contexts, real Codex SDK and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.',
+      agent, sessionId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
+      proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} SDK and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
     }, null, 2))
   } finally {
     await Promise.all([contextA.close(), contextB.close()])
@@ -110,3 +115,4 @@ test('Liveblocks: two separate instances, live Codex/presence, control relay, en
     }
   }
 })
+}
