@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentChat } from '@/components/AgentChat/AgentChat'
 import { messagesAtom } from '@/store/chat'
-import type { CodingAgent } from '@/lib/rpc'
+import type { CodingAgent, PermissionMode } from '@/lib/rpc'
+import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
 
 const { rpcRequest, onNotification, showToast } = vi.hoisted(() => ({
   rpcRequest: vi.fn(), onNotification: vi.fn(), showToast: vi.fn(),
@@ -27,8 +28,9 @@ function Inspector() {
 const transcript = (text: string) => [
   { id: text, index: 0, timestamp: 1000, event: { type: 'result', result: text } },
 ]
-function setup() {
+function setup(options: { useStoredSettings?: boolean; permissionMode?: PermissionMode } = {}) {
   const store = createStore()
+  if (!options.useStoredSettings) store.set(defaultPermissionModeAtom, options.permissionMode ?? 'default')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onSessionChange = vi.fn()
   const view = (worktreeId: string, sessionId?: string, agentType?: CodingAgent) => (
@@ -37,7 +39,7 @@ function setup() {
       <Inspector />
     </QueryClientProvider></Provider>
   )
-  return { view, onSessionChange }
+  return { view, onSessionChange, store }
 }
 
 beforeEach(() => {
@@ -222,9 +224,12 @@ describe('per-chat permissions', () => {
     render(view('A', 'saved', agent))
     expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
     await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    expect(screen.queryByTestId('claude-permission-rules-notice')).not.toBeInTheDocument()
     fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'default' } })
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.updateSettings`, { sessionId: 'saved', permissionMode: 'default' }))
     await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    if (agent === 'claude') expect(screen.getByTestId('claude-permission-rules-notice')).toHaveTextContent('a hook can resolve a request automatically')
+    else expect(screen.queryByTestId('claude-permission-rules-notice')).not.toBeInTheDocument()
     fireEvent.change(screen.getByTestId(`${agent}-model-select`), { target: { value: 'available' } })
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.updateSettings`, { sessionId: 'saved', model: 'available' }))
     expect(rpcRequest.mock.calls.some(([method]) => method.endsWith('.send'))).toBe(false)
@@ -239,6 +244,34 @@ describe('per-chat permissions', () => {
     expect(screen.getByTestId(`${agent}-model-select`)).toBeDisabled()
     fireEvent.click(screen.getByTestId('stop-agent-button'))
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.cancel`, { sessionId: 'saved' }))
+  })
+
+  it.each(['codex', 'claude'] as const)('%s follows the persisted new-chat default while retaining per-draft overrides', async agent => {
+    mockPermissions(agent)
+    localStorage.setItem('settings:defaultPermissionMode', JSON.stringify('bypassPermissions'))
+    const { view } = setup({ useStoredSettings: true })
+    const rendered = render(view('A'))
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: agent } })
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'default' } })
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: agent === 'codex' ? 'claude' : 'codex' } })
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    expect(localStorage.getItem('settings:defaultPermissionMode')).toBe(JSON.stringify('bypassPermissions'))
+    rendered.rerender(view('B'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+  })
+
+  it('keeps a saved normal chat unchanged when the global new-chat preference is bypass', async () => {
+    mockPermissions('codex', 'idle', 'default')
+    const { view, store } = setup({ permissionMode: 'bypassPermissions' })
+    const rendered = render(view('A', 'saved'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    act(() => store.set(defaultModelAtom, 'claude'))
+    expect(screen.getByTestId('agent-select')).toHaveValue('codex')
+    rendered.rerender(view('B'))
+    expect(screen.getByTestId('agent-select')).toHaveValue('claude')
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions')
   })
 
   it('keeps settings disabled until Stop finishes, even after cancelled status arrives', async () => {

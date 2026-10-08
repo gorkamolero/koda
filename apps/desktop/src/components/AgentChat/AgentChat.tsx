@@ -13,6 +13,7 @@ import { InputArea } from './InputArea'
 import { PlanModeIndicator } from './PlanModeIndicator'
 import { useNotifications } from '@/hooks/useNotifications'
 import { ApprovalRequests } from './ApprovalRequests'
+import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
 
 interface AgentChatProps {
   worktreeId: string
@@ -38,15 +39,20 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
   const pendingPrompt = useAtomValue(pendingPromptAtom)
   const setPendingPrompt = useSetAtom(pendingPromptAtom)
   const { showToast } = useNotifications()
+  const preferredAgent = useAtomValue(defaultModelAtom)
+  const defaultPermissions = useAtomValue(defaultPermissionModeAtom)
+  const defaultPermissionsRef = useRef(defaultPermissions)
+  defaultPermissionsRef.current = defaultPermissions
+  const draftPermissionOverrideRef = useRef<PermissionMode | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [checkpointId, setCheckpointId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [draftAgent, setDraftAgent] = useState<CodingAgent>('codex')
+  const [draftAgent, setDraftAgent] = useState<CodingAgent>(() => preferredAgent === 'claude' ? 'claude' : 'codex')
   const agent = sessionId ? agentType : draftAgent
   const agentName = agentNames[agent]
   const [model, setModel] = useState(() => preferredModel(agent))
   const [customModel, setCustomModel] = useState(false)
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default')
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>(defaultPermissions)
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [operationError, setOperationError] = useState<string | null>(null)
@@ -82,8 +88,10 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     activeAgentRef.current = agent
     loadedModelSession.current = undefined
     setLoadedSession(null)
-    setPermissionMode('default')
-    savedSettingsRef.current = { model: preferredModel(agent), permissionMode: 'default' }
+    if (sessionId) draftPermissionOverrideRef.current = null
+    const initialMode = sessionId ? 'default' : draftPermissionOverrideRef.current ?? defaultPermissionsRef.current
+    setPermissionMode(initialMode)
+    savedSettingsRef.current = { model: preferredModel(agent), permissionMode: initialMode }
     settingsRequestRef.current = null
     stopRequestRef.current = null
     setSettingsSaving(false)
@@ -101,6 +109,13 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
       setCurrentWorkspaceId(null)
     }
   }, [worktreeId, sessionId, agent, setCurrentWorkspaceId, setMessages, setIsStreaming, setSelectedModel])
+
+  useEffect(() => {
+    if (!sessionId && draftPermissionOverrideRef.current === null) {
+      setPermissionMode(defaultPermissions)
+      savedSettingsRef.current = { ...savedSettingsRef.current, permissionMode: defaultPermissions }
+    }
+  }, [defaultPermissions, sessionId])
 
   const refresh = useCallback(async () => {
     const id = activeSessionRef.current
@@ -167,6 +182,7 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     setOperationError(null)
     if (!id) {
       savedSettingsRef.current = next
+      if (update.permissionMode !== undefined) draftPermissionOverrideRef.current = next.permissionMode
       if (update.model !== undefined) localStorage.setItem(`settings:${agent}Model`, next.model)
       return
     }
@@ -311,6 +327,7 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
         {checkpointId && <span data-testid="checkpoint-saved" data-checkpoint-id={checkpointId}>Checkpoint saved</span>}
       </div>
       {permissionMode === 'bypassPermissions' && <p data-testid="bypass-permissions-notice" className="shrink-0 px-4 py-2 text-xs text-text-accent">Tools can run outside this worktree without asking. This also applies to collaborators with control.</p>}
+      {agent === 'claude' && permissionMode === 'default' && <p data-testid="claude-permission-rules-notice" className="shrink-0 px-4 py-2 text-xs text-text-muted">Your configured Claude rules and hooks also apply; a hook can resolve a request automatically.</p>}
       {modelsError && <div role="alert" data-testid="agent-model-error" className="px-4 py-2 text-xs text-status-error">{agentName} models: {modelsError.message}</div>}
       {error && <div role="alert" className="px-4 py-2 text-xs text-status-error">{error}</div>}
       {operationError && <div role="alert" className="px-4 py-2 text-xs text-status-error">{operationError}</div>}
