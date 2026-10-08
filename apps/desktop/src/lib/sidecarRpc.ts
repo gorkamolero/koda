@@ -216,7 +216,15 @@ let notificationUnlisten: UnlistenFn | null = null
 /**
  * Start listening for sidecar RPC requests and notifications
  */
-export async function startSidecarRpcListener(): Promise<void> {
+let listening: Promise<void> | null = null
+
+export function startSidecarRpcListener(): Promise<void> {
+  // Layout effects can run more than once (StrictMode); a second listener would
+  // deliver every notification twice, e.g. duplicating terminal output.
+  return listening ??= listen()
+}
+
+async function listen(): Promise<void> {
   if (!isTauriContext()) {
     // The browser build has no sidecar requests, but terminals still stream over the WebSocket.
     const { onNotification } = await import('@/lib/tauri')
@@ -247,6 +255,7 @@ export async function startSidecarRpcListener(): Promise<void> {
  * Stop listening for sidecar RPC
  */
 export function stopSidecarRpcListener(): void {
+  listening = null
   rpcRequestUnlisten?.()
   notificationUnlisten?.()
   rpcRequestUnlisten = null
