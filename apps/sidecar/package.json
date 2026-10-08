@@ -21,7 +21,7 @@
   "dependencies": {
     "@liveblocks/client": "^3.13.3",
     "@liveblocks/node": "^3.13.3",
-    "@openai/codex-sdk": "^0.92.0",
+    "@openai/codex-sdk": "^0.161.0",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.1",
     "node-pty": "^1.1.0",
