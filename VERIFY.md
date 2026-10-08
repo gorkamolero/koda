@@ -90,7 +90,7 @@ pnpm --filter e2e record:collaboration
 
 The recording shows two actual browser clients and isolated sidecars side by side at 1920×1080: Claude drafts a launch plan, a collaborator requests a revision through the relay, then a view-only collaborator watches another update. The setup and invitations are kept outside the filmed sequence. The host runs the real Claude CLI; the collaborator sends requests and receives the shared transcript through Liveblocks.
 
-The continuous original `collaboration.raw.webm`, an MP4 conversion, a final frame, and `evidence.json` are retained under `proof-results/collaboration-video/<timestamp>/`. This is a silent browser recording, not native macOS window capture. Temporary repositories, data directories, processes, and the test Liveblocks room are cleaned up after recording.
+The original `user-A.raw.webm` and `user-B.raw.webm` recordings, a synchronized side-by-side `collaboration.mp4`, a final frame, and `evidence.json` are retained under `proof-results/collaboration-video/<timestamp>/`. The evidence records synchronization and the composition of the two actual browser recordings. This is a silent browser recording, not native macOS window capture. Temporary repositories, data directories, processes, and the test Liveblocks room are cleaned up after recording.
 
 ## Native macOS launch
 

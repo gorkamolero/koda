@@ -8,8 +8,11 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:proof": "playwright test --config proof.config.ts",
+    "typecheck:proof": "tsc --noEmit -p tsconfig.proof.json",
     "test:proof:codex": "playwright test --config proof.config.ts codex-proof.spec.ts",
-    "test:proof:collaboration": "playwright test --config proof.config.ts collaboration-proof.spec.ts"
+    "test:proof:claude": "playwright test --config proof.config.ts claude-proof.spec.ts",
+    "test:proof:collaboration": "playwright test --config proof.config.ts collaboration-proof.spec.ts",
+    "record:collaboration": "playwright test --config video.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
