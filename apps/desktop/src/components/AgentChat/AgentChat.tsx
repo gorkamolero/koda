@@ -211,7 +211,7 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
             if (!custom) { setModel(event.target.value); localStorage.setItem(`settings:${agent}Model`, event.target.value) }
           }}>
             <option value="default">{agentName} default</option>
-            {models.map(option => <option key={option.id} value={option.model}>{option.displayName}{option.isDefault ? ' (default)' : ''}</option>)}
+            {models.filter(option => option.model !== 'default').map(option => <option key={option.id} value={option.model}>{option.displayName}{option.isDefault ? ' (default)' : ''}</option>)}
             <option value="custom">Custom model…</option>
           </select>
         </label>

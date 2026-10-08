@@ -50,7 +50,7 @@ describe('agent and model routing', () => {
   function mockAgents() {
     rpcRequest.mockImplementation(async (method: string, params?: { sessionId: string }) => {
       const agent = method.split('.')[0]
-      if (method.endsWith('.models')) return [{ id: `${agent}-model`, model: `${agent}-model`, displayName: `${agent} available model` }]
+      if (method.endsWith('.models')) return [{ id: 'default', model: 'default', displayName: 'SDK default' }, { id: `${agent}-model`, model: `${agent}-model`, displayName: `${agent} available model` }]
       if (method.endsWith('.start')) return { id: `${agent}-session`, sessionId: `${agent}-session` }
       if (method.endsWith('.get')) return { agentType: agent, status: 'idle', model: `${agent}-model` }
       if (method.endsWith('.getMessages')) return transcript(`${params?.sessionId} reply`)
@@ -68,6 +68,7 @@ describe('agent and model routing', () => {
     fireEvent.change(screen.getByTestId('codex-model-select'), { target: { value: 'codex-model' } })
     fireEvent.change(screen.getByTestId('agent-select'), { target: { value: 'claude' } })
     await screen.findByRole('option', { name: 'claude available model' })
+    expect(screen.getByTestId('claude-model-select').querySelectorAll('option[value="default"]')).toHaveLength(1)
     expect(screen.getByTestId('claude-model-select')).toHaveValue('default')
     fireEvent.change(screen.getByTestId('claude-model-select'), { target: { value: 'claude-model' } })
     fireEvent.change(screen.getByTestId('agent-select'), { target: { value: 'codex' } })
