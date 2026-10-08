@@ -5,13 +5,13 @@
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "app": "lsof -ti:3847 | xargs kill -9 2>/dev/null || true; pnpm --filter desktop tauri dev",
+    "app": "node scripts/run.mjs app",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "desktop": "lsof -ti:3847 | xargs kill -9 2>/dev/null || true; pnpm --filter desktop tauri dev",
-    "sidecar": "pnpm --filter sidecar dev"
+    "desktop": "node scripts/run.mjs app",
+    "sidecar": "node scripts/run.mjs sidecar"
   },
   "devDependencies": {
     "tsx": "^4.7.0",
@@ -19,7 +19,7 @@
     "typescript": "^5.7.2"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.12.0",
     "pnpm": ">=9.0.0"
   }
 }

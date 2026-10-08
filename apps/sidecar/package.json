@@ -18,9 +18,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@liveblocks/client": "^3.13.3",
     "@liveblocks/node": "^3.13.3",
     "@openai/codex-sdk": "^0.92.0",
-    "better-sqlite3": "^9.2.2",
+    "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.1",
     "node-pty": "^1.1.0",
     "playwright": "^1.58.1",
