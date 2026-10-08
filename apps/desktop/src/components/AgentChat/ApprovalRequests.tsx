@@ -3,8 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { onNotification, rpcRequest } from '@/lib/tauri'
 import type { ApprovalRequest } from '@/lib/rpc'
 
-/** Local host controls only. Shared workspace viewers never mount this component. */
-export function ApprovalRequests({ sessionId }: { sessionId: string }) {
+/** The agent's permission requests. A view-only collaborator sees them without the buttons enabled. */
+export function ApprovalRequests({ sessionId, readOnly = false, hostName }: { sessionId: string; readOnly?: boolean; hostName?: string | null }) {
   const queryClient = useQueryClient()
   const scopeRef = useRef(0)
   const respondingRef = useRef(new Set<string>())
@@ -33,7 +33,7 @@ export function ApprovalRequests({ sessionId }: { sessionId: string }) {
   }, [sessionId, queryClient])
 
   const respond = async (request: ApprovalRequest, decision: 'allow' | 'deny') => {
-    if (request.sessionId !== sessionId || respondingRef.current.has(request.id)) return
+    if (readOnly || request.sessionId !== sessionId || respondingRef.current.has(request.id)) return
     const scope = scopeRef.current
     respondingRef.current.add(request.id)
     setResponding(new Set(respondingRef.current))
@@ -75,9 +75,10 @@ export function ApprovalRequests({ sessionId }: { sessionId: string }) {
         {network?.host && <p data-testid="approval-network" className="break-all">Network: {network.protocol ? `${network.protocol}://` : ''}{network.host}</p>}
         {Array.isArray(item?.changes) && <ul data-testid="approval-files" className="space-y-1 break-all">{item.changes.map((change, index) => <li key={index}>{typeof change.kind === 'string' ? change.kind : change.kind?.type || 'Change'}: {change.path || 'Path not supplied'}</li>)}</ul>}
         <details><summary className="cursor-pointer text-text-muted">Request details</summary><pre data-testid="approval-input" className="mt-1 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{JSON.stringify(request.input, null, 2)}</pre></details>
+        {readOnly && <p data-testid="approval-view-only" className="text-text-muted">View only: {hostName || 'the host'} or a collaborator with control can answer.</p>}
         <div className="flex flex-wrap gap-2">
-          <button data-testid="approval-allow" disabled={busy} onClick={() => void respond(request, 'allow')} className="border border-border-subtle px-3 py-1 hover:text-text-accent disabled:opacity-50">{busy ? 'Sending…' : 'Approve once'}</button>
-          <button data-testid="approval-deny" disabled={busy} onClick={() => void respond(request, 'deny')} className="border border-border-subtle px-3 py-1 hover:text-status-error disabled:opacity-50">Deny</button>
+          <button data-testid="approval-allow" disabled={busy || readOnly} onClick={() => void respond(request, 'allow')} className="border border-border-subtle px-3 py-1 hover:text-text-accent disabled:opacity-50">{busy ? 'Sending…' : 'Approve once'}</button>
+          <button data-testid="approval-deny" disabled={busy || readOnly} onClick={() => void respond(request, 'deny')} className="border border-border-subtle px-3 py-1 hover:text-status-error disabled:opacity-50">Deny</button>
         </div>
       </section>
     })}

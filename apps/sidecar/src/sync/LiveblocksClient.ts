@@ -296,7 +296,16 @@ export class SyncManager {
   }
   /** Answers a guest's read with the host's own handler, after the scope checks. */
   async answer(request: RemoteRequest) {
-    const outcome = await executeRemoteRequest(request, { roomId: this.roomId, worktreeId: this.workspaceId, hostMachineId: getMachineId(), secret: secret(), grant: grantInvitation })
+    const outcome = await executeRemoteRequest(request, {
+      roomId: this.roomId, worktreeId: this.workspaceId, hostMachineId: getMachineId(), secret: secret(), grant: grantInvitation,
+      claim: (id) => {
+        const key = `${this.roomId}:control:${id}`
+        if (getState().receipts[key]) return false
+        getState().receipts[key] = { error: null }
+        saveState()
+        return true
+      },
+    })
     for (const chunk of responseChunks(request.requestId, outcome)) this.room?.broadcastEvent(chunk)
     return outcome
   }
@@ -352,7 +361,7 @@ export function initializeCollaboration() {
     const payload = params as JsonObject & { sessionId?: string; data?: string }
     const sessionId = payload?.sessionId
     if (!sessionId) return
-    if (method === 'message' || method === 'sessionStatus') {
+    if (method === 'message' || method === 'sessionStatus' || method === 'approvalChanged' || method === 'questionChanged') {
       if (!sessionWorktrees.has(sessionId) || method === 'sessionStatus') {
         sessionWorktrees.set(sessionId, getDb().select().from(sessions).where(eq(sessions.id, sessionId)).get()?.worktreeId ?? null)
       }

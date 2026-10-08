@@ -1,6 +1,6 @@
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process'
-import { createWriteStream, existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync, realpathSync, type WriteStream } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { createWriteStream, existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync, rmdirSync, realpathSync, type WriteStream } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
@@ -273,4 +273,22 @@ export async function createWorkspace(page: Page, instance: KodaInstance, testIn
 export async function send(page: Page, prompt: string) {
   await page.getByTestId('chat-input').fill(prompt)
   await page.getByTestId('chat-input').press('Enter')
+}
+
+export type Agent = 'codex' | 'claude'
+
+// OS temporary directories are allowed by Codex workspace-write. This exact
+// throwaway directory is deliberately outside them and contains only markers.
+export function outsideFixture() {
+  const parent = join(homedir(), '.koda-approval-proofs')
+  const createdParent = !existsSync(parent)
+  mkdirSync(parent, { recursive: true })
+  const root = mkdtempSync(join(parent, 'owned-'))
+  return { root, cleanup() { rmSync(root, { recursive: true, force: true }); if (createdParent) { try { rmdirSync(parent) } catch { /* another owned proof may still use it */ } } } }
+}
+
+export function writePrompt(path: string, marker: string, agent: Agent, bypass = false) {
+  const command = agent === 'codex' ? `/usr/bin/touch '${path}'` : `printf '%s\\n' '${marker}' > '${path}'`
+  const mode = bypass ? 'This chat explicitly has bypass permissions selected; run normally.' : 'Try normal tool execution first. If sandboxing blocks the command, request permission to run this exact command outside the sandbox with no reusable command rule. Wait for the tool approval; do not ask an ordinary chat question.'
+  return `Use only your shell tool to execute this exact command: ${command}. This is a disposable permission-test marker outside the worktree. Do not read any other files. ${mode} If permission is denied, stop without retrying, writing by another tool, or choosing another path. After success reply ${marker}_DONE; after denial reply PERMISSION_DENIED.`
 }

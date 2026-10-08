@@ -10,6 +10,7 @@ import { router } from '../rpc/router.js'
 import { getNotificationEmitter } from '../rpc/notifications.js'
 import { readFile, readDirectory, ReadFileInputSchema, ReadDirectoryInputSchema } from '../handlers/fs.js'
 import { signRemoteRequest } from './capabilities.js'
+import { getQuestionBroker, questionList, questionRespond, QuestionListParamsSchema, QuestionRespondParamsSchema } from '../agents/questionBroker.js'
 
 // One in-memory room shared by the host service and the guest service.
 const bus = vi.hoisted(() => new Map<string, Set<(value: { event: any }) => void>>())
@@ -45,6 +46,7 @@ let sessionId: string
 const transcript = vi.fn(async (): Promise<unknown[]> => [{ id: 'user', event: { type: 'user', message: { content: 'hello' } } }])
 const send = vi.fn(async () => ({ status: 'running' }))
 const save = vi.fn(async () => ({ id: 'checkpoint' }))
+const cancel = vi.fn(async () => ({ status: 'cancelled' }))
 
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-remote-'))
@@ -59,6 +61,9 @@ beforeAll(async () => {
   router.register('checkpoint.save', save)
   router.register('fs.readFile', readFile, ReadFileInputSchema)
   router.register('fs.readDirectory', readDirectory, ReadDirectoryInputSchema)
+  router.register('question.list', questionList, QuestionListParamsSchema)
+  router.register('question.respond', questionRespond, QuestionRespondParamsSchema)
+  router.register('codex.cancel', cancel)
   router.setInterceptor(guest.routeRemoteCall)
 })
 beforeEach(() => {
@@ -71,7 +76,7 @@ beforeEach(() => {
   getDb().insert(repos).values({ id: repoId, rootPath: directory, name: 'launch-site' }).run()
   getDb().insert(worktrees).values({ id: worktreeId, repoId, branch: 'launch-plan', worktreePath }).run()
   getDb().insert(sessions).values({ id: sessionId, worktreeId, agentType: 'codex', status: 'idle' }).run()
-  transcript.mockClear(); send.mockClear(); save.mockClear()
+  transcript.mockClear(); send.mockClear(); save.mockClear(); cancel.mockClear()
 })
 afterEach(() => { resetDb() })
 afterAll(() => { router.setInterceptor(undefined); vi.unstubAllEnvs(); rmSync(directory, { recursive: true, force: true }) })
@@ -140,6 +145,47 @@ describe('guest reads answered by the host', () => {
   })
 })
 
+describe("the host's agent controls for collaborators", () => {
+  const ask = (isSecret = false) => getQuestionBroker().request({ sessionId, agentType: 'codex', questions: [
+    { id: 'tone', header: 'Tone', question: 'Which tone?', options: [{ label: 'Friendly' }, { label: 'Formal' }], multiSelect: false, allowOther: false, isSecret },
+  ] })
+  const pendingId = () => getQuestionBroker().list(sessionId)[0]!.id
+
+  it("lets a control guest answer the agent's question through the host", async () => {
+    await joinAs('control')
+    await call('session.list', { worktreeId })
+    const decision = ask()
+    expect(await call('question.list', { sessionId })).toHaveLength(1)
+    await call('question.respond', { sessionId, requestId: pendingId(), decision: 'submit', answers: { tone: { selected: ['Friendly'] } } })
+    expect(await decision).toEqual({ decision: 'submit', answers: { tone: { selected: ['Friendly'] } } })
+  })
+  it('shows a view guest the question but keeps answering and stopping to control', async () => {
+    await joinAs('view')
+    await call('session.list', { worktreeId })
+    const decision = ask()
+    expect(await call('question.list', { sessionId })).toHaveLength(1)
+    await expect(call('question.respond', { sessionId, requestId: pendingId(), decision: 'cancel' })).rejects.toThrow('View permission cannot answer or stop the agent')
+    await expect(call('codex.cancel', { sessionId })).rejects.toThrow('View permission cannot answer or stop the agent')
+    expect(cancel).not.toHaveBeenCalled()
+    getQuestionBroker().cancelSession(sessionId)
+    expect((await decision).decision).toBe('cancel')
+  })
+  it('lets a control guest stop the turn', async () => {
+    await joinAs('control')
+    await call('session.list', { worktreeId })
+    await call('codex.cancel', { sessionId })
+    expect(cancel).toHaveBeenCalledWith({ sessionId })
+  })
+  it('keeps secret answers on the host', async () => {
+    await joinAs('control')
+    await call('session.list', { worktreeId })
+    const decision = ask(true)
+    await expect(call('question.respond', { sessionId, requestId: pendingId(), decision: 'submit', answers: { tone: { selected: ['Formal'] } } })).rejects.toThrow('Answer secret questions on the host')
+    getQuestionBroker().cancelSession(sessionId)
+    await decision
+  })
+})
+
 describe('host scope checks', () => {
   async function request(method: string, params: unknown, permission: 'view' | 'control' = 'view') {
     const share = await sync.shareWorkspace(worktreeId, permission)
@@ -160,11 +206,18 @@ describe('host scope checks', () => {
     expect(transcript).not.toHaveBeenCalled()
   })
   it('never executes writes, even for a control invitation', async () => {
-    for (const method of ['codex.send', 'checkpoint.save', 'pty.create', 'pty.write', 'worktree.delete']) {
+    for (const method of ['codex.send', 'checkpoint.save', 'pty.create', 'pty.write', 'worktree.delete', 'codex.updateSettings']) {
       expect((await answer((await request(method, { worktreeId, sessionId }, 'control')).signed)).error).toBe(`Only the host can run ${method} in a shared workspace`)
     }
     expect(send).not.toHaveBeenCalled()
     expect(save).not.toHaveBeenCalled()
+  })
+  it('refuses a view invitation and a replayed control request at the host', async () => {
+    expect((await answer((await request('codex.cancel', { sessionId }, 'view')).signed)).error).toBe('View permission cannot answer or stop the agent')
+    const { signed } = await request('codex.cancel', { sessionId }, 'control')
+    expect((await answer(signed)).error).toBeUndefined()
+    expect((await answer(signed)).error).toBe('Request was already handled')
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
   it('rejects forged, replaced and disabled-sharing requests', async () => {
     const { signed } = await request('codex.getMessages', { sessionId })

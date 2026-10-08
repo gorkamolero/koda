@@ -1,28 +1,10 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, rmdirSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { KodaInstance, createWorkspace, requireClaude, requireCodex, screenshot, send } from './harness'
+import { KodaInstance, createWorkspace, outsideFixture, requireClaude, requireCodex, screenshot, send, writePrompt, type Agent } from './harness'
 
-type Agent = 'codex' | 'claude'
 type Session = { status: string; permissionMode: string; threadId: string }
 type Pending = { id: string; sessionId: string; input: Record<string, unknown> }
-
-// OS temporary directories are allowed by Codex workspace-write. This exact
-// throwaway directory is deliberately outside them and contains only markers.
-function outsideFixture() {
-  const parent = join(homedir(), '.koda-approval-proofs')
-  const createdParent = !existsSync(parent)
-  mkdirSync(parent, { recursive: true })
-  const root = mkdtempSync(join(parent, 'owned-'))
-  return { root, cleanup() { rmSync(root, { recursive: true, force: true }); if (createdParent) { try { rmdirSync(parent) } catch { /* another owned proof may still use it */ } } } }
-}
-
-function writePrompt(path: string, marker: string, agent: Agent, bypass = false) {
-  const command = agent === 'codex' ? `/usr/bin/touch '${path}'` : `printf '%s\\n' '${marker}' > '${path}'`
-  const mode = bypass ? 'This chat explicitly has bypass permissions selected; run normally.' : 'Try normal tool execution first. If sandboxing blocks the command, request permission to run this exact command outside the sandbox with no reusable command rule. Wait for the tool approval; do not ask an ordinary chat question.'
-  return `Use only your shell tool to execute this exact command: ${command}. This is a disposable permission-test marker outside the worktree. Do not read any other files. ${mode} If permission is denied, stop without retrying, writing by another tool, or choosing another path. After success reply ${marker}_DONE; after denial reply PERMISSION_DENIED.`
-}
 
 async function pendingRequest(page: Page, instance: KodaInstance, sessionId: string, path: string) {
   await expect(page.getByTestId('approval-card')).toHaveCount(1, { timeout: 120_000 })

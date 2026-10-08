@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentChat } from '@/components/AgentChat/AgentChat'
 import { MessageItem } from '@/components/AgentChat/MessageItem'
 import { SharedWorkspacesSection } from '@/components/WorkspaceSharing'
+import { QuestionRequests } from '@/components/AgentChat/QuestionRequests'
+import { ApprovalRequests } from '@/components/AgentChat/ApprovalRequests'
 import type { ChatMessage } from '@/store/chat'
 import type { RemoteWorktree } from '@/lib/rpc'
 
@@ -52,9 +54,11 @@ describe("a collaborator's view of the host's session", () => {
     expect(screen.getByRole('button', { name: 'Send task' })).toHaveAttribute('title', expect.stringContaining('view only'))
     expect(screen.queryByTestId('save-checkpoint')).not.toBeInTheDocument()
     expect(screen.getByTestId('shared-session-host')).toHaveTextContent('running on Gorka')
-    // Approvals and permission modes stay with the host.
-    expect(screen.queryByTestId('permission-mode-select')).not.toBeInTheDocument()
-    expect(rpcRequest).not.toHaveBeenCalledWith('approval.list', expect.anything())
+    // The host's permission mode is shown; changing it stays with the host.
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    // The agent's questions and permission requests reach the collaborator too.
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('approval.list', { sessionId: 's1' }))
+    expect(rpcRequest).toHaveBeenCalledWith('question.list', { sessionId: 's1' })
     // The host runs the agent, so its catalog is the one shown.
     expect(rpcRequest).toHaveBeenCalledWith('claude.models', { worktreeId: 'w1' })
   })
@@ -147,5 +151,43 @@ describe('themes', () => {
     const { initializeThemeAtom } = await import('@/store/theme')
     createStore().set(initializeThemeAtom)
     expect(document.documentElement.style.getPropertyValue('--surface-messages')).toBe('#212328')
+  })
+})
+
+describe("the agent's questions and permission requests on a collaborator's screen", () => {
+  const question = (isSecret = false) => [{ id: 'q1', sessionId: 's1', agentType: 'codex', createdAt: '', expiresAt: '', questions: [
+    { id: 'tone', header: 'Tone', question: 'Which tone?', options: [{ label: 'Friendly' }, { label: 'Formal' }], multiSelect: false, allowOther: false, isSecret },
+  ] }]
+  const approval = [{ id: 'a1', sessionId: 's1', agentType: 'codex', toolName: 'Bash', input: { command: 'touch /outside' }, createdAt: '', expiresAt: '' }]
+
+  it('lets a collaborator with control answer a question for the host', async () => {
+    rpcRequest.mockImplementation(async (method: string) => method === 'question.list' ? question() : {})
+    render(wrap(<QuestionRequests sessionId="s1" hostName="Gorka" />))
+    fireEvent.click(await screen.findByLabelText('Friendly'))
+    fireEvent.click(screen.getByTestId('question-submit'))
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('question.respond', { sessionId: 's1', requestId: 'q1', decision: 'submit', answers: { tone: { selected: ['Friendly'] } } }))
+  })
+
+  it('shows the question to a viewer without letting them answer', async () => {
+    rpcRequest.mockImplementation(async (method: string) => method === 'question.list' ? question() : {})
+    render(wrap(<QuestionRequests sessionId="s1" readOnly hostName="Gorka" />))
+    expect(await screen.findByTestId('question-view-only')).toHaveTextContent('Gorka or a collaborator with control can answer')
+    expect(screen.getByLabelText('Friendly')).toBeDisabled()
+    expect(screen.getByTestId('question-cancel')).toBeDisabled()
+  })
+
+  it('keeps secret answers on the host', async () => {
+    rpcRequest.mockImplementation(async (method: string) => method === 'question.list' ? question(true) : {})
+    render(wrap(<QuestionRequests sessionId="s1" hostName="Gorka" />))
+    expect(await screen.findByTestId('question-secret-on-host')).toHaveTextContent('Gorka answers it on their machine')
+    expect(screen.getByTestId('question-submit')).toBeDisabled()
+  })
+
+  it('shows permission requests to a viewer with the buttons disabled', async () => {
+    rpcRequest.mockImplementation(async (method: string) => method === 'approval.list' ? approval : {})
+    render(wrap(<ApprovalRequests sessionId="s1" readOnly hostName="Gorka" />))
+    expect(await screen.findByTestId('approval-view-only')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-allow')).toBeDisabled()
+    expect(screen.getByTestId('approval-deny')).toBeDisabled()
   })
 })

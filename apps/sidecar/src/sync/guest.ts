@@ -10,10 +10,10 @@ import path from 'node:path'
 import { getNotificationEmitter } from '../rpc/notifications.js'
 import { signRemoteRequest } from './capabilities.js'
 import { getInvitation, getMachineId, getMachineName, isCollaborationEnabled, listSharedWorkspaces, prepareRelay, token, type SyncEvent } from './LiveblocksClient.js'
-import { REMOTE_READ_METHODS } from './remoteAccess.js'
+import { REMOTE_CONTROL_METHODS, REMOTE_METHODS } from './remoteAccess.js'
 
 const TIMEOUT = 20_000
-const FORWARDED = new Set(['message', 'sessionStatus', 'pty.data', 'pty.exit'])
+const FORWARDED = new Set(['message', 'sessionStatus', 'approvalChanged', 'questionChanged', 'pty.data', 'pty.exit'])
 
 type Outcome = { result?: unknown; error?: string }
 type Waiter<T> = { resolve: (value: T) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
@@ -158,7 +158,8 @@ export async function routeRemoteCall(method: string, params: unknown): Promise<
     await room.send(sessionId, message)
     return { result: { status: 'running' } }
   }
-  if (!REMOTE_READ_METHODS.has(method)) throw new Error(`Only ${host} can do that in this shared workspace`)
+  if (!REMOTE_METHODS.has(method)) throw new Error(`Only ${host} can do that in this shared workspace`)
+  if (REMOTE_CONTROL_METHODS.has(method) && share.permission !== 'control') throw new Error('View permission cannot answer or stop the agent')
   const result = await room.call(method, params)
   learn(method, result, roomId)
   if (method === 'worktree.get' && result && typeof result === 'object') {

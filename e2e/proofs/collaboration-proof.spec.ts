@@ -1,7 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
-import { KodaInstance, createWorkspace, pairScreenshot, requireClaude, requireCodex, requireLiveblocks, send } from './harness'
+import { existsSync, writeFileSync } from 'node:fs'
+import { join as joinPath } from 'node:path'
+import { KodaInstance, createWorkspace, outsideFixture, pairScreenshot, requireClaude, requireCodex, requireLiveblocks, send, writePrompt } from './harness'
 
 async function share(page: Page, permission: 'control' | 'view') {
   await page.getByTestId('share-workspace').click()
@@ -64,9 +65,8 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await expect(b.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', sessionId!)
     await expect(b.getByTestId('active-agent')).toHaveText(agent === 'claude' ? 'Claude' : 'Codex')
     await expect(b.getByTestId('presence-avatars').getByTitle('User A', { exact: true })).toBeVisible()
-    // Approvals and permission modes stay with the host.
-    await expect(b.getByTestId('permission-mode-select')).toHaveCount(0)
-    await expect(b.getByTestId('approval-requests')).toHaveCount(0)
+    // B sees the host's permission mode; changing it stays with the host.
+    await expect(b.getByTestId('permission-mode-select')).toBeDisabled()
     await expect(a.getByTestId('presence-avatars').getByTitle('User B', { exact: true })).toBeVisible()
     // The host's terminal is mirrored read-only, including output typed after B joined.
     await expect(b.getByTestId(/^remote-terminal-tab-/)).toHaveCount(1)
@@ -96,6 +96,23 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await expect(assistant(a, 'B_RELAY_FINISHED')).toHaveAttribute('data-message-status', 'complete', { timeout: 150_000 })
     await expect(assistant(b, 'B_RELAY_FINISHED')).toBeVisible()
     await pairScreenshot(browser, a, b, testInfo, '04-relay-complete-on-both')
+
+    if (agent === 'codex') {
+      // The agent's permission request reaches both screens, and B answers it as A could.
+      const outside = outsideFixture()
+      try {
+        const marker = joinPath(outside.root, 'approved-by-b')
+        await send(a, writePrompt(marker, 'B_APPROVED', 'codex'))
+        await expect(b.getByTestId('approval-card')).toHaveCount(1, { timeout: 120_000 })
+        await expect(a.getByTestId('approval-card')).toHaveCount(1)
+        await expect(b.getByTestId('approval-card')).toContainText(marker)
+        await pairScreenshot(browser, a, b, testInfo, '04b-permission-request-on-both')
+        await b.getByTestId('approval-allow').click()
+        await expect(a.getByTestId('approval-card')).toHaveCount(0, { timeout: 30_000 })
+        await expect.poll(() => existsSync(marker), { timeout: 120_000 }).toBe(true)
+        await expect(assistant(b, 'B_APPROVED_DONE')).toBeVisible({ timeout: 120_000 })
+      } finally { outside.cleanup() }
+    }
 
     // Replace B's joined grant with a view invitation; B rejoins from the sidebar.
     const revokedCommand = await guest.rpc<Record<string, unknown>>('collaboration.prepareRelay', { roomId, sessionId, content: 'REVOKED_CONTROL_MUST_NOT_RUN', requestId: randomUUID() })

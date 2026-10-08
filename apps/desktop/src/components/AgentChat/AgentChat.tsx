@@ -327,16 +327,16 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
           const next = model.trim() || 'default'
           if (next !== savedSettingsRef.current.model) void updateSettings({ model: next })
         }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />}
-        {/* Permissions, stopping and checkpoints stay with the host of a shared workspace. */}
-        {!remote && <label className="flex items-center gap-1">Permissions
-          <select aria-label="Permissions" data-testid="permission-mode-select" value={permissionMode} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId)} onChange={event => void updateSettings({ permissionMode: event.target.value as PermissionMode })} className="bg-surface-card border border-border-subtle p-1">
+        {/* A collaborator sees the host's permission mode; changing it is the host's security decision. */}
+        <label className="flex items-center gap-1">Permissions
+          <select aria-label="Permissions" data-testid="permission-mode-select" value={permissionMode} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} onChange={event => void updateSettings({ permissionMode: event.target.value as PermissionMode })} className="bg-surface-card border border-border-subtle p-1">
             <option value="default">Ask when needed</option>
             <option value="bypassPermissions">Bypass permissions</option>
           </select>
-        </label>}
+        </label>
         {settingsSaving && <span role="status">Saving settings…</span>}
         {!sessionId && !remote && <button data-testid="start-chat-button" disabled={isStreaming} onClick={() => void handleSendMessage()} className="hover:text-text-primary disabled:opacity-40">Start chat</button>}
-        {sessionId && !remote && (isStreaming || stopping) && <button data-testid="stop-agent-button" disabled={stopping} onClick={() => void stopTurn()} className="border border-border-subtle px-2 py-1 text-status-error disabled:opacity-40">{stopping ? 'Stopping…' : 'Stop'}</button>}
+        {sessionId && canSend && (isStreaming || stopping) && <button data-testid="stop-agent-button" disabled={stopping} onClick={() => void stopTurn()} className="border border-border-subtle px-2 py-1 text-status-error disabled:opacity-40">{stopping ? 'Stopping…' : 'Stop'}</button>}
         {!remote && <button data-testid="save-checkpoint" disabled={saving || isStreaming || !workingDirectory} onClick={() => void saveCheckpoint()} className="hover:text-text-primary disabled:opacity-40">
           {saving ? 'Saving…' : 'Save checkpoint'}
         </button>}
@@ -344,14 +344,14 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
         {checkpointId && <span data-testid="checkpoint-saved" data-checkpoint-id={checkpointId}>Checkpoint saved</span>}
       </div>
       {permissionMode === 'bypassPermissions' && <p data-testid="bypass-permissions-notice" className="shrink-0 px-4 py-2 text-xs text-text-accent">Tools can run outside this worktree without asking. This also applies to collaborators with control.</p>}
-      {agent === 'claude' && permissionMode === 'default' && !remote && <p data-testid="claude-permission-rules-notice" className="shrink-0 px-4 py-2 text-xs text-text-muted">Your configured Claude rules and hooks also apply; a hook can resolve a request automatically.</p>}
+      {agent === 'claude' && permissionMode === 'default' && <p data-testid="claude-permission-rules-notice" className="shrink-0 px-4 py-2 text-xs text-text-muted">{remote ? `${hostName}'s` : 'Your'} configured Claude rules and hooks also apply; a hook can resolve a request automatically.</p>}
       {modelsError && <div role="alert" data-testid="agent-model-error" className="px-4 py-2 text-xs text-status-error">{agentName} models: {modelsError.message}</div>}
       {error && <div role="alert" className="px-4 py-2 text-xs text-status-error">{error}</div>}
       {operationError && <div role="alert" className="px-4 py-2 text-xs text-status-error">{operationError}</div>}
-      {/* Questions and approvals are answered on the host, never by a collaborator. */}
-      {sessionId && !remote && <div className="shrink-0 max-h-[45%] overflow-y-auto">
-        <QuestionRequests sessionId={sessionId} />
-        <ApprovalRequests key={sessionId} sessionId={sessionId} />
+      {/* Both people see the agent's questions and requests; control decides who can answer. */}
+      {sessionId && <div className="shrink-0 max-h-[45%] overflow-y-auto">
+        <QuestionRequests sessionId={sessionId} readOnly={!canSend} hostName={remote ? remote.hostName : undefined} />
+        <ApprovalRequests key={sessionId} sessionId={sessionId} readOnly={!canSend} hostName={remote?.hostName} />
       </div>}
       <div className="flex-1 overflow-hidden"><MessageList /></div>
       <InputArea
