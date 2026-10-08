@@ -13,6 +13,7 @@ export interface AgentEvent {
     text?: string
     result?: string
     is_error?: boolean
+    cancelled?: boolean
     tool?: string
     tool_id?: string
     tool_use_id?: string
@@ -60,7 +61,10 @@ export function agentEventsToMessages(events: AgentEvent[], model: AgentModel = 
       message.contentBlocks?.push({ type: 'tool_result', toolUseId: event.tool_use_id ?? '', toolName: event.tool ?? 'tool', output: typeof output === 'string' ? output : JSON.stringify(output), error: event.error })
     } else if (event.type === 'result') {
       const message = getAssistant(entry)
-      message.content ||= event.result || (event.is_error ? 'Agent failed' : 'Done')
+      if (event.cancelled) {
+        message.content = message.content ? `${message.content}\n\nStopped.` : 'Stopped.'
+        message.contentBlocks = message.contentBlocks?.map(block => block.type === 'tool_use' && (!block.status || block.status === 'pending' || block.status === 'running') ? { ...block, status: 'cancelled' } : block)
+      } else message.content ||= event.result || (event.is_error ? 'Agent failed' : 'Done')
       message.status = event.is_error ? 'error' : 'complete'
       assistant = undefined
     } else if (event.type === 'error') {

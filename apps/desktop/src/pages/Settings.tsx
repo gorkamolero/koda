@@ -1,6 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { useAtom } from 'jotai'
 import { cn } from '@/lib/utils'
 import { ThemeSelector } from '@/components/ThemeSelector'
+import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
+import { isTauriContext } from '@/lib/tauri'
+import type { CodingAgent, PermissionMode } from '@/lib/rpc'
+
+const guardSetupUrl = 'https://github.com/Dicklesworthstone/destructive_command_guard#quick-install'
 
 /**
  * Terminal-style settings section
@@ -80,13 +86,19 @@ function TerminalSelect({
   value,
   onChange,
   options,
+  label,
+  testId,
 }: {
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
+  label?: string
+  testId?: string
 }) {
   return (
     <select
+      aria-label={label}
+      data-testid={testId}
       value={value}
       onChange={(e) => { onChange(e.target.value) }}
       className={cn(
@@ -132,6 +144,15 @@ function ShortcutRow({ action, keys }: { action: string; keys: string }) {
  * └─────────────────────────────────────────────┘
  */
 export function Settings() {
+  const [defaultAgent, setDefaultAgent] = useAtom(defaultModelAtom)
+  const [defaultPermissions, setDefaultPermissions] = useAtom(defaultPermissionModeAtom)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const openGuardSetup = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!isTauriContext()) return
+    event.preventDefault()
+    setLinkError(null)
+    void import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(guardSetupUrl)).catch(() => setLinkError('Unable to open the setup guide in your browser.'))
+  }
   return (
     <div className="h-full overflow-y-auto font-mono bg-surface-messages">
       <div className="max-w-2xl mx-auto p-8">
@@ -166,15 +187,30 @@ export function Settings() {
                 description="The agent that will be used for new conversations"
               >
                 <TerminalSelect
-                  value="claude-code"
-                  onChange={() => {}}
+                  label="Default agent"
+                  testId="default-agent-select"
+                  value={defaultAgent === 'claude' ? 'claude' : 'codex'}
+                  onChange={value => setDefaultAgent(value as CodingAgent)}
                   options={[
-                    { value: 'claude-code', label: 'Claude Code' },
+                    { value: 'claude', label: 'Claude' },
                     { value: 'codex', label: 'Codex' },
-                    { value: 'kimi-code', label: 'Kimi Code' },
                   ]}
                 />
               </TerminalField>
+              <TerminalField label="New conversation permissions" description="Applies to new Codex and Claude chats. Existing chats keep their saved permissions.">
+                <TerminalSelect label="New conversation permissions" testId="default-permission-mode-select" value={defaultPermissions} onChange={value => setDefaultPermissions(value as PermissionMode)} options={[
+                  { value: 'default', label: 'Ask when needed' },
+                  { value: 'bypassPermissions', label: 'Bypass permissions' },
+                ]} />
+                {defaultPermissions === 'bypassPermissions' && <p className="mt-2 text-text-accent">Tools can run outside the worktree without asking. This also applies to collaborators with control.</p>}
+              </TerminalField>
+              <div data-testid="command-guard-recommendation" className="border border-dashed border-border-subtle p-3 space-y-2 text-text-muted">
+                <p className="text-text-primary">Destructive Command Guard (dcg) · Recommended with bypass</p>
+                <p>Blocks known destructive commands, including <code>rm -rf /</code>. Supports Claude and Codex hooks; Codex coverage is incomplete. It adds protection but does not replace a sandbox.</p>
+                <p>Requires separate setup. Koda does not install it.</p>
+                <a href={guardSetupUrl} target="_blank" rel="noopener noreferrer" onClick={openGuardSetup} className="text-text-accent underline">Official setup guide ↗</a>
+                {linkError && <p role="alert" className="text-status-error">{linkError}</p>}
+              </div>
             </div>
           </TerminalSection>
 

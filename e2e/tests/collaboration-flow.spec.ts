@@ -79,10 +79,6 @@ interface LiveblocksRoom {
   activeUsers?: number
 }
 
-interface LiveblocksRoomResponse {
-  data: LiveblocksRoom[]
-}
-
 interface LiveblocksActiveUsers {
   data: Array<{
     connectionId: number

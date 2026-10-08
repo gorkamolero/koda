@@ -71,7 +71,7 @@ export interface ToolUseContentBlock extends BaseContentBlock {
   id: string
   name: string
   input: Record<string, unknown>
-  status?: 'pending' | 'running' | 'success' | 'error'
+  status?: 'pending' | 'running' | 'success' | 'error' | 'cancelled'
   durationMs?: number
 }
 

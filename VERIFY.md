@@ -1,21 +1,35 @@
 # Reproduce Koda's end-to-end proofs
 
-This document covers the macOS desktop launch and real-service Playwright proofs for Codex, Claude, and collaboration with each agent. The proofs use the production React UI and Node sidecar, real git worktrees, the official agent SDKs, and Liveblocks. Playwright drives Chromium; it does not automate the native macOS WKWebView. Native desktop verification is a separate check below.
+This document covers the macOS desktop launch and real-service Playwright proofs for Codex, Claude, and collaboration with each agent. The proofs use the production React UI and Node sidecar, real git worktrees, the installed Codex app-server, the official Claude Agent SDK, and Liveblocks. Playwright drives Chromium; it does not automate the native macOS WKWebView. Native desktop verification is a separate check below.
 
 ## Prerequisites
 
 - macOS with Xcode command-line tools and a Rust toolchain.
 - Node.js 24 (see `.nvmrc`) and pnpm 9.15.9. Node 22.12 or later is required.
-- An installed, authenticated Codex CLI: run `codex login`, then `codex login status`. Koda uses that CLI through the official Codex TypeScript SDK. See [Codex SDK documentation](https://learn.chatgpt.com/docs/codex-sdk).
+- An installed, authenticated Codex CLI: run `codex login`, then `codex login status`. Koda uses its official bidirectional app-server protocol for streaming and interactive approvals. See [Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 - An installed, authenticated Claude CLI for the Claude proofs: run `claude auth login`, then `claude auth status`. Koda runs the official Claude Agent SDK with the installed CLI; authentication remains with Claude.
 - A Liveblocks **development** secret key for the collaboration proof. Both development instances use the same Liveblocks project. No public browser key is needed.
 - Internet access for dependencies, the selected agent, and Liveblocks.
 
-Codex remains the default. Choose Codex or Claude when starting a new chat, then select its model in the UI. The agent and model are stored with the session. Kimi is not part of the verified flow. The Codex-only proof does not require Claude authentication.
+Codex remains the default. Choose Codex or Claude when starting a new chat, then select its model in the UI. The agent, model, and permission mode are stored with the session. Kimi is not part of the verified flow. The Codex-only proof does not require Claude authentication.
 
-If Claude is installed outside `PATH`, set `KODA_CLAUDE_PATH` to its executable. Models are selected in the UI rather than environment variables. Claude inherits its official CLI settings; Koda allows file changes within the selected worktree and requires the CLI sandbox for shell commands. Requests needing broader approval fail visibly instead of waiting on an unavailable approval dialog.
+If Claude is installed outside `PATH`, set `KODA_CLAUDE_PATH` to its executable. Models are selected in the UI rather than environment variables. Claude inherits its official CLI settings. Koda explicitly sets each chat's permission mode; normal mode requires the CLI sandbox for ordinary shell commands and forwards real permission requests to the host.
 
 Model catalogs are discovered from each installed CLI, with a one-minute cache. New model releases normally need no Koda code changes: keep the CLI updated and reopen Koda to refresh its catalog. The custom model ID field also accepts models supported by the CLI and your account. An old CLI or missing account entitlement can still prevent a model from working.
+
+### Tool approvals and bypass
+
+**Settings → Agent → New conversation permissions** controls the initial mode for both agents. This setup defaults to **Bypass permissions**, as requested; **Ask when needed** is also available. The preference persists in the local UI profile. Each new chat can override it, while existing chats retain their saved mode. Requests needing a decision show their tool, command or path, reason, and input details in the host chat. **Approve once** permits that request; **Deny** rejects it. The host can stop a waiting turn. Pending requests survive a UI reload while the sidecar stays running; cancellation, a sidecar shutdown, or a ten-minute expiry clears them with denial.
+
+The host can change permissions while the chat is idle. Its mode remains visible in the toolbar and applies to subsequent collaborator requests too. Changing a chat's mode does not change the Settings preference. Guests cannot answer requests or change the host's mode through the collaboration relay.
+
+The adjacent recommendation links to [Destructive Command Guard](https://github.com/Dicklesworthstone/destructive_command_guard), which intercepts known destructive shell and git commands through agent hooks. Upstream supports Claude and Codex but documents incomplete interception of Codex shell execution. It is an optional additional guard, not a sandbox or a guarantee against every destructive operation. Koda does not install it or claim it is active; use its setup and verification instructions before relying on it.
+
+Codex normal mode uses `on-request` with a worktree write sandbox and a human reviewer; bypass uses `never` with `danger-full-access`. Claude normal mode uses the official SDK's `default` permissions and native shell sandbox; bypass uses its `bypassPermissions` option and disables that sandbox. These settings use provider-supported modes, without changing global CLI configuration. Koda launches Codex in the selected worktree with its optional `shell_snapshot` and `shell_snapshot_v2` features disabled for that child process. This keeps execution on the native sandbox path tested here; an actual inside write succeeds while an ordinary outside write receives an OS permission denial before an approved retry. Do not remove those launch options without rerunning the approval proofs. [Claude's permission rules](https://code.claude.com/docs/en/agent-sdk/permissions) can still require a decision in bypass mode; Koda displays every callback rather than overriding it. Managed policies and hooks remain authoritative.
+
+Claude's configured permission hooks remain active. Anthropic documents that a `PermissionRequest` hook and the SDK's host callback run concurrently, and the first decision wins. A hook, including one connected to an external reviewer, can therefore resolve a visible request without a Koda button click; Koda clears the cancelled callback. Live Bash and Write diagnostics confirmed that behavior. See [Claude's PermissionRequest lifecycle](https://code.claude.com/docs/en/hooks#permissionrequest).
+
+Claude's structured `AskUserQuestion` questionnaires are not yet supported: they end the turn with a visible explanation to ask in ordinary chat. Unsupported Codex interactive request types also stop with an explicit error rather than hanging.
 
 ### Claude authentication research (2026-10-08)
 
@@ -61,7 +75,17 @@ The source repository is checked to remain unchanged. Screenshots are captured f
 pnpm --filter e2e test:proof:claude
 ```
 
-This exercises the same repository, worktree, streamed task, diff, and checkpoint flow with Claude selected in the UI. After both app processes restart, it checks the saved Claude session, model, and upstream session ID, then continues the conversation. Authentication or service failures fail the proof rather than skipping it or substituting a mocked response.
+This exercises the same repository, worktree, streamed task, diff, and checkpoint flow with Claude selected in the UI. It explicitly selects bypass for the unattended workflow; the separate approval proofs cover normal-mode decisions. After both app processes restart, it checks the saved Claude session, model, and upstream session ID, then continues the conversation. Authentication or service failures fail the proof rather than skipping it or substituting a mocked response.
+
+## Real approval proofs
+
+```sh
+pnpm --filter e2e test:proof:approvals
+```
+
+For each agent, this selects normal approvals and requests a harmless marker-file write in a task-owned directory outside the worktree and OS temporary directories. It holds the request for ten seconds while checking that the file stays absent, reloads the UI and recovers the same request, approves through the visible button, then verifies the expected output file. Separate requests exercise Deny and Stop and confirm their files remain absent. It selects bypass through the UI, restarts both app processes, confirms the saved mode and upstream conversation, and verifies an outside write finishes without a pending request. New chats must follow the Settings preference independently of the previous chat's mode. The fixture directories and owned processes are removed afterward.
+
+Leave external approval prompts unanswered during these tests: the proof must make its decisions through Koda. Hooks remain enabled. A hook that independently resolves a request will cause the manual-decision assertions to fail; that failure must not be presented as a passing manual approval proof.
 
 ## Real Liveblocks proofs
 
@@ -69,7 +93,7 @@ This exercises the same repository, worktree, streamed task, diff, and checkpoin
 pnpm --filter e2e test:proof:collaboration
 ```
 
-Each agent's collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control and user B joins from B's own sidebar, which keeps B's projects and lists A's workspace under Shared. B gets the normal workspace view of A's session: the streamed conversation with tool calls, A's changes, and a read-only mirror of A's terminal, with presence on both sides. B sends a message to A's actual Codex or Claude session through Liveblocks, and each message shows its author. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation.
+Each agent's collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control and user B joins from B's own sidebar, which keeps B's projects and lists A's workspace under Shared. B gets the normal workspace view of A's session: the streamed conversation with tool calls, A's changes, and a read-only mirror of A's terminal, with presence on both sides. B sends a message to A's actual Codex or Claude session through Liveblocks, and each message shows its author. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation. The Claude workflow explicitly uses bypass; the approval proofs separately exercise normal mode. Backend relay regressions verify that extra approval or permission-mode fields cannot invoke the host's controls.
 
 Run all proofs together:
 
@@ -82,17 +106,17 @@ Screenshots, structured evidence, and logs are written under `e2e/proof-results/
 
 ## Record the collaboration on two machines
 
-The recording uses two Macs. This one hosts the workspace and runs Claude; the collaborator Mac runs its own Koda sidecar, frontend and headless Chromium. Both need this checkout at `~/Developer/koda` on the collaborator, built dependencies, a `.env.local` with the same Liveblocks development secret, Tailscale, and SSH access by host alias. The collaborator does not need Claude or Codex.
+The recording uses two Macs. This one hosts the workspace and runs Claude; the collaborator Mac runs its own Koda sidecar, frontend and headless Chromium. The collaborator needs this checkout at `~/Developer/koda` with dependencies installed, a `.env.local` with the same Liveblocks development secret, and SSH access by host alias. It does not need Claude; with a signed-in Codex CLI it opens on its own project, otherwise on its home screen.
 
 ```sh
 pnpm --filter e2e record:two-machine
 ```
 
-`KODA_COLLABORATOR_SSH` selects the collaborator's SSH alias (default `cyberyogin`); `KODA_HOST_NAME` and `KODA_GUEST_NAME` set the names shown in the session (default `Gorka` and `Alex`). The collaborator's browser listens only on its Tailscale address behind a random path for the length of the run.
+`KODA_COLLABORATOR_SSH` selects the collaborator's SSH alias (default `cyberyogin`); `KODA_HOST_NAME` and `KODA_GUEST_NAME` set the names shown in the session (default `Gorka` and `Alex`). The collaborator's browser keeps its debugging port on localhost; this machine reaches it through an SSH tunnel for the length of the run. The host's Claude session explicitly uses bypass so the filmed turns do not wait on approval cards.
 
-Before filming, the script creates both users' projects, starts a Claude session, shares it with control permission and joins it from the collaborator, so no invitation appears on screen. It then captures both screens on one clock while the collaborator opens the shared workspace from their own sidebar, the host asks Claude for a change, the collaborator asks for a follow-up that arrives under their name, and the host's terminal output appears in the collaborator's read-only mirror.
+Before filming, the script creates both users' projects, starts a Claude session, shares it with control permission and joins it from the collaborator, so no invitation appears on screen. It then captures both screens while the collaborator opens the shared workspace from their own sidebar, the host asks Claude for a change, and the collaborator asks for a follow-up that arrives under their name. The collaborator uses the KODA Graphite theme so the two screens are easy to tell apart.
 
-Each screen is a 1280×1440 window captured at 1920×2160, so the two fill a 3840×2160 frame side by side. `A.mp4`, `B.mp4`, the raw frames and `timeline.json` (beat times for editing) are kept under `proof-results/two-machine-video/<timestamp>/`. Repositories, data directories, collaborator processes and the Liveblocks room are removed afterwards. The capture is Chromium rendering the production UI, not native macOS window capture.
+Each screen is a 1280×1440 window captured at 1920×2160 and up to 60 fps on its own machine; the collaborator's frames are aligned by the clock offset measured at the start. Side by side they fill a 3840×2160 frame. `A.mp4`, `B.mp4`, the raw frames and `timeline.json` (beat times for editing) are kept under `proof-results/two-machine-video/<timestamp>/`. Repositories, data directories, collaborator processes and the Liveblocks room are removed afterwards. The capture is Chromium rendering the production UI, not native macOS window capture.
 
 ## Native macOS launch
 
@@ -135,7 +159,7 @@ cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
 
 ## Development trust boundary
 
-The host owns the session transcript and validates signed relay requests before dispatching the session's agent. Browser participants receive read/presence access rather than permission to rewrite the transcript. Control invitations must be kept private; relay broadcasts do not include the invitation token. View invitations do not authorize commands.
+The host owns the session transcript and validates signed relay requests before dispatching the session's agent. Browser participants receive read/presence access rather than permission to rewrite the transcript. Control invitations must be kept private; relay broadcasts do not include the invitation token. View invitations do not authorize commands. Local HTTP RPC and WebSocket subscriptions reject untrusted browser origins using exact configured-origin matches, including simple POST requests that do not require a browser preflight.
 
 This same-machine development setup gives both sidecars a Liveblocks project secret. It is not a production identity service for mutually untrusted machines. Cross-machine deployment and production account/permission management require their own verification.
 

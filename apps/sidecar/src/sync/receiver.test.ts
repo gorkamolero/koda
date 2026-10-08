@@ -8,6 +8,7 @@ import { initDbWithMigrations, resetDb, getDb } from '../db/index.js'
 import { repos, worktrees, sessions } from '../db/schema.js'
 import { router } from '../rpc/router.js'
 import { signRelay, type RelayCommand } from './capabilities.js'
+import { ApprovalBroker } from '../agents/approvalBroker.js'
 
 let sync: typeof import('./LiveblocksClient.js')
 let directory: string
@@ -15,6 +16,7 @@ let worktreeId: string
 let sessionId: string
 const dispatch = vi.fn(async () => ({ status: 'running' }))
 const claudeDispatch = vi.fn(async () => ({ status: 'running' }))
+const respond = vi.fn(), settings = vi.fn()
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-receiver-'))
   vi.stubEnv('KODA_DATA_DIR', directory)
@@ -22,6 +24,9 @@ beforeAll(async () => {
   sync = await import('./LiveblocksClient.js')
   router.register('codex.send', dispatch)
   router.register('claude.send', claudeDispatch)
+  router.register('approval.respond', respond)
+  router.register('claude.updateSettings', settings)
+  router.register('codex.updateSettings', settings)
 })
 beforeEach(() => {
   initDbWithMigrations(':memory:')
@@ -33,6 +38,7 @@ beforeEach(() => {
   vi.spyOn(sync.SyncManager.prototype, 'connect').mockResolvedValue()
   dispatch.mockClear()
   claudeDispatch.mockClear()
+  respond.mockClear(); settings.mockClear()
 })
 afterEach(() => { resetDb(); vi.restoreAllMocks() })
 afterAll(() => { vi.unstubAllEnvs(); rmSync(directory, { recursive: true, force: true }) })
@@ -43,6 +49,25 @@ async function command(permission: 'control' | 'view') {
 }
 
 describe('host relay receiver', () => {
+  it.each(['claude', 'codex'])('does not let a %s collaborator change permission modes or answer host approvals', async agentType => {
+    getDb().update(sessions).set({ agentType, permissionMode: 'default' }).where(eq(sessions.id, sessionId)).run()
+    const broker = new ApprovalBroker({ notify: () => {} })
+    const pending = broker.request({ sessionId, agentType: agentType as 'claude' | 'codex', toolName: 'Write', input: { file_path: '/outside/file.txt' } })
+    const approval = broker.list()[0]
+    try {
+      const request = await command('control')
+      // A holder of a real control grant can attach arbitrary fields to a broadcast.
+      // The receiver must build the send arguments from its own narrow allowlist.
+      const malicious = { ...request, method: 'approval.respond', permissionMode: 'bypassPermissions',
+        approvalId: approval.id, decision: 'allow', params: { sessionId, permissionMode: 'bypassPermissions' } }
+      expect((await new sync.SyncManager(worktreeId).receive(malicious)).error).toBeNull()
+      expect(agentType === 'claude' ? claudeDispatch : dispatch).toHaveBeenCalledWith({ sessionId, message: request.content, stream: true })
+      expect(respond).not.toHaveBeenCalled()
+      expect(settings).not.toHaveBeenCalled()
+      expect(getDb().select().from(sessions).where(eq(sessions.id, sessionId)).get()?.permissionMode).toBe('default')
+      expect(broker.list()).toEqual([approval])
+    } finally { broker.dispose(); await pending }
+  })
   it('routes Claude control to the stored session runtime once and preserves the signed author', async () => {
     getDb().update(sessions).set({ agentType: 'claude' }).where(eq(sessions.id, sessionId)).run()
     const share = await sync.shareWorkspace(worktreeId, 'control')

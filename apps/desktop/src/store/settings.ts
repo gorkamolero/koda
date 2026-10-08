@@ -1,6 +1,6 @@
 import { atom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
-import type { AgentType } from '@/lib/rpc'
+import type { AgentType, CodingAgent, PermissionMode } from '@/lib/rpc'
 
 /**
  * Settings Store - Conductor-style user preferences
@@ -16,7 +16,10 @@ import type { AgentType } from '@/lib/rpc'
 /**
  * Default agent model to use for new sessions
  */
-export const defaultModelAtom = atomWithStorage<AgentType>('settings:defaultModel', 'codex')
+export const defaultModelAtom = atomWithStorage<CodingAgent>('settings:defaultModel', 'codex', undefined, { getOnInit: true })
+
+/** Applies only to new conversations; each saved chat owns its own mode. */
+export const defaultPermissionModeAtom = atomWithStorage<PermissionMode>('settings:defaultPermissionMode', 'bypassPermissions', undefined, { getOnInit: true })
 
 /**
  * Available models (static for now, could be dynamic later)
@@ -251,6 +254,7 @@ export const soundEffectsEnabledAtom = atomWithStorage('settings:soundEffectsEna
 export const resetAllSettingsAtom = atom(null, (_get, set) => {
   // Model settings
   set(defaultModelAtom, 'codex')
+  set(defaultPermissionModeAtom, 'bypassPermissions')
   set(thinkingEnabledDefaultAtom, true)
   set(planModeEnabledAtom, false)
 

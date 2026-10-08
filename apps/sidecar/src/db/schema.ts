@@ -202,8 +202,8 @@ export const sessions = sqliteTable(
     // Conductor-style fields
     title: text('title').default('Untitled'),
     claudeSessionId: text('claude_session_id'), // Claude CLI session ID for resume
-    codexThreadId: text('codex_thread_id'), // Codex SDK thread ID for durable resume
-    permissionMode: text('permission_mode').default('default'), // 'default', 'plan', 'auto-approve'
+    codexThreadId: text('codex_thread_id'), // Codex CLI thread ID for durable resume
+    permissionMode: text('permission_mode').default('default'), // 'default', 'bypassPermissions'
     thinkingEnabled: integer('thinking_enabled', { mode: 'boolean' }).default(true),
     codexThinkingLevel: text('codex_thinking_level'), // 'high', 'medium', 'low' for Codex
     contextUsedPercent: text('context_used_percent'), // Float as text (0.0-1.0)

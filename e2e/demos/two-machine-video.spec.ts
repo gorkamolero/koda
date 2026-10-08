@@ -122,7 +122,8 @@ test('record two machines sharing one Claude session', async ({}, testInfo) => {
       const worktree = await host.rpc<{ id: string; worktreePath: string }>('worktree.create', { repoId: repo.id, branch, workspaceId: workspace.id })
       if (path === landing) shared = { worktreeId: worktree.id, worktreePath: worktree.worktreePath }
     }
-    const session = await host.rpc<{ id: string; sessionId?: string }>('claude.start', { worktreeId: shared.worktreeId, model: 'default' })
+    // Bypass so the filmed turns do not wait on approval cards.
+    const session = await host.rpc<{ id: string; sessionId?: string }>('claude.start', { worktreeId: shared.worktreeId, model: 'default', permissionMode: 'bypassPermissions' })
     const sessionId = session.sessionId ?? session.id
     host.trackClaudeSession(sessionId, shared.worktreePath)
     const invitation = (await host.rpc<{ invitation: string }>('collaboration.share', { worktreeId: shared.worktreeId, permission: 'control' })).invitation

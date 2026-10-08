@@ -43,6 +43,8 @@ import {
   listCodexSessions,
   getCodexMessages,
   getCodexHandler,
+  updateCodexSettings,
+  UpdateSettingsSchema,
   ListSessionsSchema,
   GetMessagesSchema,
   StartSessionSchema,
@@ -75,6 +77,13 @@ import {
   ClaudeGetMessagesParamsSchema,
 } from './agents/claude.js';
 import { getClaudeStatus, listClaudeModels } from './agents/claudeModels.js';
+import {
+  ApprovalListParamsSchema,
+  ApprovalRespondParamsSchema,
+  approvalList,
+  approvalRespond,
+  getApprovalBroker,
+} from './agents/approvalBroker.js';
 
 // Import Kimi agent handlers
 import {
@@ -250,6 +259,9 @@ function registerMethods() {
   router.register('codex.list', listCodexSessions, ListSessionsSchema);
   router.register('codex.getMessages', getCodexMessages, GetMessagesSchema);
   router.register('codex.models', listCodexModels);
+  router.register('codex.updateSettings', updateCodexSettings, UpdateSettingsSchema);
+  router.register('approval.list', approvalList, ApprovalListParamsSchema);
+  router.register('approval.respond', approvalRespond, ApprovalRespondParamsSchema);
   router.register('session.list', async (input: { worktreeId: string }) => getSessionsByWorktree(getDb(), input.worktreeId), ListSessionsSchema);
 
   // Claude agent
@@ -424,7 +436,8 @@ async function main() {
       
       console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
       stopFileWatching(); // Stop file watching
-      getCodexHandler().cleanup();
+      getApprovalBroker().dispose();
+      await getCodexHandler().cleanup();
       await getClaudeHandler().dispose();
       cleanupAllSessions(); // Close all PTY sessions
       await getPulseManager().stopAll(); // Stop all pulse processes

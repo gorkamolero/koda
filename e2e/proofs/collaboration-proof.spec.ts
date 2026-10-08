@@ -47,10 +47,13 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await b.goto(guest.url)
     await a.getByTestId('new-chat-button').click()
     await a.getByTestId('agent-select').selectOption(agent)
+    await a.getByTestId('permission-mode-select').selectOption(agent === 'claude' ? 'bypassPermissions' : 'default')
     await a.getByTestId('start-chat-button').click()
     await expect(a.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', /.+/)
     const sessionId = await a.getByTestId('agent-chat-container').getAttribute('data-session-id')
     if (agent === 'claude') host.trackClaudeSession(sessionId!, workspace.worktreePath)
+    const permissionMode = (await host.rpc<{ permissionMode: string }>(`${agent}.get`, { sessionId })).permissionMode
+    expect(permissionMode).toBe(agent === 'claude' ? 'bypassPermissions' : 'default')
     roomId = `workspace:${workspace.worktreeId}`
     const controlInvitation = await share(a, 'control')
     await join(b, controlInvitation, 'control')
@@ -61,6 +64,9 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await expect(b.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', sessionId!)
     await expect(b.getByTestId('active-agent')).toHaveText(agent === 'claude' ? 'Claude' : 'Codex')
     await expect(b.getByTestId('presence-avatars').getByTitle('User A', { exact: true })).toBeVisible()
+    // Approvals and permission modes stay with the host.
+    await expect(b.getByTestId('permission-mode-select')).toHaveCount(0)
+    await expect(b.getByTestId('approval-requests')).toHaveCount(0)
     await expect(a.getByTestId('presence-avatars').getByTitle('User B', { exact: true })).toBeVisible()
     // The host's terminal is mirrored read-only, including output typed after B joined.
     await expect(b.getByTestId(/^remote-terminal-tab-/)).toHaveCount(1)
@@ -112,10 +118,12 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await send(a, 'Without tools, reply exactly VIEW_CAN_STILL_WATCH.')
     await expect(assistant(b, 'VIEW_CAN_STILL_WATCH')).toBeVisible({ timeout: 120_000 })
     await pairScreenshot(browser, a, b, testInfo, '06-viewer-still-receives-live-messages')
+    const upstreamSession = await host.rpc<{ threadId: string | null }>(`${agent}.get`, { sessionId })
+    expect(upstreamSession.threadId).toBeTruthy()
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
       hostPids: host.pids, guestPids: guest.pids, separateDataDirectories: host.dataDir !== guest.dataDir,
-      agent, sessionId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
-      proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} SDK and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
+      agent, permissionMode, sessionId, threadId: upstreamSession.threadId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
+      proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} runtime and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
     }, null, 2))
   } finally {
     const cleanupErrors: unknown[] = []

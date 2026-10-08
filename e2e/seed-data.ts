@@ -355,7 +355,8 @@ async function main() {
     let repoId: string
     const projectRoot = path.resolve(__dirname, '..')
 
-    if (repos.length === 0) {
+    const existingRepo = repos[0]
+    if (!existingRepo) {
       // Register this project as a repo
       console.log(`Registering repo at: ${projectRoot}`)
 
@@ -365,7 +366,7 @@ async function main() {
       repoId = newRepo.id
       console.log(`Created repo: ${newRepo.id} (${newRepo.name})`)
     } else {
-      repoId = repos[0].id
+      repoId = existingRepo.id
       console.log(`Using existing repo: ${repoId}`)
     }
 
@@ -405,7 +406,7 @@ async function main() {
       console.log('Workspaces already exist, checking for existing worktree...')
       // Try to find existing worktree path - now under ~/.koda/worktrees/
       const ws = workspaces[0]
-      if (ws.branch) {
+      if (ws?.branch) {
         const repoName = path.basename(projectRoot)
         worktreePath = path.join(os.homedir(), '.koda', 'worktrees', repoName, ws.branch)
       }

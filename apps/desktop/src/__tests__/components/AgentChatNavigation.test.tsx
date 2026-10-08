@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentChat } from '@/components/AgentChat/AgentChat'
 import { messagesAtom } from '@/store/chat'
-import type { CodingAgent } from '@/lib/rpc'
+import type { CodingAgent, PermissionMode } from '@/lib/rpc'
+import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
 
 const { rpcRequest, onNotification, showToast } = vi.hoisted(() => ({
   rpcRequest: vi.fn(), onNotification: vi.fn(), showToast: vi.fn(),
@@ -27,8 +28,9 @@ function Inspector() {
 const transcript = (text: string) => [
   { id: text, index: 0, timestamp: 1000, event: { type: 'result', result: text } },
 ]
-function setup() {
+function setup(options: { useStoredSettings?: boolean; permissionMode?: PermissionMode } = {}) {
   const store = createStore()
+  if (!options.useStoredSettings) store.set(defaultPermissionModeAtom, options.permissionMode ?? 'default')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const onSessionChange = vi.fn()
   const view = (worktreeId: string, sessionId?: string, agentType?: CodingAgent) => (
@@ -37,7 +39,7 @@ function setup() {
       <Inspector />
     </QueryClientProvider></Provider>
   )
-  return { view, onSessionChange }
+  return { view, onSessionChange, store }
 }
 
 beforeEach(() => {
@@ -54,6 +56,7 @@ describe('agent and model routing', () => {
       if (method.endsWith('.start')) return { id: `${agent}-session`, sessionId: `${agent}-session` }
       if (method.endsWith('.get')) return { agentType: agent, status: 'idle', model: `${agent}-model` }
       if (method.endsWith('.getMessages')) return transcript(`${params?.sessionId} reply`)
+      if (method === 'approval.list') return []
       return {}
     })
   }
@@ -86,7 +89,7 @@ describe('agent and model routing', () => {
     fireEvent.change(screen.getByTestId('claude-model-select'), { target: { value: 'claude-model' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send task' }))
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('claude.send', { sessionId: 'claude-session', message: 'submitted task', stream: true, model: 'claude-model' }))
-    expect(rpcRequest).toHaveBeenCalledWith('claude.start', { worktreeId: 'A', model: 'claude-model' })
+    expect(rpcRequest).toHaveBeenCalledWith('claude.start', { worktreeId: 'A', model: 'claude-model', permissionMode: 'default' })
     expect(onSessionChange).toHaveBeenCalledWith('claude-session', 'claude')
     expect(rpcRequest.mock.calls.some(([method]) => method === 'codex.start' || method === 'codex.send')).toBe(false)
   })
@@ -153,6 +156,7 @@ describe('chat navigation during requests', () => {
       if (method === 'codex.models') return []
       if (method === 'codex.get') return params?.sessionId === 'A' ? oldSession.promise : { status: 'idle', model: 'default' }
       if (method === 'codex.getMessages') return transcript(`${params?.sessionId} reply`)
+      if (method === 'approval.list') return []
       return {}
     })
     const { view } = setup()
@@ -172,17 +176,155 @@ describe('chat navigation during requests', () => {
       if (method === 'codex.start') return created.promise
       if (method === 'codex.get') return { status: 'idle', model: 'default' }
       if (method === 'codex.getMessages') return transcript(`${params?.sessionId} reply`)
+      if (method === 'approval.list') return []
       return {}
     })
     const { view, onSessionChange } = setup()
     const rendered = render(view('worktree-A'))
     fireEvent.click(screen.getByRole('button', { name: 'Send task' }))
-    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('codex.start', { worktreeId: 'worktree-A', model: 'default' }))
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('codex.start', { worktreeId: 'worktree-A', model: 'default', permissionMode: 'default' }))
     rendered.rerender(view('worktree-B', 'B'))
     await waitFor(() => expect(screen.getByTestId('selected-transcript')).toHaveTextContent('B reply'))
     await act(async () => { created.resolve({ id: 'A', sessionId: 'A' }); await created.promise })
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith('codex.send', { sessionId: 'A', message: 'submitted task', stream: true, model: 'default' }))
     expect(onSessionChange).not.toHaveBeenCalled()
     expect(screen.getByTestId('selected-transcript')).toHaveTextContent('B reply')
+  })
+})
+
+describe('per-chat permissions', () => {
+  function mockPermissions(agent: CodingAgent, status = 'idle', permissionMode = 'default') {
+    rpcRequest.mockImplementation(async (method: string) => {
+      if (method.endsWith('.models')) return [{ id: 'available', model: 'available', displayName: 'Available model' }]
+      if (method.endsWith('.get')) return { agentType: agent, status, model: 'default', permissionMode }
+      if (method.endsWith('.getMessages') || method === 'approval.list') return []
+      if (method.endsWith('.start')) return { id: 'created', sessionId: 'created' }
+      return {}
+    })
+  }
+
+  it.each(['codex', 'claude'] as const)('%s starts in ask mode and only bypasses after explicit selection', async agent => {
+    mockPermissions(agent)
+    localStorage.setItem('settings:permissionMode', 'bypassPermissions')
+    const { view } = setup()
+    const rendered = render(view('A'))
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: agent } })
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'bypassPermissions' } })
+    expect(screen.getByTestId('bypass-permissions-notice')).toHaveTextContent('collaborators with control')
+    fireEvent.click(screen.getByTestId('start-chat-button'))
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.start`, { worktreeId: 'A', model: 'default', permissionMode: 'bypassPermissions' }))
+    rendered.rerender(view('B'))
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+  })
+
+  it.each(['codex', 'claude'] as const)('%s restores mode and saves idle settings without sending a turn', async agent => {
+    mockPermissions(agent, 'idle', 'bypassPermissions')
+    const { view } = setup()
+    render(view('A', 'saved', agent))
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    expect(screen.queryByTestId('claude-permission-rules-notice')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'default' } })
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.updateSettings`, { sessionId: 'saved', permissionMode: 'default' }))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    if (agent === 'claude') expect(screen.getByTestId('claude-permission-rules-notice')).toHaveTextContent('a hook can resolve a request automatically')
+    else expect(screen.queryByTestId('claude-permission-rules-notice')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByTestId(`${agent}-model-select`), { target: { value: 'available' } })
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.updateSettings`, { sessionId: 'saved', model: 'available' }))
+    expect(rpcRequest.mock.calls.some(([method]) => method.endsWith('.send'))).toBe(false)
+  })
+
+  it.each(['codex', 'claude'] as const)('%s disables settings and can stop while waiting for permission', async agent => {
+    mockPermissions(agent, 'running')
+    const { view } = setup()
+    render(view('A', 'saved', agent))
+    await screen.findByTestId('stop-agent-button')
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    expect(screen.getByTestId(`${agent}-model-select`)).toBeDisabled()
+    fireEvent.click(screen.getByTestId('stop-agent-button'))
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.cancel`, { sessionId: 'saved' }))
+  })
+
+  it.each(['codex', 'claude'] as const)('%s follows the persisted new-chat default while retaining per-draft overrides', async agent => {
+    mockPermissions(agent)
+    localStorage.setItem('settings:defaultPermissionMode', JSON.stringify('bypassPermissions'))
+    const { view } = setup({ useStoredSettings: true })
+    const rendered = render(view('A'))
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: agent } })
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'default' } })
+    fireEvent.change(screen.getByTestId('agent-select'), { target: { value: agent === 'codex' ? 'claude' : 'codex' } })
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    expect(localStorage.getItem('settings:defaultPermissionMode')).toBe(JSON.stringify('bypassPermissions'))
+    rendered.rerender(view('B'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+  })
+
+  it('keeps a saved normal chat unchanged when the global new-chat preference is bypass', async () => {
+    mockPermissions('codex', 'idle', 'default')
+    const { view, store } = setup({ permissionMode: 'bypassPermissions' })
+    const rendered = render(view('A', 'saved'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    act(() => store.set(defaultModelAtom, 'claude'))
+    expect(screen.getByTestId('agent-select')).toHaveValue('codex')
+    rendered.rerender(view('B'))
+    expect(screen.getByTestId('agent-select')).toHaveValue('claude')
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions')
+  })
+
+  it('keeps settings disabled until Stop finishes, even after cancelled status arrives', async () => {
+    mockPermissions('claude', 'running')
+    let status = 'running'
+    const stopped = deferred<object>()
+    const callbacks: Array<(payload: { sessionId: string }) => void> = []
+    onNotification.mockImplementation(async (method, callback) => { if (method === 'sessionStatus') callbacks.push(callback); return () => {} })
+    const normal = rpcRequest.getMockImplementation()!
+    rpcRequest.mockImplementation((method, params) => {
+      if (method === 'claude.cancel') return stopped.promise
+      if (method === 'claude.get') return Promise.resolve({ agentType: 'claude', status, model: 'default', permissionMode: 'default' })
+      return normal(method, params)
+    })
+    const { view } = setup()
+    render(view('A', 'saved', 'claude'))
+    await screen.findByTestId('stop-agent-button')
+    fireEvent.click(screen.getByTestId('stop-agent-button'))
+    status = 'cancelled'
+    act(() => callbacks.forEach(callback => callback({ sessionId: 'saved' })))
+    await waitFor(() => expect(screen.getByTestId('stop-agent-button')).toHaveTextContent('Stopping'))
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    expect(screen.getByTestId('claude-model-select')).toBeDisabled()
+    await act(async () => { stopped.resolve({}); await stopped.promise })
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+  })
+
+  it('reverts failed settings and shows the reason', async () => {
+    mockPermissions('codex')
+    const normal = rpcRequest.getMockImplementation()!
+    rpcRequest.mockImplementation((method, params) => method === 'codex.updateSettings' ? Promise.reject(new Error('The task is already running')) : normal(method, params))
+    const { view } = setup()
+    render(view('A', 'saved'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'bypassPermissions' } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('The task is already running')
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+  })
+
+  it('keeps the next chat settings and loading state when an old save finishes', async () => {
+    mockPermissions('codex')
+    const old = deferred<object>()
+    const normal = rpcRequest.getMockImplementation()!
+    rpcRequest.mockImplementation((method, params) => method === 'codex.updateSettings' ? old.promise : normal(method, params))
+    const { view } = setup()
+    const rendered = render(view('A', 'old'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    fireEvent.change(screen.getByTestId('permission-mode-select'), { target: { value: 'bypassPermissions' } })
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    rendered.rerender(view('A', 'new'))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toBeEnabled())
+    await act(async () => { old.resolve({}); await old.promise })
+    expect(screen.getByTestId('permission-mode-select')).toHaveValue('default')
+    expect(screen.queryByText('Saving settings…')).not.toBeInTheDocument()
   })
 })

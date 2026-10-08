@@ -19,6 +19,7 @@ test('Codex: repository → isolated worktree → live task → diff → checkpo
       } catch { /* non-JSON is not evidence */ }
     }))
     const workspace = await createWorkspace(page, instance, testInfo)
+    await page.getByTestId('permission-mode-select').selectOption('default')
     await expect(page.getByTestId('active-agent')).toHaveText('Codex')
     const availableModels = await instance.rpc<Array<{ model: string; isDefault: boolean }>>('codex.models')
     expect(availableModels.length).toBeGreaterThan(0)

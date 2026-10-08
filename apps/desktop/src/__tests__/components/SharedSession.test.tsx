@@ -39,6 +39,7 @@ beforeEach(() => {
     if (method === 'claude.get') return { agentType: 'claude', status: 'idle', model: 'default' }
     if (method === 'claude.getMessages') return []
     if (method === 'collaboration.status') return { enabled: true, machineId: 'machine-a', name: 'Gorka' }
+    if (method === 'approval.list') return []
     return {}
   })
 })
@@ -51,6 +52,9 @@ describe("a collaborator's view of the host's session", () => {
     expect(screen.getByRole('button', { name: 'Send task' })).toHaveAttribute('title', expect.stringContaining('view only'))
     expect(screen.queryByTestId('save-checkpoint')).not.toBeInTheDocument()
     expect(screen.getByTestId('shared-session-host')).toHaveTextContent('running on Gorka')
+    // Approvals and permission modes stay with the host.
+    expect(screen.queryByTestId('permission-mode-select')).not.toBeInTheDocument()
+    expect(rpcRequest).not.toHaveBeenCalledWith('approval.list', expect.anything())
     // The host runs the agent, so its catalog is the one shown.
     expect(rpcRequest).toHaveBeenCalledWith('claude.models', { worktreeId: 'w1' })
   })

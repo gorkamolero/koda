@@ -33,6 +33,7 @@ function mapStatusToToolState(status?: string, hasResult?: boolean): AIElementsT
   if (status === 'pending') return 'input-streaming'
   if (status === 'running') return 'input-available'
   if (status === 'error') return 'output-error'
+  if (status === 'cancelled') return 'output-denied'
   if (hasResult) return 'output-available'
   return 'input-available'
 }
@@ -57,6 +58,7 @@ function ToolBlock({ block, result }: { block: ToolUseContentBlock; result?: Too
         type="dynamic-tool"
         toolName={toolName}
         state={toolState}
+        statusLabel={block.status === 'cancelled' ? 'Stopped' : undefined}
         title={getToolTitle(toolName, block.input)}
       />
       <ToolContent>

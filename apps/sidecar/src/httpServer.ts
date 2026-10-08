@@ -23,7 +23,7 @@ function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) return true; // Allow non-browser requests
   return config.corsOrigins.some((allowed) => {
     if (allowed === '*') return true;
-    return origin === allowed || origin.startsWith(allowed);
+    return origin === allowed;
   });
 }
 
@@ -31,8 +31,9 @@ function isOriginAllowed(origin: string | undefined): boolean {
  * Set CORS headers on response
  */
 function setCorsHeaders(res: http.ServerResponse, origin: string | undefined): void {
-  const allowedOrigin = origin && isOriginAllowed(origin) ? origin : config.corsOrigins[0];
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Vary', 'Origin');
+  if (!origin || !isOriginAllowed(origin)) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -116,7 +117,11 @@ export class HttpRpcServer {
   private setupWebSocket(): void {
     if (!this.server) return;
 
-    this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
+    this.wss = new WebSocketServer({
+      server: this.server,
+      path: '/ws',
+      verifyClient: ({ req }: { req: http.IncomingMessage }) => isOriginAllowed(req.headers.origin),
+    });
 
     this.wss.on('connection', (ws, req) => {
       // Verify auth token from query string
@@ -196,6 +201,13 @@ export class HttpRpcServer {
     res: http.ServerResponse
   ): Promise<void> {
     const origin = req.headers.origin;
+
+    // CORS headers alone cannot prevent a simple cross-origin POST from
+    // executing. Reject it before reading or dispatching any RPC request.
+    if (!isOriginAllowed(origin)) {
+      sendJson(res, 403, { error: 'Forbidden: Origin is not allowed' });
+      return;
+    }
 
     // Set CORS headers on all responses
     setCorsHeaders(res, origin);
