@@ -24,7 +24,6 @@ const __dirname = path.dirname(__filename)
 
 // Test configuration - matches playwright.config.ts
 const TEST_HTTP_RPC_PORT = 3848
-const TEST_VITE_PORT = 1421
 
 /**
  * Make an RPC call to the sidecar via HTTP
@@ -164,9 +163,6 @@ function killSidecar(): boolean {
   }
 }
 
-// Keep track of spawned sidecar processes
-let spawnedSidecar: ChildProcess | null = null
-
 /**
  * Spawn a new sidecar process
  * Used to restart the sidecar after killing it in tests
@@ -209,7 +205,6 @@ function spawnSidecar(): ChildProcess | null {
 
     // Unref so the process doesn't block the test from exiting
     child.unref()
-    spawnedSidecar = child
     
     console.log(`Spawned sidecar with PID: ${child.pid}`)
     return child

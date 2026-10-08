@@ -75,7 +75,6 @@ interface Worktree {
  */
 
 // Timeouts for various operations
-const NAVIGATION_TIMEOUT = 15000
 const ELEMENT_TIMEOUT = 10000
 
 // Test data created in beforeAll
@@ -105,38 +104,6 @@ async function navigateToChangesTab(page: Page): Promise<void> {
  */
 async function getDiffFileEntries(page: Page) {
   return page.locator('[data-testid^="diff-file-"]')
-}
-
-/**
- * Navigate to first available worktree
- * Returns false if no worktrees exist
- */
-async function navigateToFirstWorktree(page: Page): Promise<boolean> {
-  // Wait for the sidebar to show workspaces
-  await page.waitForSelector('text=REPOS', { timeout: NAVIGATION_TIMEOUT }).catch(() => {
-    // May not have repos yet - continue anyway
-  })
-
-  // Find worktree links in the sidebar
-  const worktreeLinks = page.locator('a[href*="/workspace/"]')
-  const count = await worktreeLinks.count()
-
-  if (count === 0) {
-    return false
-  }
-
-  // Click the first worktree link
-  await worktreeLinks.first().click()
-
-  // Wait for the workspace view to load
-  await page.waitForURL(/\/workspace\/.*\/.*/, { timeout: NAVIGATION_TIMEOUT })
-
-  // Wait for the right sidebar to be visible
-  await expect(page.getByTestId('right-sidebar')).toBeVisible({
-    timeout: ELEMENT_TIMEOUT,
-  })
-
-  return true
 }
 
 test.describe('Multi-File Diff Review', () => {
