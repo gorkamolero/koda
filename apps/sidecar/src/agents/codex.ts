@@ -3,20 +3,22 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import { Codex, type Thread, type ThreadEvent, type ThreadOptions, type Usage } from '@openai/codex-sdk';
+import { runCodexTurn, type CodexEvent, type CodexUsage, type CodexPermissionMode } from './codexTransport.js';
+import { getApprovalBroker, SessionPermissionModeSchema, normalizePermissionMode } from './approvalBroker.js';
 import { getDb } from '../db/index.js';
 import { sessions, sessionMessages, worktrees } from '../db/schema.js';
 import { getNotificationEmitter } from '../rpc/notifications.js';
 import type { ClaudeStreamEvent } from './claude.js';
-import { resolveCodexPath } from './codexModels.js';
 
 const DEFAULT_MODEL = 'default';
+export const PermissionModeSchema = SessionPermissionModeSchema;
 export const StartSessionSchema = z.object({
   worktreeId: z.string().uuid().optional(),
   workspaceId: z.string().uuid().optional(), // Legacy name for a worktree ID.
   workingDirectory: z.string().optional(),
   model: z.string().optional(),
   skipGitRepoCheck: z.boolean().optional(),
+  permissionMode: PermissionModeSchema.optional(),
 }).refine(input => !!(input.worktreeId || input.workspaceId), 'worktreeId is required');
 export const SendMessageSchema = z.object({
   sessionId: z.string().uuid(), message: z.string().min(1), stream: z.boolean().optional(), model: z.string().min(1).optional(),
@@ -26,6 +28,9 @@ export const ResumeSessionSchema = z.object({
   sessionId: z.string().uuid(), threadId: z.string().optional(),
   workspaceId: z.string().uuid().optional(), workingDirectory: z.string().optional(), model: z.string().optional(),
 });
+export const UpdateSettingsSchema = z.object({
+  sessionId: z.string().uuid(), model: z.string().min(1).optional(), permissionMode: PermissionModeSchema.optional(),
+}).refine(input => input.model !== undefined || input.permissionMode !== undefined, 'A model or permission mode is required');
 export const CancelSessionSchema = z.object({ sessionId: z.string().uuid() });
 export const GetSessionSchema = CancelSessionSchema;
 export const ListSessionsSchema = z.object({ worktreeId: z.string().uuid() });
@@ -38,7 +43,7 @@ export type CodexGetSessionInput = z.infer<typeof GetSessionSchema>;
 export type SessionStatus = 'idle' | 'running' | 'cancelled';
 export interface CodexSession {
   id: string; sessionId: string; worktreeId: string; workspaceId: string; workingDirectory: string;
-  agentType: 'codex'; model: string; status: SessionStatus; threadId: string | null;
+  agentType: 'codex'; model: string; permissionMode: CodexPermissionMode; status: SessionStatus; threadId: string | null;
   createdAt: Date; updatedAt: Date;
 }
 export interface SendMessageResponse {
@@ -46,27 +51,17 @@ export interface SendMessageResponse {
   usage?: { inputTokens: number; cachedInputTokens: number; outputTokens: number };
 }
 export interface CancelSessionResponse { success: boolean; sessionId: string }
-export type StreamEvent = ThreadEvent;
+export type StreamEvent = CodexEvent;
 export interface StoredCodexMessage { id: string; index: number; timestamp: number; event: ClaudeStreamEvent }
-interface InternalSession extends CodexSession { thread: Thread; abortController?: AbortController }
+interface InternalSession extends CodexSession { abortController?: AbortController }
 
 export class CodexHandler {
   private sessions = new Map<string, InternalSession>();
-
-  private options(workingDirectory: string, model: string): ThreadOptions {
-    return {
-      workingDirectory,
-      ...(model !== DEFAULT_MODEL ? { model } : {}),
-      // The agent may edit this worktree; interactive approvals are unavailable in SDK turns.
-      sandboxMode: 'workspace-write', approvalPolicy: 'never',
-    };
-  }
-
-  private client(): Codex {
-    return new Codex({ codexPathOverride: resolveCodexPath() });
-  }
+  private turns = new Map<string, Promise<void>>();
+  private stopping = false;
 
   async startSession(input: CodexStartInput): Promise<CodexSession> {
+    if (this.stopping) throw new Error('Codex handler is stopping');
     const worktreeId = input.worktreeId ?? input.workspaceId!;
     const worktree = getDb().select().from(worktrees).where(eq(worktrees.id, worktreeId)).get();
     if (!worktree?.worktreePath) throw new Error('Worktree not found');
@@ -75,15 +70,15 @@ export class CodexHandler {
       throw new Error('Working directory must match the selected worktree');
     }
     const model = input.model || DEFAULT_MODEL;
-    const thread = this.client().startThread(this.options(workingDirectory, model));
+    const permissionMode = input.permissionMode ?? 'default';
     const id = randomUUID();
     const now = new Date();
     const session: InternalSession = {
       id, sessionId: id, worktreeId, workspaceId: worktreeId, workingDirectory,
-      agentType: 'codex', model, status: 'idle', threadId: thread.id, createdAt: now, updatedAt: now, thread,
+      agentType: 'codex', model, permissionMode, status: 'idle', threadId: null, createdAt: now, updatedAt: now,
     };
     getDb().insert(sessions).values({
-      id, worktreeId, agentType: 'codex', model, status: 'idle', codexThreadId: thread.id,
+      id, worktreeId, agentType: 'codex', model, permissionMode, status: 'idle', codexThreadId: null,
       createdAt: now.toISOString(), updatedAt: now.toISOString(),
     }).run();
     getDb().update(worktrees).set({ activeSessionId: id }).where(eq(worktrees.id, worktreeId)).run();
@@ -92,6 +87,7 @@ export class CodexHandler {
   }
 
   private load(sessionId: string): InternalSession {
+    if (this.stopping) throw new Error('Codex handler is stopping');
     const active = this.sessions.get(sessionId);
     if (active) return active;
     const row = getDb().select().from(sessions).where(and(eq(sessions.id, sessionId), eq(sessions.agentType, 'codex'))).get();
@@ -100,13 +96,12 @@ export class CodexHandler {
     if (!worktree?.worktreePath) throw new Error('Worktree not found');
     const workingDirectory = realpathSync(worktree.worktreePath);
     const model = row.model || DEFAULT_MODEL;
-    const codex = this.client();
-    const options = this.options(workingDirectory, model);
-    const thread = row.codexThreadId ? codex.resumeThread(row.codexThreadId, options) : codex.startThread(options);
+    // Historical/unknown modes never opt a session into bypass.
+    const permissionMode = normalizePermissionMode(row.permissionMode);
     const session: InternalSession = {
       id: row.id, sessionId: row.id, worktreeId: row.worktreeId, workspaceId: row.worktreeId,
-      workingDirectory, agentType: 'codex', model, status: 'idle', threadId: row.codexThreadId,
-      createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt), thread,
+      workingDirectory, agentType: 'codex', model, permissionMode, status: 'idle', threadId: row.codexThreadId,
+      createdAt: new Date(row.createdAt), updatedAt: new Date(row.updatedAt),
     };
     // A crashed or stopped process cannot still have an active turn.
     if (row.status === 'running') getDb().update(sessions).set({ status: 'idle' }).where(eq(sessions.id, row.id)).run();
@@ -133,9 +128,22 @@ export class CodexHandler {
   }
   async cancelSession(input: CodexCancelInput): Promise<CancelSessionResponse> {
     const session = this.load(input.sessionId);
+    const finished = this.turns.get(session.id);
+    getApprovalBroker().denySession(session.id, 'Codex turn cancelled');
     session.abortController?.abort();
-    this.status(session, 'cancelled');
+    if (finished) await finished;
+    else this.status(session, 'cancelled');
     return { success: true, sessionId: session.id };
+  }
+
+  async updateSettings(input: z.infer<typeof UpdateSettingsSchema>): Promise<CodexSession> {
+    const session = this.load(input.sessionId);
+    if (session.status === 'running' || session.abortController) throw new Error('Cannot change settings during a running turn');
+    if (input.model) session.model = input.model;
+    if (input.permissionMode) session.permissionMode = input.permissionMode;
+    session.updatedAt = new Date();
+    getDb().update(sessions).set({ model: session.model, permissionMode: session.permissionMode, updatedAt: session.updatedAt.toISOString() }).where(eq(sessions.id, session.id)).run();
+    return this.publicSession(session);
   }
 
   private status(session: InternalSession, status: SessionStatus): void {
@@ -161,9 +169,6 @@ export class CodexHandler {
     if (session.status === 'running') throw new Error('Session is already running');
     if (session.abortController) throw new Error('Previous turn is still stopping');
     if (input.model && input.model !== session.model) {
-      const codex = this.client();
-      const options = this.options(session.workingDirectory, input.model);
-      session.thread = session.threadId ? codex.resumeThread(session.threadId, options) : codex.startThread(options);
       session.model = input.model;
       getDb().update(sessions).set({ model: session.model }).where(eq(sessions.id, session.id)).run();
     }
@@ -173,15 +178,22 @@ export class CodexHandler {
     getDb().update(sessions).set({ title: input.message.slice(0, 80), lastUserMessageAt: new Date().toISOString() }).where(eq(sessions.id, session.id)).run();
     const textByItem = new Map<string, string>();
     let completed = false;
+    let finish!: () => void;
+    const finished = new Promise<void>(resolve => { finish = resolve; });
+    this.turns.set(session.id, finished);
     try {
-      const stream = await session.thread.runStreamed(input.message, { signal: session.abortController.signal });
-      for await (const event of stream.events) {
+      const stream = runCodexTurn({
+        threadId: session.threadId, workingDirectory: session.workingDirectory, model: session.model,
+        permissionMode: session.permissionMode, message: input.message, signal: session.abortController.signal,
+        approve: request => getApprovalBroker().request({ ...request, sessionId: session.id, agentType: 'codex' }),
+      });
+      for await (const event of stream) {
         if (event.type === 'thread.started') {
           session.threadId = event.thread_id;
           getDb().update(sessions).set({ codexThreadId: event.thread_id }).where(eq(sessions.id, session.id)).run();
         } else if (event.type === 'item.started' || event.type === 'item.updated' || event.type === 'item.completed') {
           const item = event.item;
-          if (item.type === 'agent_message') {
+          if (item.type === 'agent_message' && typeof item.text === 'string') {
             const previous = textByItem.get(item.id) ?? '';
             if (item.text !== previous) {
               const prefix = !previous && textByItem.size > 0 ? '\n\n' : '';
@@ -196,12 +208,10 @@ export class CodexHandler {
         } else if (event.type === 'turn.completed') {
           completed = true;
           const usage = event.usage;
-          getDb().update(sessions).set({ contextTokenCount: usage.input_tokens + usage.output_tokens }).where(eq(sessions.id, session.id)).run();
+          if (usage) getDb().update(sessions).set({ contextTokenCount: usage.input_tokens + usage.output_tokens }).where(eq(sessions.id, session.id)).run();
           this.emit(session, turnId, { type: 'result', result: [...textByItem.values()].join('\n\n'), usage });
         } else if (event.type === 'turn.failed') {
           throw new Error(event.error.message);
-        } else if (event.type === 'error') {
-          throw new Error(event.message);
         }
         yield event;
       }
@@ -214,20 +224,27 @@ export class CodexHandler {
       }
       throw error;
     } finally {
-      const cancelled = session.abortController.signal.aborted;
-      session.abortController = undefined;
-      this.status(session, cancelled ? 'cancelled' : 'idle');
+      try {
+        getApprovalBroker().denySession(session.id, 'Codex turn ended');
+        const cancelled = session.abortController.signal.aborted;
+        if (cancelled && !completed) this.emit(session, turnId, { type: 'result', result: 'Cancelled', cancelled: true });
+        session.abortController = undefined;
+        this.status(session, cancelled ? 'cancelled' : 'idle');
+      } finally {
+        this.turns.delete(session.id);
+        finish();
+      }
     }
   }
 
   async sendMessage(input: CodexSendInput, turnId = randomUUID()): Promise<SendMessageResponse> {
     const items: unknown[] = [];
     let response = '';
-    let usage: Usage | undefined;
+    let usage: CodexUsage | undefined;
     for await (const event of this.sendMessageStreamed(input, turnId)) {
       if (event.type === 'item.completed') {
         items.push(event.item);
-        if (event.item.type === 'agent_message') response += (response ? '\n\n' : '') + event.item.text;
+        if (event.item.type === 'agent_message' && typeof event.item.text === 'string') response += (response ? '\n\n' : '') + event.item.text;
       }
       if (event.type === 'turn.completed') usage = event.usage;
     }
@@ -243,12 +260,17 @@ export class CodexHandler {
     void this.sendMessage(input, turnId).catch(() => { /* failure is persisted and emitted above */ });
     return { sessionId: session.id, status: 'running', turnId };
   }
-  cleanup(): void {
-    for (const session of this.sessions.values()) session.abortController?.abort();
+  async cleanup(): Promise<void> {
+    this.stopping = true;
+    for (const session of this.sessions.values()) {
+      getApprovalBroker().denySession(session.id, 'Codex handler stopped');
+      session.abortController?.abort();
+    }
+    await Promise.allSettled([...this.turns.values()]);
     this.sessions.clear();
   }
   private publicSession(session: InternalSession): CodexSession {
-    const { thread: _thread, abortController: _abort, ...result } = session;
+    const { abortController: _abort, ...result } = session;
     return result;
   }
 }
@@ -261,3 +283,5 @@ export async function getCodexSession(input: CodexGetSessionInput) { return getC
 export async function listCodexSessions(input: z.infer<typeof ListSessionsSchema>) { return getCodexHandler().listSessions(input); }
 export async function getCodexMessages(input: z.infer<typeof GetMessagesSchema>) { return getCodexHandler().getMessages(input); }
 export async function sendCodexMessage(input: CodexSendInput) { return input.stream ? getCodexHandler().startTurn(input) : getCodexHandler().sendMessage(input); }
+
+export async function updateCodexSettings(input: z.infer<typeof UpdateSettingsSchema>) { return getCodexHandler().updateSettings(input); }

@@ -1,10 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { ClaudeHandler, ClaudeStartParamsSchema, claudeWorkspacePermissions } from '../src/agents/claude.js';
+import { ClaudeHandler, ClaudeStartParamsSchema, ClaudeUpdateSettingsParamsSchema, claudeToolPermissions } from '../src/agents/claude.js';
+import { ApprovalBroker } from '../src/agents/approvalBroker.js';
 import { initDbWithMigrations, resetDb, getDb } from '../src/db/index.js';
 import { repos, worktrees, sessions } from '../src/db/schema.js';
 import { getNotificationEmitter } from '../src/rpc/notifications.js';
@@ -36,6 +37,7 @@ describe('durable Claude runtime', () => {
   let directory: string;
   let databasePath: string;
   let worktreeId: string;
+  let approvals: ApprovalBroker;
   beforeEach(() => {
     vi.clearAllMocks();
     directory = mkdtempSync(join(tmpdir(), 'koda-claude-unit-'));
@@ -45,9 +47,10 @@ describe('durable Claude runtime', () => {
     getDb().insert(repos).values({ id: repoId, rootPath: directory }).run();
     getDb().insert(worktrees).values({ id: worktreeId, repoId, worktreePath: directory }).run();
     mocks.query.mockImplementation(() => fakeQuery());
-    handler = new ClaudeHandler();
+    approvals = new ApprovalBroker({ notify: () => {} });
+    handler = new ClaudeHandler(approvals);
   });
-  afterEach(async () => { await handler.dispose(); resetDb(); rmSync(directory, { recursive: true, force: true }); vi.restoreAllMocks(); });
+  afterEach(async () => { approvals.dispose(); await handler.dispose(); resetDb(); rmSync(directory, { recursive: true, force: true }); vi.restoreAllMocks(); });
 
   it('creates an idle persisted session and uses CLI defaults without changing auth', async () => {
     expect(ClaudeStartParamsSchema.safeParse({}).success).toBe(false);
@@ -57,7 +60,7 @@ describe('durable Claude runtime', () => {
     await handler.send({ sessionId: session.id, message: 'Task' });
     const options = mocks.query.mock.calls[0][0].options;
     expect(options).toMatchObject({ pathToClaudeCodeExecutable: '/trusted/claude', includePartialMessages: true, persistSession: true,
-      permissionMode: 'default', settingSources: ['user', 'project', 'local'], sandbox: { enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false } });
+      permissionMode: 'default', settingSources: ['user', 'project', 'local'], sandbox: { enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: true } });
     expect(options).not.toHaveProperty('model');
     expect(options).not.toHaveProperty('env');
     expect(options).not.toHaveProperty('allowDangerouslySkipPermissions');
@@ -175,28 +178,115 @@ describe('durable Claude runtime', () => {
     expect(() => handler.getMessages(randomUUID())).toThrow('not found');
   });
 
-  it('allows scoped file changes and sandboxed commands while denying escaping paths and interactive requests', async () => {
-    const permissions = claudeWorkspacePermissions(resolve(directory));
-    const options = { signal: new AbortController().signal, toolUseID: 'test' };
-    expect(await permissions('Write', { file_path: join(directory, 'new/file.txt') }, options)).toMatchObject({ behavior: 'allow' });
-    expect(await permissions('Write', { file_path: `${directory}-other/file.txt` }, options)).toMatchObject({ behavior: 'deny' });
-    expect(await permissions('Write', { file_path: '../escape.txt' }, options)).toMatchObject({ behavior: 'deny' });
-    mkdirSync(join(directory, 'sub'));
-    symlinkSync(tmpdir(), join(directory, 'sub/escape'));
-    expect(await permissions('Edit', { file_path: join(directory, 'sub/escape/file.txt') }, options)).toMatchObject({ behavior: 'deny' });
-    expect(await permissions('Bash', { command: 'wc -c file.txt' }, options)).toMatchObject({ behavior: 'allow' });
-    expect(await permissions('Bash', { command: 'pwd', dangerouslyDisableSandbox: true }, options)).toMatchObject({ behavior: 'deny' });
-    expect(await permissions('ExitPlanMode', {}, options)).toMatchObject({ behavior: 'deny' });
+  it('queues every SDK permission ask, including workspace operations and unsandboxed retries', async () => {
+    const session = await handler.start({ worktreeId });
+    const permissions = claudeToolPermissions(session.id, new AbortController().signal, approvals);
+    const options = { signal: new AbortController().signal, toolUseID: 'tool-1', requestId: 'request-1',
+      matchedAskRule: { source: 'user', toolName: 'Write' }, title: 'Claude wants to change a file', blockedPath: '/outside/file.txt' };
+    for (const [tool, input] of [
+      ['Write', { file_path: join(directory, 'new/file.txt'), content: 'Inside' }],
+      ['Edit', { file_path: '/outside/file.txt', old_string: '', new_string: 'Outside' }],
+      ['Bash', { command: 'pwd' }],
+      ['Bash', { command: 'pwd', dangerouslyDisableSandbox: true }],
+      ['ExitPlanMode', {}],
+    ] as const) {
+      const result = permissions(tool, input, options);
+      const [pending] = approvals.list(session.id);
+      expect(pending).toMatchObject({ agentType: 'claude', toolName: tool, input, toolUseId: 'tool-1' });
+      expect(pending.reason).toContain('Claude wants to change a file');
+      approvals.respond({ sessionId: session.id, approvalId: pending.id, decision: 'allow' });
+      expect(await result).toEqual({ behavior: 'allow', updatedInput: input, toolUseID: 'tool-1' });
+    }
   });
 
-  it('accepts files inside a symlinked worktree root without accepting neighboring files', async () => {
-    const realRoot = join(directory, 'actual-worktree');
-    const alias = join(directory, 'worktree-alias');
-    mkdirSync(realRoot); symlinkSync(realRoot, alias);
-    const permissions = claudeWorkspacePermissions(alias);
-    const options = { signal: new AbortController().signal, toolUseID: 'test' };
-    expect(await permissions('Write', { file_path: join(alias, 'nested/new.txt') }, options)).toMatchObject({ behavior: 'allow' });
-    expect(await permissions('Write', { file_path: join(realRoot, 'new.txt') }, options)).toMatchObject({ behavior: 'allow' });
-    expect(await permissions('Write', { file_path: join(directory, 'neighbor.txt') }, options)).toMatchObject({ behavior: 'deny' });
+  it('passes denial and SDK cancellation back to the exact tool call', async () => {
+    const session = await handler.start({ worktreeId });
+    const permissions = claudeToolPermissions(session.id, new AbortController().signal, approvals);
+    const controller = new AbortController();
+    const options = { signal: controller.signal, toolUseID: 'tool-1', requestId: 'request-1' };
+    const denied = permissions('Write', { file_path: '/outside/file.txt' }, options);
+    approvals.respond({ sessionId: session.id, approvalId: approvals.list()[0].id, decision: 'deny' });
+    expect(await denied).toMatchObject({ behavior: 'deny', message: 'Denied by user', toolUseID: 'tool-1' });
+    const aborted = permissions('Write', { file_path: '/outside/file.txt' }, options);
+    controller.abort();
+    expect(await aborted).toMatchObject({ behavior: 'deny', toolUseID: 'tool-1' });
+    expect(approvals.list()).toEqual([]);
+  });
+
+  it('ends unsupported structured questions promptly and exposes the actual question', async () => {
+    const report = vi.fn();
+    const permissions = claudeToolPermissions(randomUUID(), new AbortController().signal, approvals, report);
+    const result = await permissions('AskUserQuestion', { questions: [{ question: 'Which color?' }] }, {
+      signal: new AbortController().signal, toolUseID: 'question-1', requestId: 'request-1',
+    });
+    expect(result).toMatchObject({ behavior: 'deny', interrupt: true });
+    expect(report).toHaveBeenCalledWith(expect.stringContaining('Which color?'));
+    expect(approvals.list()).toEqual([]);
+  });
+
+  it('persists explicit bypass settings per session across restart and can return to default', async () => {
+    const session = await handler.start({ worktreeId, permissionMode: 'bypassPermissions' });
+    const other = await handler.start({ worktreeId });
+    expect(other.permissionMode).toBe('default');
+    await handler.send({ sessionId: session.id, message: 'Full access task' });
+    expect(mocks.query.mock.calls[0][0].options).toMatchObject({ permissionMode: 'bypassPermissions', allowDangerouslySkipPermissions: true, sandbox: { enabled: false } });
+    expect(mocks.query.mock.calls[0][0].options.canUseTool).toBeTypeOf('function');
+    await handler.dispose(); resetDb(); initDbWithMigrations(databasePath); handler = new ClaudeHandler(approvals);
+    expect(handler.getSession(session.id).permissionMode).toBe('bypassPermissions');
+    expect((await handler.updateSettings(session.id, { permissionMode: 'default' })).permissionMode).toBe('default');
+    await handler.send({ sessionId: session.id, message: 'Restricted task' });
+    const options = mocks.query.mock.calls[1][0].options;
+    expect(options).toMatchObject({ permissionMode: 'default', sandbox: { enabled: true, allowUnsandboxedCommands: true } });
+    expect(options).not.toHaveProperty('allowDangerouslySkipPermissions');
+    getDb().update(sessions).set({ permissionMode: 'auto-approve' }).where(eq(sessions.id, session.id)).run();
+    expect(handler.getSession(session.id).permissionMode).toBe('default');
+    expect(ClaudeStartParamsSchema.safeParse({ worktreeId, permissionMode: 'auto-approve' }).success).toBe(false);
+    expect(ClaudeUpdateSettingsParamsSchema.safeParse({ sessionId: session.id }).success).toBe(false);
+  });
+
+  it('keeps explicit asks in bypass mode and clears pending approvals when the turn stops', async () => {
+    let response: unknown;
+    mocks.query.mockImplementationOnce(({ options }) => Object.assign((async function* () {
+      response = await options.canUseTool('Bash', { command: 'outside-task', dangerouslyDisableSandbox: true }, {
+        signal: new AbortController().signal, toolUseID: 'ask-1', requestId: 'request-1', decisionReason: 'Explicit user ask rule',
+      });
+      yield result;
+    })(), { close: vi.fn() }));
+    const session = await handler.start({ worktreeId, permissionMode: 'bypassPermissions' });
+    handler.startTurn({ sessionId: session.id, message: 'Task' });
+    expect(approvals.list(session.id)).toHaveLength(1);
+    const pending = approvals.list()[0];
+    await expect(handler.updateSettings(session.id, { permissionMode: 'default' })).rejects.toThrow('Wait');
+    await handler.cancel({ sessionId: session.id });
+    await handler.dispose();
+    expect(response).toMatchObject({ behavior: 'deny' });
+    expect(approvals.list()).toEqual([]);
+    expect(() => approvals.respond({ sessionId: session.id, approvalId: pending.id, decision: 'allow' })).toThrow('no longer pending');
+  });
+
+  it('waits for SDK teardown before Stop resolves so settings can save immediately afterward', async () => {
+    let release!: () => void;
+    const teardown = new Promise<void>(resolve => { release = resolve; });
+    mocks.query.mockImplementationOnce(({ options }) => Object.assign((async function* () {
+      await options.canUseTool('Write', { file_path: '/outside/file.txt' }, {
+        signal: options.abortController.signal, toolUseID: 'ask-1', requestId: 'request-1',
+      });
+      await teardown;
+      yield result;
+    })(), { close: vi.fn() }));
+    const session = await handler.start({ worktreeId });
+    handler.startTurn({ sessionId: session.id, message: 'Task' });
+    expect(approvals.list()).toHaveLength(1);
+    let stopped = false;
+    const cancel = handler.cancel({ sessionId: session.id }).then(() => { stopped = true; });
+    try {
+      await Promise.resolve();
+      expect(stopped).toBe(false);
+      expect(approvals.list()).toEqual([]);
+      await expect(handler.updateSettings(session.id, { permissionMode: 'bypassPermissions' })).rejects.toThrow('Wait');
+    } finally { release(); }
+    await cancel;
+    expect((await handler.updateSettings(session.id, { permissionMode: 'bypassPermissions' })).permissionMode).toBe('bypassPermissions');
+    expect(handler.getSession(session.id).status).toBe('cancelled');
   });
 });

@@ -4,15 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { CodexHandler, StartSessionSchema } from '../src/agents/codex.js';
+import { CodexHandler, StartSessionSchema, UpdateSettingsSchema } from '../src/agents/codex.js';
 import { initDbWithMigrations, resetDb, getDb } from '../src/db/index.js';
 import { repos, worktrees, sessions } from '../src/db/schema.js';
 import { getNotificationEmitter } from '../src/rpc/notifications.js';
 
-const mocks = vi.hoisted(() => ({ runStreamed: vi.fn(), startThread: vi.fn(), resumeThread: vi.fn() }));
-vi.mock('@openai/codex-sdk', () => ({
-  Codex: vi.fn(() => ({ startThread: mocks.startThread, resumeThread: mocks.resumeThread })),
-}));
+const mocks = vi.hoisted(() => ({ runTurn: vi.fn() }));
+vi.mock('../src/agents/codexTransport.js', () => ({ runCodexTurn: mocks.runTurn }));
 
 const usage = { input_tokens: 100, cached_input_tokens: 50, output_tokens: 20 };
 async function* success() {
@@ -38,25 +36,23 @@ describe('durable Codex runtime', () => {
     worktreeId = randomUUID();
     getDb().insert(repos).values({ id: repoId, rootPath: directory }).run();
     getDb().insert(worktrees).values({ id: worktreeId, repoId, worktreePath: directory }).run();
-    const thread = { id: null, runStreamed: mocks.runStreamed };
-    mocks.startThread.mockReturnValue(thread);
-    mocks.resumeThread.mockReturnValue(thread);
-    mocks.runStreamed.mockImplementation(async () => ({ events: success() }));
+    mocks.runTurn.mockImplementation(() => success());
     handler = new CodexHandler();
   });
-  afterEach(() => {
-    handler.cleanup();
+  afterEach(async () => {
+    await handler.cleanup();
     resetDb();
     rmSync(directory, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
-  it('requires a worktree and defaults to installed Codex configuration with workspace-write', async () => {
+  it('requires a worktree and creates an idle session with default approval mode', async () => {
     expect(StartSessionSchema.safeParse({}).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ sessionId: randomUUID() }).success).toBe(false);
     const session = await handler.startSession({ worktreeId });
     expect(session.model).toBe('default');
-    expect(mocks.startThread).toHaveBeenCalledWith(expect.objectContaining({ sandboxMode: 'workspace-write', approvalPolicy: 'never' }));
-    expect(mocks.startThread.mock.calls[0][0]).not.toHaveProperty('model');
+    expect(session.permissionMode).toBe('default');
+    expect(mocks.runTurn).not.toHaveBeenCalled();
     expect(getDb().select().from(sessions).get()?.id).toBe(session.id);
   });
 
@@ -82,33 +78,34 @@ describe('durable Codex runtime', () => {
     const session = await handler.startSession({ worktreeId, model: 'test-model' });
     await handler.sendMessage({ sessionId: session.id, message: 'First turn' });
     const before = handler.getMessages({ sessionId: session.id });
-    handler.cleanup();
+    await handler.cleanup();
     resetDb();
     initDbWithMigrations(databasePath);
     handler = new CodexHandler();
     const restored = (await handler.listSessions({ worktreeId }))[0];
     expect(restored.id).toBe(session.id);
     expect(restored.threadId).toBe('sdk-thread-1');
-    expect(mocks.resumeThread).toHaveBeenCalledWith('sdk-thread-1', expect.objectContaining({ model: 'test-model' }));
+    expect(restored.model).toBe('test-model');
     expect(handler.getMessages({ sessionId: session.id })).toEqual(before);
     await handler.sendMessage({ sessionId: session.id, message: 'Continue' });
+    expect(mocks.runTurn).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: 'sdk-thread-1', model: 'test-model' }));
     expect(handler.getMessages({ sessionId: session.id })).toHaveLength(before.length * 2);
   });
 
   it('persists a session that has not sent a first turn yet', async () => {
     const session = await handler.startSession({ worktreeId });
-    handler.cleanup();
+    await handler.cleanup();
     handler = new CodexHandler();
     expect((await handler.getSession({ sessionId: session.id })).id).toBe(session.id);
-    expect(mocks.resumeThread).not.toHaveBeenCalled();
+    expect(mocks.runTurn).not.toHaveBeenCalled();
   });
 
   it('changes the selected model on the existing thread and persists the choice', async () => {
     const session = await handler.startSession({ worktreeId, model: 'model-a' });
     await handler.sendMessage({ sessionId: session.id, message: 'First' });
     await handler.sendMessage({ sessionId: session.id, message: 'Next', model: 'model-b' });
-    expect(mocks.resumeThread).toHaveBeenCalledWith('sdk-thread-1', expect.objectContaining({ model: 'model-b' }));
-    handler.cleanup();
+    expect(mocks.runTurn).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: 'sdk-thread-1', model: 'model-b' }));
+    await handler.cleanup();
     handler = new CodexHandler();
     expect((await handler.getSession({ sessionId: session.id })).model).toBe('model-b');
   });
@@ -124,11 +121,12 @@ describe('durable Codex runtime', () => {
   it('starts a background stream promptly and rejects concurrent local or relay turns', async () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
-    mocks.runStreamed.mockImplementation(async () => ({ events: (async function* () { await gate; yield* success(); })() }));
+    mocks.runTurn.mockImplementation(() => (async function* () { await gate; yield* success(); })());
     const session = await handler.startSession({ worktreeId });
     const accepted = handler.startTurn({ sessionId: session.id, message: 'First' });
     expect(accepted.status).toBe('running');
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('running');
+    await expect(handler.updateSettings({ sessionId: session.id, permissionMode: 'bypassPermissions' })).rejects.toThrow('running turn');
     expect(() => handler.startTurn({ sessionId: session.id, message: 'Racing' })).toThrow('already running');
     release();
     await vi.waitFor(async () => expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle'));
@@ -136,11 +134,11 @@ describe('durable Codex runtime', () => {
 
   it('cancels the actual SDK request and allows a later turn', async () => {
     let signal!: AbortSignal;
-    mocks.runStreamed.mockImplementationOnce(async (_message, options) => {
+    mocks.runTurn.mockImplementationOnce(options => {
       signal = options.signal;
-      return { events: (async function* () {
+      return (async function* () {
         await new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
-      })() };
+      })();
     });
     const session = await handler.startSession({ worktreeId });
     const pending = handler.sendMessage({ sessionId: session.id, message: 'Long task' });
@@ -150,12 +148,15 @@ describe('durable Codex runtime', () => {
     await rejected;
     expect(signal.aborted).toBe(true);
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('cancelled');
+    expect(handler.getMessages({ sessionId: session.id }).filter(row => row.event.cancelled)).toHaveLength(1);
+    expect(handler.getMessages({ sessionId: session.id }).at(-1)?.event).toMatchObject({ type: 'result', result: 'Cancelled', cancelled: true });
+    await expect(handler.updateSettings({ sessionId: session.id, permissionMode: 'bypassPermissions' })).resolves.toMatchObject({ permissionMode: 'bypassPermissions' });
     await handler.sendMessage({ sessionId: session.id, message: 'Try again' });
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle');
   });
 
   it('records failed turns and recovers idle state without inventing completion', async () => {
-    mocks.runStreamed.mockImplementationOnce(async () => ({ events: (async function* () { yield { type: 'turn.failed', error: { message: 'provider unavailable' } }; })() }));
+    mocks.runTurn.mockImplementationOnce(() => (async function* () { yield { type: 'turn.failed', error: { message: 'provider unavailable' } }; })());
     const session = await handler.startSession({ worktreeId });
     await expect(handler.sendMessage({ sessionId: session.id, message: 'Task' })).rejects.toThrow('provider unavailable');
     const events = handler.getMessages({ sessionId: session.id }).map(message => message.event);
@@ -164,10 +165,52 @@ describe('durable Codex runtime', () => {
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle');
   });
 
+  it('waits for the transport to finish closing before shutdown resolves', async () => {
+    let releaseClose!: () => void;
+    const closing = new Promise<void>(resolve => { releaseClose = resolve; });
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      try {
+        await new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
+      } finally { await closing; }
+    })());
+    const session = await handler.startSession({ worktreeId });
+    const turn = handler.sendMessage({ sessionId: session.id, message: 'Long task' });
+    const rejected = expect(turn).rejects.toThrow('aborted');
+    await new Promise(resolve => setImmediate(resolve));
+    let stopped = false;
+    const stop = handler.cleanup().then(() => { stopped = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(stopped).toBe(false);
+    releaseClose();
+    await stop;
+    await rejected;
+    expect(stopped).toBe(true);
+  });
+
+  it('persists explicit bypass and model changes while idle, including after restart', async () => {
+    const session = await handler.startSession({ worktreeId });
+    await handler.updateSettings({ sessionId: session.id, permissionMode: 'bypassPermissions', model: 'chosen' });
+    await handler.cleanup();
+    handler = new CodexHandler();
+    expect(await handler.getSession({ sessionId: session.id })).toMatchObject({ permissionMode: 'bypassPermissions', model: 'chosen' });
+    await handler.sendMessage({ sessionId: session.id, message: 'Task' });
+    expect(mocks.runTurn).toHaveBeenCalledWith(expect.objectContaining({ permissionMode: 'bypassPermissions', model: 'chosen' }));
+    await handler.updateSettings({ sessionId: session.id, permissionMode: 'default' });
+    expect(getDb().select().from(sessions).get()?.permissionMode).toBe('default');
+  });
+
+  it('never interprets legacy permission modes as bypass', async () => {
+    const session = await handler.startSession({ worktreeId });
+    getDb().update(sessions).set({ permissionMode: 'auto-approve' }).where(eq(sessions.id, session.id)).run();
+    await handler.cleanup();
+    handler = new CodexHandler();
+    expect((await handler.getSession({ sessionId: session.id })).permissionMode).toBe('default');
+  });
+
   it('recovers stale running state after process restart', async () => {
     const session = await handler.startSession({ worktreeId });
     getDb().update(sessions).set({ status: 'running' }).where(eq(sessions.id, session.id)).run();
-    handler.cleanup();
+    await handler.cleanup();
     handler = new CodexHandler();
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle');
   });

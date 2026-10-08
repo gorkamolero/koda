@@ -1,7 +1,6 @@
 /** Durable Claude sessions backed by the official Agent SDK and installed CLI. */
 import { randomUUID } from 'node:crypto';
-import { existsSync, realpathSync } from 'node:fs';
-import * as path from 'node:path';
+import { realpathSync } from 'node:fs';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { query, type Options, type Query } from '@anthropic-ai/claude-agent-sdk';
@@ -10,6 +9,7 @@ import { sessions, sessionMessages, worktrees } from '../db/schema.js';
 import { getNotificationEmitter } from '../rpc/notifications.js';
 import { saveCheckpoint } from '../checkpoint/service.js';
 import { resolveClaudePath } from './claudeModels.js';
+import { ApprovalBroker, getApprovalBroker, normalizePermissionMode, SessionPermissionModeSchema, type SessionPermissionMode } from './approvalBroker.js';
 
 // Shared normalized event shape also used by Codex and the collaboration relay.
 export type ClaudeStreamEvent = { type: string; [key: string]: unknown };
@@ -20,6 +20,7 @@ export interface TokenUsage {
 export const ClaudeStartParamsSchema = z.object({
   worktreeId: z.string().uuid().optional(), workspaceId: z.string().uuid().optional(),
   workingDirectory: z.string().optional(), model: z.string().min(1).optional(),
+  permissionMode: SessionPermissionModeSchema.optional(),
   // Accept the old start-with-prompt call while new clients use start then send.
   prompt: z.string().min(1).optional(),
   options: z.object({ model: z.string().optional(), workingDirectory: z.string().optional() }).optional(),
@@ -34,54 +35,52 @@ export const ClaudeResumeParamsSchema = ClaudeGetSessionParamsSchema.extend({ pr
 export const ClaudeGetMessagesParamsSchema = ClaudeGetSessionParamsSchema.extend({ fromIndex: z.number().int().nonnegative().optional() });
 export const ClaudeListParamsSchema = z.object({ worktreeId: z.string().uuid() });
 export const ClaudeContinueParamsSchema = ClaudeGetSessionParamsSchema.extend({ prompt: z.string().min(1) });
-export const ClaudeUpdateSettingsParamsSchema = ClaudeGetSessionParamsSchema.extend({ model: z.string().min(1) });
+export const ClaudeUpdateSettingsParamsSchema = ClaudeGetSessionParamsSchema.extend({
+  model: z.string().min(1).optional(), permissionMode: SessionPermissionModeSchema.optional(),
+}).refine(input => input.model !== undefined || input.permissionMode !== undefined, 'A setting is required');
 export type ClaudeStartParams = z.infer<typeof ClaudeStartParamsSchema>;
 export type ClaudeSendParams = z.infer<typeof ClaudeSendParamsSchema>;
 export type SessionStatus = 'idle' | 'running' | 'cancelled';
 export interface ClaudeSession {
   id: string; sessionId: string; worktreeId: string; workspaceId: string; workingDirectory: string;
-  agentType: 'claude'; model: string; status: SessionStatus; threadId: string | null;
+  agentType: 'claude'; model: string; permissionMode: SessionPermissionMode; status: SessionStatus; threadId: string | null;
   createdAt: string; updatedAt: string;
 }
 export interface StoredMessage { id: string; index: number; timestamp: number; event: ClaudeStreamEvent }
 interface ActiveTurn { controller: AbortController; query?: Query; finished?: Promise<unknown> }
 
-/** Resolve nonexistent targets through their nearest existing parent, including symlinks. */
-function targetWithinWorktree(cwd: string, filename: string): boolean {
-  let existing = path.resolve(cwd, filename);
-  const suffix: string[] = [];
-  while (!existsSync(existing)) {
-    const parent = path.dirname(existing);
-    if (parent === existing) return false;
-    suffix.unshift(path.basename(existing)); existing = parent;
-  }
-  const target = path.resolve(realpathSync(existing), ...suffix);
-  const relative = path.relative(cwd, target);
-  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-}
-
-/** No legacy frontend approval callback: supported workspace tools can run;
- * requests for wider access or interactive approval receive an explicit denial. */
-export function claudeWorkspacePermissions(cwd: string): NonNullable<Options['canUseTool']> {
-  const worktree = realpathSync(cwd);
-  return async (name, input) => {
-    if (['Edit', 'Write', 'NotebookEdit'].includes(name)) {
-      const filename = input.file_path ?? input.notebook_path ?? input.path;
-      if (typeof filename !== 'string' || !targetWithinWorktree(worktree, filename)) {
-        return { behavior: 'deny', message: 'File changes must stay inside the selected worktree.' };
-      }
-      return { behavior: 'allow', updatedInput: input };
+/** The SDK decides which calls need review, including explicit ask rules in bypass mode. */
+export function claudeToolPermissions(
+  sessionId: string,
+  turnSignal: AbortSignal,
+  approvals: ApprovalBroker = getApprovalBroker(),
+  onQuestion: (message: string) => void = message => getNotificationEmitter().emitQueryError(sessionId, message),
+): NonNullable<Options['canUseTool']> {
+  return async (toolName, input, options) => {
+    if (toolName === 'AskUserQuestion') {
+      const questions = Array.isArray(input.questions) ? input.questions
+        .map(question => typeof question === 'object' && question !== null && 'question' in question ? String(question.question) : '')
+        .filter(Boolean).join('\n') : '';
+      const message = `Claude needs your answer${questions ? `:\n${questions}` : '.'}\nStructured question forms are not supported yet. Reply in the chat to continue.`;
+      onQuestion(message);
+      return { behavior: 'deny', interrupt: true, message: `${message} Ask the user directly in ordinary chat instead of using AskUserQuestion.`, toolUseID: options.toolUseID };
     }
-    if (name === 'Bash' && input.dangerouslyDisableSandbox !== true) {
-      // The SDK sandbox below is mandatory; never approve an unsandboxed retry.
-      return { behavior: 'allow', updatedInput: input };
-    }
-    return { behavior: 'deny', message: `The ${name} request requires permission outside this workspace workflow. Explain what is needed in your response.` };
+    const reason = [options.title, options.description, options.decisionReason,
+      options.blockedPath ? `Requested path: ${options.blockedPath}` : undefined].filter(Boolean).join('\n');
+    const result = await approvals.request({
+      sessionId, agentType: 'claude', toolName, input,
+      ...(reason ? { reason } : {}), toolUseId: options.toolUseID,
+      signal: AbortSignal.any([turnSignal, options.signal]),
+    });
+    return result.decision === 'allow'
+      ? { behavior: 'allow', updatedInput: input, toolUseID: options.toolUseID }
+      : { behavior: 'deny', message: result.reason ?? 'Denied by user', toolUseID: options.toolUseID };
   };
 }
 
 export class ClaudeHandler {
   private active = new Map<string, ActiveTurn>();
+  constructor(private readonly approvals: ApprovalBroker = getApprovalBroker()) {}
 
   async start(params: ClaudeStartParams): Promise<ClaudeSession> {
     const worktreeId = params.worktreeId ?? params.workspaceId!;
@@ -94,7 +93,7 @@ export class ClaudeHandler {
     const id = randomUUID();
     const now = new Date().toISOString();
     getDb().insert(sessions).values({ id, worktreeId, agentType: 'claude', model: params.model ?? params.options?.model ?? 'default',
-      status: 'idle', createdAt: now, updatedAt: now }).run();
+      permissionMode: normalizePermissionMode(params.permissionMode), status: 'idle', createdAt: now, updatedAt: now }).run();
     getDb().update(worktrees).set({ activeSessionId: id }).where(eq(worktrees.id, worktreeId)).run();
     if (params.prompt) this.startTurn({ sessionId: id, message: params.prompt, stream: true });
     return this.getSession(id);
@@ -112,6 +111,7 @@ export class ClaudeHandler {
     }
     return { id: row.id, sessionId: row.id, worktreeId: row.worktreeId, workspaceId: row.worktreeId,
       workingDirectory: worktree.worktreePath, agentType: 'claude', model: row.model ?? 'default', status,
+      permissionMode: normalizePermissionMode(row.permissionMode),
       threadId: row.claudeSessionId, createdAt: row.createdAt, updatedAt: row.updatedAt };
   }
 
@@ -202,10 +202,15 @@ export class ClaudeHandler {
         ...(session.threadId ? { resume: session.threadId } : {}),
         ...(session.model === 'default' ? {} : { model: session.model }),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
-        settingSources: ['user', 'project', 'local'], permissionMode: 'default',
-        sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: false,
-          filesystem: { allowWrite: [session.workingDirectory] } },
-        canUseTool: claudeWorkspacePermissions(session.workingDirectory),
+        settingSources: ['user', 'project', 'local'], permissionMode: session.permissionMode,
+        ...(session.permissionMode === 'bypassPermissions'
+          ? { allowDangerouslySkipPermissions: true, sandbox: { enabled: false } }
+          : { sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: true,
+            filesystem: { allowWrite: [session.workingDirectory] } } }),
+        canUseTool: claudeToolPermissions(session.id, turn.controller.signal, this.approvals, message => {
+          this.emit(session.id, turnId, { type: 'error', error: message });
+          getNotificationEmitter().emitQueryError(session.id, message);
+        }),
       };
       const sdk = query({ prompt: input.message, options: sdkOptions });
       turn.query = sdk;
@@ -271,18 +276,25 @@ export class ClaudeHandler {
       }
       throw error;
     } finally {
-      turn.query?.close();
-      this.active.delete(session.id);
-      this.status(session.id, turn.controller.signal.aborted ? 'cancelled' : 'idle');
+      this.approvals.denySession(session.id, 'Turn finished');
+      try { turn.query?.close(); }
+      finally {
+        this.active.delete(session.id);
+        this.status(session.id, turn.controller.signal.aborted ? 'cancelled' : 'idle');
+      }
     }
   }
 
   async cancel(params: { sessionId: string }) {
     this.getSession(params.sessionId);
     const active = this.active.get(params.sessionId);
+    this.approvals.denySession(params.sessionId, 'Session cancelled');
     active?.controller.abort();
-    active?.query?.close();
-    this.status(params.sessionId, 'cancelled');
+    try { active?.query?.close(); }
+    finally { this.status(params.sessionId, 'cancelled'); }
+    // A successful Stop response means the SDK turn has released the session.
+    // Its abort rejection is expected; the turn itself persists any other error.
+    await active?.finished?.catch(() => {});
     return { success: true, sessionId: params.sessionId };
   }
 
@@ -291,14 +303,23 @@ export class ClaudeHandler {
     return params.prompt ? this.startTurn({ sessionId: session.id, message: params.prompt }) : session;
   }
   async continue(params: z.infer<typeof ClaudeContinueParamsSchema>) { return this.startTurn({ sessionId: params.sessionId, message: params.prompt }); }
-  async updateSettings(sessionId: string, settings: { model: string }) {
+  async updateSettings(sessionId: string, settings: { model?: string; permissionMode?: SessionPermissionMode }) {
     this.getSession(sessionId);
-    if (this.active.has(sessionId)) throw new Error('Wait for the current turn before changing its model');
-    getDb().update(sessions).set({ model: settings.model, updatedAt: new Date().toISOString() }).where(eq(sessions.id, sessionId)).run();
+    if (this.active.has(sessionId)) throw new Error('Wait for the current turn before changing its settings');
+    getDb().update(sessions).set({
+      ...(settings.model !== undefined ? { model: settings.model } : {}),
+      ...(settings.permissionMode !== undefined ? { permissionMode: settings.permissionMode } : {}),
+      updatedAt: new Date().toISOString(),
+    }).where(eq(sessions.id, sessionId)).run();
+    return this.getSession(sessionId);
   }
   async dispose(): Promise<void> {
     const turns = [...this.active.values()];
-    for (const turn of turns) { turn.controller.abort(); turn.query?.close(); }
+    for (const [sessionId, turn] of this.active) {
+      this.approvals.denySession(sessionId, 'Session stopped');
+      turn.controller.abort();
+      try { turn.query?.close(); } catch { /* Still wait for every active turn to finish. */ }
+    }
     await Promise.allSettled(turns.map(turn => turn.finished));
     this.active.clear();
   }
