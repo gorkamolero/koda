@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { getDb, getWorktreesDir } from '../db/index.js';
 import { worktrees, repos, type Worktree } from '../db/schema.js';
 
@@ -639,9 +639,9 @@ export interface WorktreeDiff {
 /**
  * Execute a git command in the specified directory
  */
-function gitCommand(repoPath: string, args: string): string | null {
+function gitCommand(repoPath: string, args: string[]): string | null {
   try {
-    return execSync(`git ${args}`, {
+    return execFileSync('git', args, {
       cwd: repoPath,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -758,31 +758,33 @@ export async function getWorktreeDiff(
 
   // Get the merge base between current HEAD and target branch
   // This is the commit where the branches diverged
-  const mergeBase = gitCommand(repoPath, `merge-base HEAD origin/${targetBranch}`);
-
-  if (!mergeBase) {
-    // If we can't find a merge base, try comparing to the target branch directly
-    // or just show uncommitted changes
-    const diffOutput = gitCommand(repoPath, 'diff HEAD --numstat') ?? '';
-    const patchOutput = gitCommand(repoPath, 'diff HEAD') ?? '';
-
-    if (!diffOutput && !patchOutput) {
-      return {
-        files: [],
-        summary: { filesChanged: 0, additions: 0, deletions: 0 },
-      };
-    }
-
-    return parseDiffOutput(diffOutput, patchOutput);
-  }
-
-  // Get the diff between merge base and current working tree
-  // This includes both committed changes on the branch AND uncommitted changes
-  const diffOutput = gitCommand(repoPath, `diff ${mergeBase} --numstat`) ?? '';
-  const patchOutput = gitCommand(repoPath, `diff ${mergeBase}`) ?? '';
-
+  const mergeBase = gitCommand(repoPath, ['merge-base', 'HEAD', `origin/${targetBranch}`])
+    ?? gitCommand(repoPath, ['merge-base', 'HEAD', targetBranch]);
+  const base = mergeBase ?? 'HEAD';
+  const diffOutput = gitCommand(repoPath, ['diff', base, '--numstat']) ?? '';
+  const patchOutput = gitCommand(repoPath, ['diff', base]) ?? '';
   const result = parseDiffOutput(diffOutput, patchOutput);
-  result.mergeBase = mergeBase;
+
+  // New agent-created files must appear without staging the user's index.
+  const untracked = gitCommand(repoPath, ['ls-files', '--others', '--exclude-standard', '-z']) ?? '';
+  for (const filePath of untracked.split('\0').filter(Boolean)) {
+    let patch = '';
+    try {
+      patch = execFileSync('git', ['diff', '--no-index', '--', '/dev/null', filePath], {
+        cwd: repoPath, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      // Git returns 1 when a diff successfully finds differences.
+      const failure = error as { status?: number; stdout?: string };
+      if (failure.status !== 1) throw error;
+      patch = String(failure.stdout ?? '');
+    }
+    const additions = patch.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).length;
+    result.files.push({ path: filePath, status: 'added', diff: patch, additions, deletions: 0 });
+    result.summary.additions += additions;
+  }
+  result.summary.filesChanged = result.files.length;
+  result.mergeBase = mergeBase ?? undefined;
   result.targetBranch = targetBranch;
 
   return result;
