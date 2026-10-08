@@ -151,6 +151,10 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
         setPermissionMode(savedMode)
         savedSettingsRef.current = { model: session.model || 'default', permissionMode: savedMode }
         setCustomModel(false)
+      } else if (remote) {
+        // The host can change its chat settings at any time; a collaborator follows them.
+        setModel(session.model || 'default')
+        setPermissionMode(session.permissionMode === 'bypassPermissions' ? 'bypassPermissions' : 'default')
       }
       setLoadedSession(id)
       setIsStreaming(session.status === 'running' || sendingRef.current?.sessionId === id)
@@ -169,7 +173,7 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     } finally {
       if (loadingVersionRef.current === version) loadingVersionRef.current = null
     }
-  }, [queryClient, worktreeId, agent, agentName, setMessages, setIsStreaming])
+  }, [queryClient, worktreeId, agent, agentName, setMessages, setIsStreaming, remote])
 
   useEffect(() => {
     let disposed = false

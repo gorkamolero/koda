@@ -97,12 +97,16 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await expect(assistant(b, 'B_RELAY_FINISHED')).toBeVisible()
     await pairScreenshot(browser, a, b, testInfo, '04-relay-complete-on-both')
 
-    if (agent === 'codex') {
+    if (agent === 'claude') {
       // The agent's permission request reaches both screens, and B answers it as A could.
+      // Codex's current default model reports approvals it never requests (the approval
+      // proof fails the same way), so this step runs with Claude.
+      await a.getByTestId('permission-mode-select').selectOption('default')
+      await expect(b.getByTestId('permission-mode-select')).toHaveValue('default', { timeout: 20_000 })
       const outside = outsideFixture()
       try {
         const marker = joinPath(outside.root, 'approved-by-b')
-        await send(a, writePrompt(marker, 'B_APPROVED', 'codex'))
+        await send(a, writePrompt(marker, 'B_APPROVED', agent))
         await expect(b.getByTestId('approval-card')).toHaveCount(1, { timeout: 120_000 })
         await expect(a.getByTestId('approval-card')).toHaveCount(1)
         await expect(b.getByTestId('approval-card')).toContainText(marker)

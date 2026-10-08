@@ -63,6 +63,19 @@ describe("a collaborator's view of the host's session", () => {
     expect(rpcRequest).toHaveBeenCalledWith('claude.models', { worktreeId: 'w1' })
   })
 
+  it("follows the host's permission mode when the host changes it", async () => {
+    let mode = 'bypassPermissions'
+    rpcRequest.mockImplementation(async (method: string) => {
+      if (method === 'claude.get') return { agentType: 'claude', status: 'idle', model: 'default', permissionMode: mode }
+      if (method === 'claude.models' || method === 'claude.getMessages' || method === 'approval.list' || method === 'question.list') return []
+      return {}
+    })
+    render(wrap(<AgentChat worktreeId="w1" sessionId="s1" agentType="claude" remote={remote('control')} collaborative />))
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    mode = 'default'
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('default'), { timeout: 3000 })
+  })
+
   it("messages the host's agent with control permission", async () => {
     render(wrap(<AgentChat worktreeId="w1" sessionId="s1" agentType="claude" remote={remote('control')} collaborative />))
     const send = screen.getByRole('button', { name: 'Send task' })
