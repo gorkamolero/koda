@@ -56,7 +56,7 @@ describe('agent and model routing', () => {
       if (method.endsWith('.start')) return { id: `${agent}-session`, sessionId: `${agent}-session` }
       if (method.endsWith('.get')) return { agentType: agent, status: 'idle', model: `${agent}-model` }
       if (method.endsWith('.getMessages')) return transcript(`${params?.sessionId} reply`)
-      if (method === 'approval.list') return []
+      if (method === 'approval.list' || method === 'question.list') return []
       return {}
     })
   }
@@ -156,7 +156,7 @@ describe('chat navigation during requests', () => {
       if (method === 'codex.models') return []
       if (method === 'codex.get') return params?.sessionId === 'A' ? oldSession.promise : { status: 'idle', model: 'default' }
       if (method === 'codex.getMessages') return transcript(`${params?.sessionId} reply`)
-      if (method === 'approval.list') return []
+      if (method === 'approval.list' || method === 'question.list') return []
       return {}
     })
     const { view } = setup()
@@ -176,7 +176,7 @@ describe('chat navigation during requests', () => {
       if (method === 'codex.start') return created.promise
       if (method === 'codex.get') return { status: 'idle', model: 'default' }
       if (method === 'codex.getMessages') return transcript(`${params?.sessionId} reply`)
-      if (method === 'approval.list') return []
+      if (method === 'approval.list' || method === 'question.list') return []
       return {}
     })
     const { view, onSessionChange } = setup()
@@ -197,7 +197,7 @@ describe('per-chat permissions', () => {
     rpcRequest.mockImplementation(async (method: string) => {
       if (method.endsWith('.models')) return [{ id: 'available', model: 'available', displayName: 'Available model' }]
       if (method.endsWith('.get')) return { agentType: agent, status, model: 'default', permissionMode }
-      if (method.endsWith('.getMessages') || method === 'approval.list') return []
+      if (method.endsWith('.getMessages') || method === 'approval.list' || method === 'question.list') return []
       if (method.endsWith('.start')) return { id: 'created', sessionId: 'created' }
       return {}
     })
@@ -242,6 +242,26 @@ describe('per-chat permissions', () => {
     await screen.findByTestId('stop-agent-button')
     expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
     expect(screen.getByTestId(`${agent}-model-select`)).toBeDisabled()
+    fireEvent.click(screen.getByTestId('stop-agent-button'))
+    await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.cancel`, { sessionId: 'saved' }))
+  })
+
+  it.each(['codex', 'claude'] as const)('%s still requires question answers in bypass mode and keeps Stop available', async agent => {
+    mockPermissions(agent, 'running', 'bypassPermissions')
+    const normal = rpcRequest.getMockImplementation()!
+    rpcRequest.mockImplementation((method, params) => method === 'question.list' ? Promise.resolve([{
+      id: 'question-1', sessionId: 'saved', agentType: agent,
+      questions: [{ id: 'choice', header: 'Approach', question: 'Which approach?', options: [{ label: 'Small' }, { label: 'Broad' }], multiSelect: false, allowOther: false }],
+    }]) : normal(method, params))
+    const { view } = setup()
+    render(view('A', 'saved', agent))
+    await screen.findByTestId('question-card')
+    await waitFor(() => expect(screen.getByTestId('permission-mode-select')).toHaveValue('bypassPermissions'))
+    expect(screen.getByTestId('question-submit')).toBeDisabled()
+    expect(screen.getByTestId('permission-mode-select')).toBeDisabled()
+    expect(screen.getByTestId(`${agent}-model-select`)).toBeDisabled()
+    expect(screen.getByTestId('stop-agent-button')).toBeEnabled()
+    expect(rpcRequest.mock.calls.some(([method]) => method === 'question.respond')).toBe(false)
     fireEvent.click(screen.getByTestId('stop-agent-button'))
     await waitFor(() => expect(rpcRequest).toHaveBeenCalledWith(`${agent}.cancel`, { sessionId: 'saved' }))
   })

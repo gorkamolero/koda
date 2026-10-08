@@ -13,6 +13,7 @@ import { InputArea } from './InputArea'
 import { PlanModeIndicator } from './PlanModeIndicator'
 import { useNotifications } from '@/hooks/useNotifications'
 import { ApprovalRequests } from './ApprovalRequests'
+import { QuestionRequests } from './QuestionRequests'
 import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
 
 interface AgentChatProps {
@@ -347,7 +348,11 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
       {modelsError && <div role="alert" data-testid="agent-model-error" className="px-4 py-2 text-xs text-status-error">{agentName} models: {modelsError.message}</div>}
       {error && <div role="alert" className="px-4 py-2 text-xs text-status-error">{error}</div>}
       {operationError && <div role="alert" className="px-4 py-2 text-xs text-status-error">{operationError}</div>}
-      {sessionId && !remote && <ApprovalRequests key={sessionId} sessionId={sessionId} />}
+      {/* Questions and approvals are answered on the host, never by a collaborator. */}
+      {sessionId && !remote && <div className="shrink-0 max-h-[45%] overflow-y-auto">
+        <QuestionRequests sessionId={sessionId} />
+        <ApprovalRequests key={sessionId} sessionId={sessionId} />
+      </div>}
       <div className="flex-1 overflow-hidden"><MessageList /></div>
       <InputArea
         disabled={settingsSaving || stopping || Boolean(sessionId && loadedSession !== sessionId) || !canSend || Boolean(remote && !sessionId)}

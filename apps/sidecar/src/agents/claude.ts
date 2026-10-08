@@ -10,6 +10,7 @@ import { getNotificationEmitter } from '../rpc/notifications.js';
 import { saveCheckpoint } from '../checkpoint/service.js';
 import { resolveClaudePath } from './claudeModels.js';
 import { ApprovalBroker, getApprovalBroker, normalizePermissionMode, SessionPermissionModeSchema, type SessionPermissionMode } from './approvalBroker.js';
+import { QuestionBroker, getQuestionBroker } from './questionBroker.js';
 
 // Shared normalized event shape also used by Codex and the collaboration relay.
 export type ClaudeStreamEvent = { type: string; [key: string]: unknown };
@@ -49,21 +50,57 @@ export interface ClaudeSession {
 export interface StoredMessage { id: string; index: number; timestamp: number; event: ClaudeStreamEvent }
 interface ActiveTurn { controller: AbortController; query?: Query; finished?: Promise<unknown> }
 
+const ClaudeQuestionsSchema = z.object({ questions: z.array(z.object({
+  header: z.string().max(200), question: z.string().min(1).max(20_000),
+  options: z.array(z.object({ label: z.string().min(1).max(2_000), description: z.string().max(20_000).optional() }).passthrough()).min(1).max(100),
+  multiSelect: z.boolean(), isSecret: z.boolean().optional(),
+}).passthrough()).min(1).max(20) }).superRefine((input, context) => {
+  if (new Set(input.questions.map(question => question.question)).size !== input.questions.length) {
+    context.addIssue({ code: 'custom', message: 'Claude question text must be unique' });
+  }
+  for (const question of input.questions) {
+    if (new Set(question.options.map(option => option.label)).size !== question.options.length) {
+      context.addIssue({ code: 'custom', message: 'Claude option labels must be unique' });
+    }
+  }
+});
+
 /** The SDK decides which calls need review, including explicit ask rules in bypass mode. */
 export function claudeToolPermissions(
   sessionId: string,
   turnSignal: AbortSignal,
   approvals: ApprovalBroker = getApprovalBroker(),
-  onQuestion: (message: string) => void = message => getNotificationEmitter().emitQueryError(sessionId, message),
+  questions: QuestionBroker = getQuestionBroker(),
+  cancelTurn: () => void = () => {},
 ): NonNullable<Options['canUseTool']> {
   return async (toolName, input, options) => {
     if (toolName === 'AskUserQuestion') {
-      const questions = Array.isArray(input.questions) ? input.questions
-        .map(question => typeof question === 'object' && question !== null && 'question' in question ? String(question.question) : '')
-        .filter(Boolean).join('\n') : '';
-      const message = `Claude needs your answer${questions ? `:\n${questions}` : '.'}\nStructured question forms are not supported yet. Reply in the chat to continue.`;
-      onQuestion(message);
-      return { behavior: 'deny', interrupt: true, message: `${message} Ask the user directly in ordinary chat instead of using AskUserQuestion.`, toolUseID: options.toolUseID };
+      // Claude's answer map is keyed by question text, so ambiguous duplicate
+      // text must be rejected instead of silently replacing a user's answer.
+      const parsed = ClaudeQuestionsSchema.safeParse(input);
+      if (!parsed.success) return { behavior: 'deny', interrupt: true,
+        message: 'Invalid question form. Ask distinct questions with unique options.', toolUseID: options.toolUseID };
+      const original = structuredClone(parsed.data.questions);
+      const result = await questions.request({ sessionId, agentType: 'claude', toolUseId: options.toolUseID,
+        questions: original.map((question, index) => ({ id: `q${index + 1}`, header: question.header,
+          question: question.question, options: question.options.map(({ label, description }) => ({ label, description })),
+          multiSelect: question.multiSelect, allowOther: true,
+          ...(question.isSecret !== undefined ? { isSecret: question.isSecret } : {}) })),
+      }, { signal: AbortSignal.any([turnSignal, options.signal]) });
+      if (result.decision === 'cancel') {
+        // Use the winning decision's source, not a later signal state: a host
+        // cancellation must still stop if the provider withdraws in the same tick.
+        if (result.source === 'user' || result.source === 'expired' || result.source === 'disposed') cancelTurn();
+        return { behavior: 'deny', message: result.reason, toolUseID: options.toolUseID };
+      }
+      const answers = Object.fromEntries(original.map((question, index) => {
+        const answer = result.answers[`q${index + 1}`];
+        const values = [...answer.selected, ...(answer.text !== undefined ? [answer.text] : [])];
+        // The installed CLI's tool schema requires string values. Its documented
+        // multi-select form joins labels; labels/custom text are never split.
+        return [question.question, values.join(', ')];
+      }));
+      return { behavior: 'allow', updatedInput: { questions: original, answers }, toolUseID: options.toolUseID };
     }
     const reason = [options.title, options.description, options.decisionReason,
       options.blockedPath ? `Requested path: ${options.blockedPath}` : undefined].filter(Boolean).join('\n');
@@ -80,7 +117,7 @@ export function claudeToolPermissions(
 
 export class ClaudeHandler {
   private active = new Map<string, ActiveTurn>();
-  constructor(private readonly approvals: ApprovalBroker = getApprovalBroker()) {}
+  constructor(private readonly approvals: ApprovalBroker = getApprovalBroker(), private readonly questions: QuestionBroker = getQuestionBroker()) {}
 
   async start(params: ClaudeStartParams): Promise<ClaudeSession> {
     const worktreeId = params.worktreeId ?? params.workspaceId!;
@@ -207,10 +244,11 @@ export class ClaudeHandler {
           ? { allowDangerouslySkipPermissions: true, sandbox: { enabled: false } }
           : { sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: true,
             filesystem: { allowWrite: [session.workingDirectory] } } }),
-        canUseTool: claudeToolPermissions(session.id, turn.controller.signal, this.approvals, message => {
-          this.emit(session.id, turnId, { type: 'error', error: message });
-          getNotificationEmitter().emitQueryError(session.id, message);
-        }),
+        canUseTool: async (toolName, toolInput, options) => {
+          if (toolName === 'AskUserQuestion') tools.set(options.toolUseID, toolName);
+          return claudeToolPermissions(session.id, turn.controller.signal, this.approvals, this.questions,
+            () => turn.controller.abort())(toolName, toolInput, options);
+        },
       };
       const sdk = query({ prompt: input.message, options: sdkOptions });
       turn.query = sdk;
@@ -237,7 +275,7 @@ export class ClaudeHandler {
           for (const block of message.message.content) {
             if (block.type === 'tool_use' && !tools.has(block.id)) {
               tools.set(block.id, block.name);
-              this.emit(session.id, turnId, { type: 'tool_use', tool: block.name, input: block.input, id: block.id, tool_id: block.id });
+              if (block.name !== 'AskUserQuestion') this.emit(session.id, turnId, { type: 'tool_use', tool: block.name, input: block.input, id: block.id, tool_id: block.id });
             } else if (block.type === 'text' && !message.parent_tool_use_id && !streamedMessages.has(message.message.id)) {
               appendText(message.message.id, block.text);
             }
@@ -246,7 +284,7 @@ export class ClaudeHandler {
           for (const block of message.message.content) {
             if (block.type === 'tool_result' && !toolResults.has(block.tool_use_id)) {
               toolResults.add(block.tool_use_id);
-              this.emit(session.id, turnId, { type: 'tool_result', tool: tools.get(block.tool_use_id) ?? 'tool',
+              if (tools.get(block.tool_use_id) !== 'AskUserQuestion') this.emit(session.id, turnId, { type: 'tool_result', tool: tools.get(block.tool_use_id) ?? 'tool',
                 id: block.tool_use_id, tool_use_id: block.tool_use_id, output: block.content,
                 ...(block.is_error ? { error: typeof block.content === 'string' ? block.content : 'Tool failed' } : {}) });
             }
@@ -277,6 +315,7 @@ export class ClaudeHandler {
       throw error;
     } finally {
       this.approvals.denySession(session.id, 'Turn finished');
+      this.questions.cancelSession(session.id, 'Turn finished');
       try { turn.query?.close(); }
       finally {
         this.active.delete(session.id);
@@ -290,6 +329,7 @@ export class ClaudeHandler {
     const active = this.active.get(params.sessionId);
     this.approvals.denySession(params.sessionId, 'Session cancelled');
     active?.controller.abort();
+    this.questions.cancelSession(params.sessionId, 'Session cancelled');
     try { active?.query?.close(); }
     finally { this.status(params.sessionId, 'cancelled'); }
     // A successful Stop response means the SDK turn has released the session.
@@ -318,6 +358,7 @@ export class ClaudeHandler {
     for (const [sessionId, turn] of this.active) {
       this.approvals.denySession(sessionId, 'Session stopped');
       turn.controller.abort();
+      this.questions.cancelSession(sessionId, 'Session stopped');
       try { turn.query?.close(); } catch { /* Still wait for every active turn to finish. */ }
     }
     await Promise.allSettled(turns.map(turn => turn.finished));

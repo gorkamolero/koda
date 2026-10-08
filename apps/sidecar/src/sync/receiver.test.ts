@@ -9,6 +9,7 @@ import { repos, worktrees, sessions } from '../db/schema.js'
 import { router } from '../rpc/router.js'
 import { signRelay, type RelayCommand } from './capabilities.js'
 import { ApprovalBroker } from '../agents/approvalBroker.js'
+import { QuestionBroker } from '../agents/questionBroker.js'
 
 let sync: typeof import('./LiveblocksClient.js')
 let directory: string
@@ -17,6 +18,7 @@ let sessionId: string
 const dispatch = vi.fn(async () => ({ status: 'running' }))
 const claudeDispatch = vi.fn(async () => ({ status: 'running' }))
 const respond = vi.fn(), settings = vi.fn()
+const questionList = vi.fn(), questionRespond = vi.fn()
 beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-receiver-'))
   vi.stubEnv('KODA_DATA_DIR', directory)
@@ -27,6 +29,8 @@ beforeAll(async () => {
   router.register('approval.respond', respond)
   router.register('claude.updateSettings', settings)
   router.register('codex.updateSettings', settings)
+  router.register('question.list', questionList)
+  router.register('question.respond', questionRespond)
 })
 beforeEach(() => {
   initDbWithMigrations(':memory:')
@@ -39,6 +43,7 @@ beforeEach(() => {
   dispatch.mockClear()
   claudeDispatch.mockClear()
   respond.mockClear(); settings.mockClear()
+  questionList.mockClear(); questionRespond.mockClear()
 })
 afterEach(() => { resetDb(); vi.restoreAllMocks() })
 afterAll(() => { vi.unstubAllEnvs(); rmSync(directory, { recursive: true, force: true }) })
@@ -49,6 +54,28 @@ async function command(permission: 'control' | 'view') {
 }
 
 describe('host relay receiver', () => {
+  it.each(['claude', 'codex'])('does not let a %s collaborator read or answer host question forms', async agentType => {
+    getDb().update(sessions).set({ agentType }).where(eq(sessions.id, sessionId)).run()
+    const broker = new QuestionBroker({ notify: () => {} })
+    const pending = broker.request({ sessionId, agentType: agentType as 'claude' | 'codex', questions: [{
+      id: 'q1', header: 'Choice', question: 'Host-only question', options: [{ label: 'First' }, { label: 'Second' }],
+      multiSelect: false, allowOther: true,
+    }] })
+    const [question] = broker.list()
+    try {
+      for (const method of ['question.list', 'question.respond']) {
+        const request = await command('control')
+        const malicious = { ...request, method, decision: 'submit', answers: { q1: { selected: ['First'] } },
+          params: { sessionId, requestId: question.id, decision: 'submit', answers: { q1: { selected: ['First'] } } } }
+        const response = await new sync.SyncManager(worktreeId).receive(malicious)
+        expect(response.error).toBeNull()
+        expect(JSON.stringify(response)).not.toContain('Host-only question')
+        expect(agentType === 'claude' ? claudeDispatch : dispatch).toHaveBeenLastCalledWith({ sessionId, message: request.content, stream: true })
+        expect(questionList).not.toHaveBeenCalled(); expect(questionRespond).not.toHaveBeenCalled()
+        expect(broker.list()).toEqual([question])
+      }
+    } finally { broker.dispose(); await pending }
+  })
   it.each(['claude', 'codex'])('does not let a %s collaborator change permission modes or answer host approvals', async agentType => {
     getDb().update(sessions).set({ agentType, permissionMode: 'default' }).where(eq(sessions.id, sessionId)).run()
     const broker = new ApprovalBroker({ notify: () => {} })

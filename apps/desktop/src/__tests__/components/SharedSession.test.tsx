@@ -39,7 +39,7 @@ beforeEach(() => {
     if (method === 'claude.get') return { agentType: 'claude', status: 'idle', model: 'default' }
     if (method === 'claude.getMessages') return []
     if (method === 'collaboration.status') return { enabled: true, machineId: 'machine-a', name: 'Gorka' }
-    if (method === 'approval.list') return []
+    if (method === 'approval.list' || method === 'question.list') return []
     return {}
   })
 })

@@ -54,6 +54,23 @@ async function freePort(): Promise<number> {
 interface ManagedProcess { process: ChildProcess; log: WriteStream }
 interface ClaudeProofSession { sessionId: string; directory: string; threadId?: string }
 
+async function archiveCodexProofSession(session: ClaudeProofSession) {
+  if (!session.threadId) return false
+  const { CodexAppServer } = await import(pathToFileURL(join(projectRoot, 'apps/sidecar/dist/agents/codexTransport.js')).href) as {
+    CodexAppServer: new () => { initialize(): Promise<void>; request(method: string, params: unknown): Promise<{ thread: { id: string; cwd: string; path: string; status: { type: string } } }>; close(): Promise<void> }
+  }
+  const server = new CodexAppServer()
+  try {
+    await server.initialize()
+    const { thread } = await server.request('thread/read', { threadId: session.threadId, includeTurns: false })
+    if (thread.id !== session.threadId || thread.cwd !== session.directory || thread.status.type !== 'notLoaded') throw new Error('Refusing to archive an active or unowned Codex proof session')
+    if (!thread.path.includes('/archived_sessions/')) await server.request('thread/archive', { threadId: session.threadId })
+    const { thread: after } = await server.request('thread/read', { threadId: session.threadId, includeTurns: false })
+    if (after.id !== session.threadId || after.cwd !== session.directory || !after.path.includes('/archived_sessions/') || !existsSync(after.path) || (after.path !== thread.path && existsSync(thread.path))) throw new Error('Codex proof session archival was not verified')
+    return true
+  } finally { await server.close() }
+}
+
 async function deleteClaudeProofSession(session: ClaudeProofSession) {
   if (!session.threadId) return false // An idle chat never started a native session.
   const require = createRequire(join(projectRoot, 'apps/sidecar/package.json'))
@@ -76,6 +93,7 @@ export class KodaInstance {
   vitePort = 0
   private children: ManagedProcess[] = []
   private claudeSessions = new Map<string, ClaudeProofSession>()
+  private codexSessions = new Map<string, ClaudeProofSession>()
   private generation = 0
   constructor(readonly label: string, readonly testInfo: TestInfo, options: { userName?: string; root?: string } = {}) {
     this.root = options.root ? (mkdirSync(options.root, { recursive: true }), options.root) : mkdtempSync(join(tmpdir(), 'koda-proof-'))
@@ -91,6 +109,13 @@ export class KodaInstance {
   /** Register only the exact Claude session this fixture created. */
   trackClaudeSession(sessionId: string, workingDirectory: string) {
     this.claudeSessions.set(sessionId, { sessionId, directory: realpathSync(workingDirectory) })
+  }
+
+  /** Only register sessions created inside this exact disposable fixture. */
+  trackCodexSession(sessionId: string, workingDirectory: string) {
+    const directory = realpathSync(workingDirectory)
+    if (!directory.startsWith(realpathSync(this.root) + '/')) throw new Error('Codex proof session must belong to this fixture')
+    this.codexSessions.set(sessionId, { sessionId, directory })
   }
 
   createRepo() {
@@ -153,9 +178,9 @@ export class KodaInstance {
     })
     const data = await response.json() as { result: T; error?: { message: string } }
     if (data.error) throw new Error(`${method}: ${data.error.message}`)
-    if (method === 'claude.get') {
+    if (method === 'claude.get' || method === 'codex.get') {
       const session = data.result as { id?: string; threadId?: string }
-      const tracked = session.id ? this.claudeSessions.get(session.id) : undefined
+      const tracked = session.id ? (method === 'claude.get' ? this.claudeSessions : this.codexSessions).get(session.id) : undefined
       if (tracked && session.threadId) tracked.threadId = session.threadId
     }
     return data.result
@@ -183,6 +208,7 @@ export class KodaInstance {
         // Capture before stopping the app. Stop/restart alone must preserve it.
         await this.rpc('claude.get', { sessionId: session.sessionId }, { timeoutMs: 5000 })
       }
+      for (const session of this.codexSessions.values()) await this.rpc('codex.get', { sessionId: session.sessionId }, { timeoutMs: 5000 })
     } catch (error) { captureError = error }
     finally { await this.stop() }
     if (captureError) throw captureError // Preserve this fixture if ownership is uncertain.
@@ -192,6 +218,11 @@ export class KodaInstance {
         if (await deleteClaudeProofSession(session)) removed.push(session.threadId!)
       }
       writeFileSync(this.testInfo.outputPath(`${this.label}-claude-cleanup.json`), JSON.stringify({ temporarySdkSessionsRemoved: removed }, null, 2))
+    }
+    if (this.codexSessions.size) {
+      const archived: string[] = []
+      for (const session of this.codexSessions.values()) if (await archiveCodexProofSession(session)) archived.push(session.threadId!)
+      writeFileSync(this.testInfo.outputPath(`${this.label}-codex-cleanup.json`), JSON.stringify({ temporaryThreadsArchived: archived, providerArchiveVerified: true }, null, 2))
     }
     // Only this test's mkdtemp tree; never a shared database or arbitrary port.
     rmSync(this.root, { recursive: true, force: true })

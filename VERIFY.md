@@ -29,7 +29,13 @@ Codex normal mode uses `on-request` with a worktree write sandbox and a human re
 
 Claude's configured permission hooks remain active. Anthropic documents that a `PermissionRequest` hook and the SDK's host callback run concurrently, and the first decision wins. A hook, including one connected to an external reviewer, can therefore resolve a visible request without a Koda button click; Koda clears the cancelled callback. Live Bash and Write diagnostics confirmed that behavior. See [Claude's PermissionRequest lifecycle](https://code.claude.com/docs/en/hooks#permissionrequest).
 
-Claude's structured `AskUserQuestion` questionnaires are not yet supported: they end the turn with a visible explanation to ask in ordinary chat. Unsupported Codex interactive request types also stop with an explicit error rather than hanging.
+### Agent question forms
+
+Claude's `AskUserQuestion` and Codex's `item/tool/requestUserInput` show a form in the host chat. Choose one option, choose multiple options when Claude requests it, or enter a custom answer when the question allows it. Text-only questions and Codex secret inputs are supported. No answer is selected automatically, including in bypass mode. Every question must be answered before **Submit answers** resumes the waiting tool. **Cancel and stop**, the toolbar's **Stop**, or a ten-minute expiry ends the turn and clears the form.
+
+Pending forms survive a UI reload while the sidecar runs. Draft answers live only in the mounted form and are discarded on reload or navigation. Requests are bound to the exact session and can be answered once; incomplete, invalid, cross-session, or stale replies are rejected. Sidecar shutdown clears pending requests. Provider withdrawal also clears its request, without cancelling a turn that the provider already resolved elsewhere.
+
+Only the host can see or answer the form. Direct form payloads and submitted answers are not written to Koda's conversation transcript or sent through the collaboration relay. The provider receives the answers and may include them in ordinary assistant replies, which remain shared; its own session storage and hooks still apply. Codex enables `default_mode_request_user_input` for its child process so questions work during normal coding, without switching to plan mode or changing global CLI settings. This was verified with CLI `0.162.0-alpha.2`. Generic MCP elicitation and OAuth/URL forms remain unsupported and stop with an explicit error.
 
 ### Claude authentication research (2026-10-08)
 
@@ -86,6 +92,14 @@ pnpm --filter e2e test:proof:approvals
 For each agent, this selects normal approvals and requests a harmless marker-file write in a task-owned directory outside the worktree and OS temporary directories. It holds the request for ten seconds while checking that the file stays absent, reloads the UI and recovers the same request, approves through the visible button, then verifies the expected output file. Separate requests exercise Deny and Stop and confirm their files remain absent. It selects bypass through the UI, restarts both app processes, confirms the saved mode and upstream conversation, and verifies an outside write finishes without a pending request. New chats must follow the Settings preference independently of the previous chat's mode. The fixture directories and owned processes are removed afterward.
 
 Leave external approval prompts unanswered during these tests: the proof must make its decisions through Koda. Hooks remain enabled. A hook that independently resolves a request will cause the manual-decision assertions to fail; that failure must not be presented as a passing manual approval proof.
+
+## Real question-form proofs
+
+```sh
+pnpm --filter e2e test:proof:questions
+```
+
+For each agent, this starts a real chat with bypass permissions, requests its built-in question tool, and confirms it waits without selecting or submitting an answer. The proof rejects a wrong-session response and an incomplete answer, reloads the same pending request, and checks Stop remains reachable in a compact window. It submits choices and custom text through the visible form and verifies the agent received them; Claude also receives multiple selections. Further turns exercise **Cancel and stop**, the toolbar's **Stop**, and rejection of stale replies. The test retains screenshots and `question-evidence.json`, removes its disposable app data, and cleans up only its own native agent sessions. Leave external question prompts unanswered so Koda supplies the answers.
 
 ## Real Liveblocks proofs
 

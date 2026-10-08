@@ -1,7 +1,9 @@
 /** Installed Codex app-server, v2 JSON-RPC over stdio. No auth or global config writes. */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { z } from 'zod';
 import { resolveCodexPath } from './codexModels.js';
+import type { Question, QuestionDecision } from './questionBroker.js';
 
 export type CodexPermissionMode = 'default' | 'bypassPermissions';
 export interface CodexUsage { input_tokens: number; cached_input_tokens: number; output_tokens: number }
@@ -14,13 +16,22 @@ export type CodexEvent =
 export interface CodexApproval {
   toolName: string; input: Record<string, unknown>; reason?: string; toolUseId?: string; signal: AbortSignal;
 }
+export interface CodexQuestionRequest {
+  questions: Question[]; toolUseId: string; signal: AbortSignal;
+}
 export interface CodexTurnOptions {
   threadId: string | null; workingDirectory: string; model: string; permissionMode: CodexPermissionMode;
   message: string; signal: AbortSignal;
   approve: (request: CodexApproval) => Promise<{ decision: 'allow' | 'deny' }>;
+  ask: (request: CodexQuestionRequest) => Promise<QuestionDecision>;
 }
 type Wire = Record<string, any>;
 type RequestId = string | number;
+const UserInputQuestionsSchema = z.array(z.object({
+  id: z.string().min(1), header: z.string(), question: z.string().min(1),
+  isOther: z.boolean(), isSecret: z.boolean(),
+  options: z.array(z.object({ label: z.string().min(1), description: z.string() })).nullable(),
+})).min(1);
 
 class EventQueue<T> {
   private values: T[] = [];
@@ -57,7 +68,7 @@ export class CodexAppServer {
   constructor(workingDirectory?: string) {
     // Local shell snapshots use an executor-managed sandbox in the installed CLI.
     // Use its native sandbox path so the requested per-chat policy is enforced.
-    this.child = spawn(resolveCodexPath(), ['app-server', '--disable', 'shell_snapshot', '--disable', 'shell_snapshot_v2'], { cwd: workingDirectory, stdio: ['pipe', 'pipe', 'pipe'] });
+    this.child = spawn(resolveCodexPath(), ['app-server', '--disable', 'shell_snapshot', '--disable', 'shell_snapshot_v2', '--enable', 'default_mode_request_user_input'], { cwd: workingDirectory, stdio: ['pipe', 'pipe', 'pipe'] });
     this.reader = createInterface({ input: this.child.stdout });
     // CLI stderr may contain private configuration; expose only structured protocol failures.
     this.child.stderr.resume();
@@ -159,7 +170,12 @@ export function codexPermissionOptions(mode: CodexPermissionMode, cwd: string) {
 }
 
 function normalizeItem(item: Wire): CodexItem {
-  if (item.type === 'agentMessage') return { ...item, type: 'agent_message' } as CodexItem;
+  if (item.type === 'agentMessage') {
+    // Question forms and direct answers are host-local; ordinary assistant text
+    // remains part of the shared transcript.
+    const { questions: _questions, ...message } = item;
+    return { ...message, type: 'agent_message' } as CodexItem;
+  }
   if (item.type === 'commandExecution') return { ...item, id: item.id, type: 'command_execution', aggregated_output: item.aggregatedOutput ?? '', exit_code: item.exitCode, status: item.status === 'inProgress' ? 'in_progress' : item.status };
   if (item.type === 'fileChange') return { ...item, id: item.id, type: 'file_change', changes: item.changes?.map((change: Wire) => ({ ...change, kind: change.kind?.type ?? change.kind })) };
   return { ...item, type: String(item.type).replace(/[A-Z]/g, char => '_' + char.toLowerCase()) } as CodexItem;
@@ -172,6 +188,8 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   const queue = new EventQueue<CodexEvent>();
   const items = new Map<string, Wire>();
   const approvals = new Map<RequestId, AbortController>();
+  const questions = new Map<RequestId, AbortController>();
+  const questionItemIds = new Set<string>();
   let threadId: string | null = null;
   let turnId: string | null = null;
   let usage: CodexUsage | undefined;
@@ -184,6 +202,11 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
       controller.abort();
     }
     approvals.clear();
+    for (const [requestId, controller] of questions) {
+      server.respond(requestId, { answers: {} });
+      controller.abort();
+    }
+    questions.clear();
   };
   const cancel = () => {
     denyPending();
@@ -195,12 +218,27 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   options.signal.addEventListener('abort', cancel, { once: true });
   server.onFailure = error => { denyPending(); queue.end(error); };
   server.onRequest = async (method, params, requestId) => {
-    if (method !== 'item/commandExecution/requestApproval' && method !== 'item/fileChange/requestApproval') {
+    const isQuestion = method === 'item/tool/requestUserInput';
+    if (!isQuestion && method !== 'item/commandExecution/requestApproval' && method !== 'item/fileChange/requestApproval') {
       throw new Error(`Koda does not support this Codex request yet: ${method}. The turn was stopped without approval.`);
     }
-    if (!threadId || params.threadId !== threadId || !turnId || params.turnId !== turnId) throw new Error('Codex approval did not match the active turn');
-    if (completed || options.signal.aborted) return { decision: 'decline' };
+    if (!threadId || params.threadId !== threadId || !turnId || params.turnId !== turnId) throw new Error('Codex request did not match the active turn');
+    if (completed || options.signal.aborted) return isQuestion ? { answers: {} } : { decision: 'decline' };
     const controller = new AbortController();
+    if (isQuestion) {
+      const parsed = UserInputQuestionsSchema.safeParse(params.questions);
+      if (!parsed.success || typeof params.itemId !== 'string') throw new Error('Codex returned an invalid question form');
+      questionItemIds.add(params.itemId);
+      questions.set(requestId, controller);
+      try {
+        const result = await options.ask({ toolUseId: params.itemId, signal: controller.signal, questions: parsed.data.map(question => ({
+          id: question.id, header: question.header, question: question.question, options: question.options ?? [],
+          multiSelect: false, allowOther: question.isOther || !question.options?.length, isSecret: question.isSecret,
+        })) });
+        if (result.decision !== 'submit' || controller.signal.aborted || options.signal.aborted) return { answers: {} };
+        return { answers: Object.fromEntries(Object.entries(result.answers).map(([id, answer]) => [id, { answers: [...answer.selected, ...(answer.text ? [answer.text] : [])] }])) };
+      } finally { questions.delete(requestId); }
+    }
     approvals.set(requestId, controller);
     try {
       const item = items.get(params.itemId);
@@ -221,12 +259,14 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
     if (method === 'serverRequest/resolved') {
       server.forgetRequest(params.requestId);
       approvals.get(params.requestId)?.abort(); approvals.delete(params.requestId);
+      questions.get(params.requestId)?.abort(); questions.delete(params.requestId);
     } else if (method === 'turn/started') {
       if (!startRequested || (turnId && params.turn?.id !== turnId)) return;
       turnId = params.turn.id;
     } else if (method === 'item/started' || method === 'item/completed') {
       const item = params.item;
       items.set(item.id, item);
+      if (questionItemIds.has(item.id) || item.name === 'request_user_input' || item.tool === 'request_user_input') return;
       if (item.type !== 'userMessage') queue.push({ type: method === 'item/started' ? 'item.started' : 'item.completed', item: normalizeItem(item) });
     } else if (method === 'item/agentMessage/delta') {
       const item = { ...(items.get(params.itemId) ?? { id: params.itemId, type: 'agentMessage' }), text: String(items.get(params.itemId)?.text ?? '') + params.delta };

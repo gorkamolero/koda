@@ -8,6 +8,7 @@ import { CodexHandler, StartSessionSchema, UpdateSettingsSchema } from '../src/a
 import { initDbWithMigrations, resetDb, getDb } from '../src/db/index.js';
 import { repos, worktrees, sessions } from '../src/db/schema.js';
 import { getNotificationEmitter } from '../src/rpc/notifications.js';
+import { getQuestionBroker } from '../src/agents/questionBroker.js';
 
 const mocks = vi.hoisted(() => ({ runTurn: vi.fn() }));
 vi.mock('../src/agents/codexTransport.js', () => ({ runCodexTurn: mocks.runTurn }));
@@ -213,5 +214,96 @@ describe('durable Codex runtime', () => {
     await handler.cleanup();
     handler = new CodexHandler();
     expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle');
+  });
+
+  const form = { toolUseId: 'question-tool', questions: [{ id: 'color', header: 'Color', question: 'Which color?', options: [{ label: 'Blue' }, { label: 'Red' }], multiSelect: false, allowOther: true, isSecret: false }] };
+
+  it('routes host answers to Codex without persisting or broadcasting the form or direct answer', async () => {
+    let decision: unknown;
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      decision = await options.ask({ ...form, signal: options.signal });
+      yield* success();
+    })());
+    const session = await handler.startSession({ worktreeId, permissionMode: 'bypassPermissions' });
+    const pending = handler.sendMessage({ sessionId: session.id, message: 'Ask a question' });
+    await vi.waitFor(() => expect(getQuestionBroker().list(session.id)).toHaveLength(1));
+    const request = getQuestionBroker().list(session.id)[0];
+    expect(request).toMatchObject({ sessionId: session.id, agentType: 'codex', ...form });
+    expect((await handler.getSession({ sessionId: session.id })).status).toBe('running');
+    getQuestionBroker().respond({ sessionId: session.id, requestId: request.id, decision: 'submit', answers: { color: { selected: [], text: 'Private choice' } } });
+    await pending;
+    expect(decision).toEqual({ decision: 'submit', answers: { color: { selected: [], text: 'Private choice' } } });
+    expect(getQuestionBroker().list(session.id)).toEqual([]);
+    expect(JSON.stringify(handler.getMessages({ sessionId: session.id }))).not.toMatch(/Private choice|Which color/);
+  });
+
+  it('cancels the turn when the host cancels its question, and rejects late answers', async () => {
+    const withdrawn = new AbortController();
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      await options.ask({ ...form, signal: withdrawn.signal });
+      if (options.signal.aborted) throw new Error('aborted');
+      yield* success();
+    })());
+    const session = await handler.startSession({ worktreeId });
+    const pending = handler.sendMessage({ sessionId: session.id, message: 'Ask a question' });
+    const rejected = expect(pending).rejects.toThrow('aborted');
+    await vi.waitFor(() => expect(getQuestionBroker().list(session.id)).toHaveLength(1));
+    const request = getQuestionBroker().list(session.id)[0];
+    getQuestionBroker().respond({ sessionId: session.id, requestId: request.id, decision: 'cancel' });
+    withdrawn.abort(); // The winning host cancellation must survive this race.
+    await rejected;
+    expect((await handler.getSession({ sessionId: session.id })).status).toBe('cancelled');
+    expect(handler.getMessages({ sessionId: session.id }).at(-1)?.event).toMatchObject({ type: 'result', cancelled: true });
+    expect(() => getQuestionBroker().respond({ sessionId: session.id, requestId: request.id, decision: 'submit', answers: { color: { selected: ['Blue'] } } })).toThrow('no longer pending');
+  });
+
+  it('withdraws a provider-resolved question without aborting the current turn', async () => {
+    const withdrawn = new AbortController();
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      await options.ask({ ...form, signal: withdrawn.signal });
+      expect(options.signal.aborted).toBe(false);
+      yield* success();
+    })());
+    const session = await handler.startSession({ worktreeId });
+    const pending = handler.sendMessage({ sessionId: session.id, message: 'Ask a question' });
+    await vi.waitFor(() => expect(getQuestionBroker().list(session.id)).toHaveLength(1));
+    withdrawn.abort();
+    await pending;
+    expect(getQuestionBroker().list(session.id)).toEqual([]);
+    expect((await handler.getSession({ sessionId: session.id })).status).toBe('idle');
+  });
+
+  it('stops an expired question rather than continuing with invented answers', async () => {
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      await options.ask({ ...form, signal: options.signal });
+      if (options.signal.aborted) throw new Error('aborted');
+      yield* success();
+    })());
+    const session = await handler.startSession({ worktreeId });
+    const pending = handler.sendMessage({ sessionId: session.id, message: 'Ask a question' });
+    const rejected = expect(pending).rejects.toThrow('aborted');
+    await vi.waitFor(() => expect(getQuestionBroker().list(session.id)).toHaveLength(1));
+    const request = getQuestionBroker().list(session.id)[0];
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(request.expiresAt) + 1);
+    expect(getQuestionBroker().list(session.id)).toEqual([]);
+    clock.mockRestore();
+    await rejected;
+    expect((await handler.getSession({ sessionId: session.id })).status).toBe('cancelled');
+  });
+
+  it.each(['stop', 'shutdown'] as const)('clears pending questions and awaits the turn on %s', async action => {
+    mocks.runTurn.mockImplementationOnce(options => (async function* () {
+      await options.ask({ ...form, signal: options.signal });
+      if (options.signal.aborted) throw new Error('aborted');
+      yield* success();
+    })());
+    const session = await handler.startSession({ worktreeId });
+    const pending = handler.sendMessage({ sessionId: session.id, message: 'Ask a question' });
+    const rejected = expect(pending).rejects.toThrow('aborted');
+    await vi.waitFor(() => expect(getQuestionBroker().list(session.id)).toHaveLength(1));
+    if (action === 'stop') await handler.cancelSession({ sessionId: session.id });
+    else await handler.cleanup();
+    await rejected;
+    expect(getQuestionBroker().list(session.id)).toEqual([]);
   });
 });

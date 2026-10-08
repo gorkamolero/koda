@@ -131,6 +131,20 @@ Attach multiple repos to a single workspace.
 
 ---
 
+### Agent question forms
+
+These host-local methods are not available through the collaboration relay.
+
+| Method | Params | Description |
+|--------|--------|-------------|
+| `question.list` | `{ sessionId?: UUID }` | List pending structured questions; poll or listen for `questionChanged { sessionId }` |
+| `question.respond` | `{ sessionId: UUID, requestId: UUID, decision: "submit", answers }` | Submit all answers exactly once |
+| `question.respond` | `{ sessionId: UUID, requestId: UUID, decision: "cancel" }` | Cancel the form and stop its turn |
+
+Each request includes `id`, `sessionId`, `agentType`, optional `toolUseId`, `createdAt`, `expiresAt`, and `questions`. Each question has `id`, `header`, `question`, `options: [{ label, description? }]`, `multiSelect`, `allowOther`, and optional `isSecret`. Answers use the exact question IDs: `{ "question-id": { "selected": ["Exact option label"], "text": "Optional custom answer" } }`. Custom text requires `allowOther`; single-choice questions accept exactly one selection or custom answer. All questions are required. Draft answers are not persisted; stopped, expired, resolved, or withdrawn requests cannot be answered.
+
+---
+
 ### Kimi Agent
 
 | Method | Params | Description |
