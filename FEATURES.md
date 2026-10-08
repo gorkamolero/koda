@@ -113,7 +113,7 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] Control messages reach the host's real Codex or Claude session and both users see its live reply.
 - [x] View access is enforced by the host as well as the UI; replacing an invitation revokes the previous grant.
 - [x] Relay broadcasts do not expose invitation tokens, and signed requests cannot be modified or replayed to execute twice.
-- [x] Both screens show the agent's questions and permission requests. A collaborator with control can answer, approve or stop, as the host can; view shows them read-only. Secret answers and permission-mode changes stay with the host. Codex chats skip the user's own PermissionRequest hooks (such as Vibe Island's), which would otherwise hold every request outside Koda. Untrusted browser origins are rejected before HTTP RPC or notification subscriptions.
+- [x] Both screens show the agent's questions and permission requests. A collaborator with control can answer, approve or stop, as the host can; view shows them read-only. Secret answers and permission-mode changes stay with the host. Codex permission requests reach both Koda and the user's own approval hooks (such as Vibe Island's); the first answer wins, as with Claude. Untrusted browser origins are rejected before HTTP RPC or notification subscriptions.
 
 ### Still Needed
 - [x] Two isolated instances (two users), live sessions/messages, presence, and relay proved with real Codex and Claude, each using Liveblocks.

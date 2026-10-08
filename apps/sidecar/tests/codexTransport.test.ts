@@ -3,8 +3,9 @@ import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
 import { CodexAppServer, runCodexTurn, type CodexApproval, type CodexQuestionRequest, type CodexTurnOptions } from '../src/agents/codexTransport.js';
 
-const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
+const mocks = vi.hoisted(() => ({ spawn: vi.fn(), runHooks: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
+vi.mock('../src/agents/codexPermissionHooks.js', async (original) => ({ ...await original<object>(), runPermissionHooks: mocks.runHooks }));
 vi.mock('../src/agents/codexModels.js', () => ({ resolveCodexPath: () => '/trusted/codex' }));
 
 describe('Codex app-server turn transport', () => {
@@ -38,6 +39,7 @@ describe('Codex app-server turn transport', () => {
     onReply = () => {};
     threadOverrides = {};
     hooksList = { data: [] };
+    mocks.runHooks.mockImplementation(async () => undefined);
     holdInitialize = false;
     child = Object.assign(new EventEmitter(), { pid: 1234, stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null });
     child.stdin = new Writable({ write(chunk, _encoding, callback) {
@@ -55,7 +57,7 @@ describe('Codex app-server turn transport', () => {
           result = hooksList;
         }
         if (message.method === 'thread/start' || message.method === 'thread/resume') result = {
-          thread: { id: 'thread-1' }, approvalPolicy: message.params.approvalPolicy,
+          thread: { id: 'thread-1', path: '/codex/sessions/thread-1.jsonl' }, approvalPolicy: message.params.approvalPolicy,
           approvalsReviewer: message.params.approvalsReviewer,
           sandbox: { type: message.params.sandbox === 'danger-full-access' ? 'dangerFullAccess' : 'workspaceWrite' },
           ...threadOverrides,
@@ -79,13 +81,54 @@ describe('Codex app-server turn transport', () => {
 
   it("switches off the user's own permission hooks for the chat, keeping managed and other hooks", async () => {
     hooksList = { data: [{ cwd: '/workspace', errors: [], warnings: [], hooks: [
-      { key: '/Users/me/.codex/hooks.json:permission_request:0:0', eventName: 'permissionRequest', isManaged: false, enabled: true },
-      { key: '/Library/managed.toml:permission_request:0:0', eventName: 'permissionRequest', isManaged: true, enabled: true },
-      { key: '/Users/me/.codex/hooks.json:pre_tool_use:0:0', eventName: 'preToolUse', isManaged: false, enabled: true },
+      { key: '/Users/me/.codex/hooks.json:permission_request:0:0', eventName: 'permissionRequest', handlerType: 'command', command: 'vibe-island-bridge --source codex', isManaged: false, enabled: true, trustStatus: 'trusted', timeoutSec: 7200 },
+      { key: '/Library/managed.toml:permission_request:0:0', eventName: 'permissionRequest', handlerType: 'command', command: 'policy', isManaged: true, enabled: true, trustStatus: 'managed' },
+      { key: '/Users/me/.codex/hooks.json:pre_tool_use:0:0', eventName: 'preToolUse', handlerType: 'command', command: 'guard', isManaged: false, enabled: true, trustStatus: 'trusted' },
     ] }] };
     await collect();
     expect(sent.find(message => message.method === 'hooks/list').params).toEqual({ cwds: ['/workspace'] });
     expect(sent.find(message => message.method === 'thread/start').params.config).toEqual({ hooks: { state: { '/Users/me/.codex/hooks.json:permission_request:0:0': { enabled: false } } } });
+  });
+  it("runs the user's permission hook next to Koda's card; a hook decision answers Codex and withdraws the card", async () => {
+    hooksList = { data: [{ cwd: '/workspace', errors: [], warnings: [], hooks: [
+      { key: 'mine', eventName: 'permissionRequest', handlerType: 'command', command: 'vibe-island-bridge --source codex', isManaged: false, enabled: true, trustStatus: 'trusted', timeoutSec: 7200 },
+    ] }] };
+    mocks.runHooks.mockImplementation(async () => 'allow');
+    let withdrawn = false;
+    options.approve = vi.fn((request: CodexApproval) => new Promise(resolve => request.signal.addEventListener('abort', () => { withdrawn = true; resolve({ decision: 'deny' as const }) })));
+    let reply: any;
+    onTurn = () => ask();
+    onReply = message => { reply = message; finish(); };
+    await collect();
+    expect(reply.result).toEqual({ decision: 'accept' });
+    expect(withdrawn).toBe(true);
+    const [hooks, hookInput] = mocks.runHooks.mock.calls[0]!;
+    expect(hooks).toEqual([{ key: 'mine', command: 'vibe-island-bridge --source codex', timeoutSec: 7200, matcher: null }]);
+    // The same input Codex gives a PermissionRequest hook.
+    expect(hookInput).toEqual({
+      session_id: 'thread-1', turn_id: 'turn-1', transcript_path: '/codex/sessions/thread-1.jsonl', cwd: '/workspace',
+      hook_event_name: 'PermissionRequest', model: 'configured-default', permission_mode: 'default',
+      tool_name: 'Bash', tool_input: { command: 'touch /elsewhere/proof', description: 'Write outside workspace' },
+    });
+  });
+  it("stops the user's hook when Koda's card is answered first", async () => {
+    let hookSignal: AbortSignal | undefined;
+    mocks.runHooks.mockImplementation((_hooks: unknown, _input: unknown, signal: AbortSignal) => { hookSignal = signal; return new Promise(resolve => signal.addEventListener('abort', () => resolve(undefined))); });
+    options.approve = vi.fn(async () => ({ decision: 'allow' as const }));
+    let reply: any;
+    onTurn = () => ask();
+    onReply = message => { reply = message; finish(); };
+    await collect();
+    expect(reply.result).toEqual({ decision: 'accept' });
+    expect(hookSignal?.aborted).toBe(true);
+  });
+  it('gives a hook the patch for a file change, as apply_patch', async () => {
+    let reply: any;
+    onTurn = () => { notify('item/started', { item: { type: 'fileChange', id: 'tool-1', status: 'inProgress', changes: [{ path: '/elsewhere/note.txt', kind: { type: 'add' }, diff: 'hello' }] } }); ask('item/fileChange/requestApproval', 0); };
+    onReply = message => { reply = message; finish(); };
+    await collect();
+    expect(reply).toBeDefined();
+    expect(mocks.runHooks.mock.calls[0]![1]).toMatchObject({ tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Add File: /elsewhere/note.txt\n+hello\n*** End Patch' } });
   });
   it('starts normally when the installed Codex cannot list hooks', async () => {
     hooksList = new Error('Method not found');

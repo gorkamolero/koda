@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline';
 import { z } from 'zod';
 import { resolveCodexPath } from './codexModels.js';
 import type { Question, QuestionDecision } from './questionBroker.js';
+import { listUserPermissionHooks, permissionHookConfig, runPermissionHooks, type PermissionHook } from './codexPermissionHooks.js';
 
 export type CodexPermissionMode = 'default' | 'bypassPermissions';
 export interface CodexUsage { input_tokens: number; cached_input_tokens: number; output_tokens: number }
@@ -26,6 +27,7 @@ export interface CodexTurnOptions {
   ask: (request: CodexQuestionRequest) => Promise<QuestionDecision>;
 }
 type Wire = Record<string, any>;
+type Decision = { from: 'koda' | 'hook'; allow: boolean };
 type RequestId = string | number;
 const UserInputQuestionsSchema = z.array(z.object({
   id: z.string().min(1), header: z.string(), question: z.string().min(1),
@@ -169,18 +171,17 @@ export function codexPermissionOptions(mode: CodexPermissionMode, cwd: string) {
     } };
 }
 
-/**
- * Koda answers a chat's permission requests itself. A user's own PermissionRequest
- * hooks (approval apps such as Vibe Island) would otherwise hold each request,
- * for hours, where Koda never sees it. Managed hooks and every other hook still run.
- */
-export async function userPermissionHookOverrides(server: Pick<CodexAppServer, 'request'>, cwd: string): Promise<{ config?: Wire }> {
-  let listed: Wire | undefined;
-  try { listed = await server.request('hooks/list', { cwds: [cwd] }); } catch { return {}; }
-  const keys = (Array.isArray(listed?.data) ? listed.data : []).flatMap((entry: Wire) => Array.isArray(entry.hooks) ? entry.hooks : [])
-    .filter((hook: Wire) => hook.eventName === 'permissionRequest' && !hook.isManaged && hook.enabled !== false && typeof hook.key === 'string')
-    .map((hook: Wire) => hook.key as string);
-  return keys.length ? { config: { hooks: { state: Object.fromEntries(keys.map((key: string) => [key, { enabled: false }])) } } } : {};
+/** Codex's patch text for a file change, rebuilt from the item the approval refers to. */
+function patchText(item: Wire | undefined): string {
+  const changes = Array.isArray(item?.changes) ? item.changes : [];
+  const body = changes.map((change: Wire) => {
+    const kind = change.kind?.type ?? change.kind;
+    const diff = typeof change.diff === 'string' ? change.diff : '';
+    if (kind === 'add') return `*** Add File: ${change.path}\n${diff.split('\n').filter(line => line.length).map(line => line.startsWith('+') ? line : `+${line}`).join('\n')}`;
+    if (kind === 'delete') return `*** Delete File: ${change.path}`;
+    return `*** Update File: ${change.path}\n${diff}`;
+  });
+  return ['*** Begin Patch', ...body, '*** End Patch'].join('\n');
 }
 
 function normalizeItem(item: Wire): CodexItem {
@@ -205,7 +206,10 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   const questions = new Map<RequestId, AbortController>();
   const questionItemIds = new Set<string>();
   let threadId: string | null = null;
+  let threadPath: string | null = null;
   let turnId: string | null = null;
+  let activeModel = options.model;
+  let permissionHooks: PermissionHook[] = [];
   let usage: CodexUsage | undefined;
   let completed = false;
   let startRequested = false;
@@ -254,15 +258,31 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
       } finally { questions.delete(requestId); }
     }
     approvals.set(requestId, controller);
+    const hooksDone = new AbortController();
     try {
       const item = items.get(params.itemId);
-      const result = await options.approve({
-        toolName: method === 'item/fileChange/requestApproval' ? 'file_change' : params.networkApprovalContext ? 'network_access' : 'command_execution',
+      const fileChange = method === 'item/fileChange/requestApproval';
+      const command = params.command ?? item?.command;
+      const hookInput = {
+        session_id: threadId, turn_id: turnId, transcript_path: threadPath, cwd: options.workingDirectory,
+        hook_event_name: 'PermissionRequest', model: activeModel, permission_mode: options.permissionMode,
+        tool_name: fileChange ? 'apply_patch' : 'Bash',
+        tool_input: fileChange ? { command: patchText(item) }
+          : { command: Array.isArray(command) ? command.join(' ') : command, ...(typeof params.reason === 'string' ? { description: params.reason } : {}) },
+      };
+      const external = runPermissionHooks(permissionHooks, hookInput, hooksDone.signal);
+      const inKoda = options.approve({
+        toolName: fileChange ? 'file_change' : params.networkApprovalContext ? 'network_access' : 'command_execution',
         input: { ...params, ...(item ? { item } : {}) }, reason: params.reason ?? undefined,
         toolUseId: params.itemId, signal: controller.signal,
-      });
-      return { decision: result.decision === 'allow' && !controller.signal.aborted && !options.signal.aborted ? 'accept' : 'decline' };
-    } finally { approvals.delete(requestId); }
+      }).then((result): Decision => ({ from: 'koda', allow: result.decision === 'allow' }));
+      const fromHook = external.then((decision): Decision | Promise<Decision> => decision ? { from: 'hook', allow: decision === 'allow' } : inKoda);
+      const first = await Promise.race<Decision>([inKoda, fromHook]);
+      // The other side stops: a hook decision withdraws Koda's card, and a Koda decision ends the hook.
+      if (first.from === 'hook') controller.abort();
+      const withdrawn = first.from === 'koda' && controller.signal.aborted;
+      return { decision: first.allow && !withdrawn && !options.signal.aborted ? 'accept' : 'decline' };
+    } finally { hooksDone.abort(); approvals.delete(requestId); }
   };
   server.onNotification = (method, params) => {
     if (params.threadId && params.threadId !== threadId) return;
@@ -301,15 +321,16 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   try {
     await server.initialize();
     let model = options.model;
+    permissionHooks = await listUserPermissionHooks(server, options.workingDirectory);
     if (model === 'default') {
       const catalog = await server.request('model/list', { limit: 100, includeHidden: false });
       model = catalog.data?.find((entry: Wire) => entry.isDefault)?.model;
       if (!model) throw new Error('Codex did not report its default model');
     }
     const permissions = codexPermissionOptions(options.permissionMode, options.workingDirectory);
-    const hookOverrides = await userPermissionHookOverrides(server, options.workingDirectory);
+    activeModel = model;
     const thread = await server.request(options.threadId ? 'thread/resume' : 'thread/start', {
-      ...(options.threadId ? { threadId: options.threadId, excludeTurns: true } : {}), ...hookOverrides,
+      ...(options.threadId ? { threadId: options.threadId, excludeTurns: true } : {}), ...permissionHookConfig(permissionHooks),
       cwd: options.workingDirectory, model, approvalPolicy: permissions.approvalPolicy,
       approvalsReviewer: permissions.approvalsReviewer, sandbox: permissions.sandbox,
     });
@@ -317,6 +338,7 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
       throw new Error('Codex did not apply the selected sandbox and approval settings. No turn was started.');
     }
     threadId = thread.thread.id;
+    threadPath = typeof thread.thread.path === 'string' ? thread.thread.path : null;
     if (options.threadId && threadId !== options.threadId) throw new Error('Codex resumed a different thread');
     yield { type: 'thread.started', thread_id: threadId! };
     startRequested = true;
