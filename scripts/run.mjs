@@ -35,12 +35,14 @@ try {
     await run(['--filter', 'desktop', 'tauri', 'dev', ...process.argv.slice(3)])
   } else if (process.argv[2] === 'sidecar') {
     await run(['--filter', '@koda/sidecar', 'dev', ...process.argv.slice(3)])
+  } else if (process.argv[2] === 'verify-clean') {
+    await run([path.join(root, 'scripts/verify-clean.mjs')], process.execPath)
   } else if (process.argv[2] === 'built') {
     const executable = path.join(root, 'apps/desktop/src-tauri/target/debug/bundle/macos/Koda.app/Contents/MacOS/koda-desktop')
     if (!existsSync(executable)) throw new Error('Build the local app first: pnpm --filter desktop tauri build --debug --bundles app')
     await run(process.argv.slice(3), executable)
   } else {
-    throw new Error('Usage: node scripts/run.mjs app|sidecar|built')
+    throw new Error('Usage: node scripts/run.mjs app|sidecar|built|verify-clean')
   }
 } catch (error) {
   console.error(error.message)

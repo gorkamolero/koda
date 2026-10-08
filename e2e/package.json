@@ -6,7 +6,10 @@
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:debug": "playwright test --debug"
+    "test:debug": "playwright test --debug",
+    "test:proof": "playwright test --config proof.config.ts",
+    "test:proof:codex": "playwright test --config proof.config.ts codex-proof.spec.ts",
+    "test:proof:collaboration": "playwright test --config proof.config.ts collaboration-proof.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

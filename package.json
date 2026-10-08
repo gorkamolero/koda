@@ -7,6 +7,7 @@
   "scripts": {
     "app": "node scripts/run.mjs app",
     "app:built": "node scripts/run.mjs built",
+    "verify:clean": "node scripts/run.mjs verify-clean",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
