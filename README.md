@@ -1,12 +1,12 @@
 # Koda
 
-**The Review-First Agent IDE**
+**The Review-First, Collaborative Agent IDE**
 
-> "Who's building an IDE for reviewing code instead of writing code? Don't only show me diffs. Show me before/after UIs, terminal output, benchmarks, playgrounds, demos, test results." — Johannes Schickling
+[![Koda: Claude running on one Mac, a collaborator on another, in the same agent session](https://gorkamolero.github.io/assets/koda/koda-poster.jpg)](https://gorkamolero.github.io/#koda)
 
-Koda is a desktop IDE for the agentic era. Traditional IDEs are for writing code. Koda is for **orchestrating agents and reviewing their work**.
+Koda runs Codex or Claude sessions in isolated git worktrees on your Mac. Share a workspace and a teammate opens it from their own Koda. They see the same transcript and tool calls live, and with control they can message the agent too. Their message lands in your session, signed with their name.
 
-Koda's first milestone was deliberate: match the interface quality bar Conductor set before diverging. Conductor proved what an agent-orchestration UI should feel like; Koda builds from that bar toward review-first workflows, collaboration, shared workspaces, and richer proof surfaces for agent output.
+[Watch the 35-second recording](https://gorkamolero.github.io/#koda) of one Claude session shared live between two Macs.
 
 ---
 
