@@ -2,17 +2,20 @@
 
 Living document for planned features.
 
-> **Status, 2026-10-07:** The real Codex and two-instance Liveblocks proofs pass. Codex is the default agent, models are selectable in the UI, sessions survive process restarts, and host-side checks enforce view/control invitations. See `VERIFY.md` for reproduction commands, native-versus-browser verification scope, and the clean-clone evidence manifest.
+> **Status, 2026-10-08:** The real Codex and Claude UI proofs and each agent's two-instance Liveblocks proof pass. Codex is the default; new chats can select either agent and its discovered models. Both agents resume the same conversation after process restarts. Host-side checks enforce view/control invitations. See `VERIFY.md` for reproduction commands, native-versus-browser verification scope, and the clean-clone evidence manifest for the commit under review.
 
-## Codex desktop flow
+## Codex and Claude desktop flow
 
 - [x] Add a local repository and create an isolated git worktree through the UI.
-- [x] Choose from the installed Codex model catalog and stream real agent messages.
+- [x] Select Codex or Claude for a new chat, discover models from its installed CLI, and stream real agent messages.
+- [x] Keep separate model preferences for each agent and restore the saved session's agent/model.
 - [x] See modified and untracked files with diffs.
 - [x] Save a checkpoint without changing the working files or staging index.
-- [x] Restart both app processes, restore workspace/session/model, and continue the saved Codex thread.
+- [x] Restart both app processes, restore workspace/session/model, and get a fresh reply in the same upstream Codex or Claude conversation.
 - [x] Native macOS build/launch, independent instance profiles, terminal startup, and notification-safe native RPC.
-- [x] Automated real-service Playwright proof with per-step screenshots; `pnpm verify:clean` reproduces both proofs from committed source.
+- [x] Automated real-service Playwright proofs with per-step screenshots; `pnpm verify:clean` runs all four proofs from committed source.
+
+Claude uses the official Agent SDK and the user's installed, authenticated Claude CLI. Worktree file writes and sandboxed shell commands are supported; requests requiring broader approval fail visibly. Model catalogs are discovered at runtime, with a custom model ID option; new model releases normally require no Koda code change. CLI support and account access still apply.
 
 ---
 
@@ -104,12 +107,12 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] Sidecar publishes sessions and streaming transcripts through Liveblocks.
 - [x] Both users see presence; a guest can view the host's sessions and messages.
 - [x] Share/join controls issue signed view or control invitations.
-- [x] Control messages reach the host's real Codex session and both users see its live reply.
+- [x] Control messages reach the host's real Codex or Claude session and both users see its live reply.
 - [x] View access is enforced by the host as well as the UI; replacing an invitation revokes the previous grant.
 - [x] Relay broadcasts do not expose invitation tokens, and signed requests cannot be modified or replayed to execute twice.
 
 ### Still Needed
-- [x] Two isolated instances (two users), live sessions/messages, presence, and relay proved with real Codex and Liveblocks.
+- [x] Two isolated instances (two users), live sessions/messages, presence, and relay proved with real Codex and Claude, each using Liveblocks.
 - [x] View/control checks and revoked-control rejection proved at the host's authorization boundary.
 - [ ] Cross-machine test (two Macs), after the same-machine proof
 
@@ -238,4 +241,4 @@ Currently Koda is worktree-based — every workspace is an isolated branch. Add 
 
 ---
 
-*Last updated: 2026-10-07*
+*Last updated: 2026-10-08*

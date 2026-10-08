@@ -1,4 +1,4 @@
-/** Reproduce both real-service proofs from the committed tree, without copying local files. */
+/** Reproduce the real-service proofs from the committed tree, without copying local files. */
 import { spawn, execFileSync } from 'node:child_process'
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, cpSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,7 +34,7 @@ const manifest = {
   clonePath: clone,
   status: 'running',
   stages: [],
-  evidence: 'Real Codex and Liveblocks proofs in a git clone --no-local of committed HEAD; no ignored source files copied.',
+  evidence: 'Real Codex, Claude, and Liveblocks proofs in a git clone --no-local of committed HEAD; no ignored source files copied.',
 }
 const saveManifest = () => writeFileSync(path.join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 saveManifest()
@@ -89,7 +89,7 @@ try {
   await run('Install locked dependencies', 'pnpm', ['install', '--frozen-lockfile'])
   await run('Install Chromium', 'pnpm', ['--filter', 'e2e', 'exec', 'playwright', 'install', 'chromium'])
   await run('Build from source', 'pnpm', ['build', '--force'])
-  await run('Run both real service proofs', 'pnpm', ['--filter', 'e2e', 'test:proof'])
+  await run('Run all real service proofs', 'pnpm', ['--filter', 'e2e', 'test:proof'])
   retainProofs()
   if (git('rev-parse', 'HEAD') !== head || git('status', '--porcelain', '--untracked-files=normal')) {
     throw new Error('The source checkout changed during verification; commit and rerun for a final reproducible result')
@@ -99,7 +99,7 @@ try {
   manifest.cloneRemoved = true
   saveManifest()
   rmSync(temporary, { recursive: true, force: true })
-  console.log(`[Clean proof] Both proofs passed for ${head}. Evidence: ${output}`)
+  console.log(`[Clean proof] All proofs passed for ${head}. Evidence: ${output}`)
 } catch (error) {
   retainProofs()
   manifest.status = interrupted ? 'interrupted' : 'failed'

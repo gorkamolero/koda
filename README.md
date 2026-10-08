@@ -19,6 +19,7 @@ Koda's first milestone was deliberate: match the interface quality bar Conductor
 - Rust toolchain (for Tauri)
 - macOS (Windows/Linux support planned)
 - An installed Codex CLI, signed in with `codex login`
+- For Claude: an installed Claude CLI, signed in with `claude auth login`
 
 ### Install
 
@@ -39,7 +40,7 @@ pnpm desktop   # Tauri desktop shell
 pnpm sidecar   # Node.js orchestration layer
 ```
 
-Codex is the default agent. Choose a model from the installed Codex model catalog in the chat UI; sessions and model choices survive restarts. Koda uses the installed Codex CLI through the TypeScript SDK and does not execute the legacy SDK's bundled binary.
+Codex is the default agent. New chats can select Codex or Claude, with a separate model picker for each. Koda uses the official agent SDKs with the installed CLIs; saved sessions retain their agent and model across restarts. Claude authentication stays with the local Claude CLI. See the dated authentication research in [VERIFY.md](./VERIFY.md).
 
 For collaboration, copy `.env.example` to `.env.local` and set `LIVEBLOCKS_SECRET_KEY` to a Liveblocks development secret. It stays on the sidecar and is ignored by git. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**.
 
@@ -113,11 +114,11 @@ Isolated environments for agent work. Each workspace is a git worktree with its 
 
 ### Agent Sessions
 
-Conversations with AI agents (Claude, Codex, Kimi). Sessions persist across restarts and can be forked/shared.
+Conversations with Codex or Claude retain their messages, selected model, and upstream agent session for continuation after restarts. Workspaces can be shared with view or control access. Kimi and cross-agent conversation forks are outside the verified flow.
 
 ### Checkpoints
 
-Git snapshots at each agent turn. Undo any change instantly — time travel for your codebase.
+Save a worktree snapshot from the chat and restore it when needed. Saving a checkpoint preserves the working files and staging index.
 
 ### Visual Diffs
 
@@ -131,7 +132,7 @@ Not just code diffs — before/after screenshots of your running app. See what c
 |-----|-------------|
 | [SPEC.md](./SPEC.md) | Full architecture and design spec |
 | [FEATURES.md](./FEATURES.md) | Feature roadmap and status |
-| [VERIFY.md](./VERIFY.md) | Reproduce the Codex and collaboration proofs |
+| [VERIFY.md](./VERIFY.md) | Reproduce the Codex, Claude, and collaboration proofs |
 | [API.md](./API.md) | JSON-RPC method reference |
 | [docs/koda-collaboration.md](./docs/koda-collaboration.md) | Collaboration architecture |
 
