@@ -1,6 +1,6 @@
 /** Host-authoritative Liveblocks synchronization and signed workspace invitations. */
 import { Liveblocks } from '@liveblocks/node'
-import { createClient, LiveList, LiveMap, LiveObject, type Room } from '@liveblocks/client'
+import { createClient, LiveList, LiveMap, LiveObject, type JsonObject, type Room } from '@liveblocks/client'
 import WebSocket from 'ws'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
@@ -8,11 +8,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { eq } from 'drizzle-orm'
 import { getDb } from '../db/index.js'
-import { sessions, worktrees } from '../db/schema.js'
+import { repos, sessions, worktrees } from '../db/schema.js'
 import { router } from '../rpc/router.js'
 import { getNotificationEmitter } from '../rpc/notifications.js'
 import { config } from '../config.js'
-import { authorizeRelay, signCapability, verifyCapability, signRelay, verifyRelay, type RelayCommand, type Capability } from './capabilities.js'
+import { getPty } from '../handlers/pty.js'
+import { authorizeRelay, signCapability, verifyCapability, signRelay, verifyRelay, type RelayCommand, type Capability, type RemoteRequest, type RemoteResponse, type RemoteNotification } from './capabilities.js'
+import { executeRemoteRequest } from './remoteAccess.js'
 
 export type SessionData = {
   id: string; worktreeId: string | null; agentType: string | null; model: string | null;
@@ -31,14 +33,22 @@ type SharedStorage = {
   comments: LiveList<LiveObject<{ id: string }>>;
 }
 type RelayEvent = RelayCommand
-type RelayResult = { type: 'relay-result'; requestId: string; error: string | null }
-type SyncEvent = RelayEvent | RelayResult
+export type RelayResult = { type: 'relay-result'; requestId: string; error: string | null }
+export type SyncEvent = RelayEvent | RelayResult | RemoteRequest | RemoteResponse | RemoteNotification
 
 // Choose the runtime from the host's persisted session, never guest input.
-function agentMethods(agentType: string | null) {
-  if (agentType === 'codex') return { messages: 'codex.getMessages', send: 'codex.send' }
-  if (agentType === 'claude') return { messages: 'claude.getMessages', send: 'claude.send' }
+function sendMethod(agentType: string | null) {
+  if (agentType === 'codex') return 'codex.send'
+  if (agentType === 'claude') return 'claude.send'
   return undefined
+}
+
+const RESPONSE_CHUNK = 256_000
+/** Splits a response below the Liveblocks message limit. */
+export function responseChunks(requestId: string, outcome: { result?: unknown; error?: string }): RemoteResponse[] {
+  const data = JSON.stringify(outcome)
+  const total = Math.max(1, Math.ceil(data.length / RESPONSE_CHUNK))
+  return Array.from({ length: total }, (_, index) => ({ type: 'rpc-response', requestId, index, total, data: data.slice(index * RESPONSE_CHUNK, (index + 1) * RESPONSE_CHUNK) }))
 }
 
 type StoredState = { machineId: string; invitations: Record<string, string>; grants: Record<string, string>; receipts: Record<string, { error: string | null }> }
@@ -70,11 +80,12 @@ let api: Liveblocks | undefined
 function getApi() { return api ??= new Liveblocks({ secret: secret() }) }
 export function isCollaborationEnabled() { return Boolean(process.env.LIVEBLOCKS_SECRET_KEY) }
 
-async function token(roomId: string, host = false, name = getMachineName()) {
-  const session = getApi().prepareSession(`${getMachineId()}${host ? ':host' : ':ui'}`, {
+/** The host service writes storage; the UI and a guest's service only read it and broadcast. */
+export async function token(roomId: string, role: 'host' | 'ui' | 'guest' = 'ui', name = getMachineName()) {
+  const session = getApi().prepareSession(`${getMachineId()}:${role}`, {
     userInfo: { name, machineId: getMachineId(), color: '#22c55e' },
   })
-  session.allow(roomId, host ? session.FULL_ACCESS : session.READ_ACCESS)
+  session.allow(roomId, role === 'host' ? session.FULL_ACCESS : session.READ_ACCESS)
   const response = await session.authorize()
   if (response.status !== 200) throw new Error(`Liveblocks authorization failed (${response.status})`)
   return JSON.parse(response.body) as { token: string }
@@ -89,7 +100,7 @@ export async function authorizeRoom(roomId: string, name?: string) {
     if (!invitation || verifyCapability(invitation, secret()).roomId !== roomId) throw new Error('Join this shared workspace first')
   }
   // UI clients, including the owner's, never mutate the authoritative transcript.
-  return token(roomId, false, name)
+  return token(roomId, 'ui', name)
 }
 
 export async function shareWorkspace(worktreeId: string, permission: 'view' | 'control') {
@@ -102,7 +113,9 @@ export async function shareWorkspace(worktreeId: string, permission: 'view' | 'c
     if (!worktree.collaborative) db.update(worktrees).set({ collaborative: false }).where(eq(worktrees.id, worktreeId)).run()
     throw error
   }
-  const capability: Capability = { version: 1, roomId: `workspace:${worktreeId}`, worktreeId, hostMachineId: getMachineId(), permission, nonce: randomUUID() }
+  const repo = worktree.repoId ? db.select().from(repos).where(eq(repos.id, worktree.repoId)).get() : undefined
+  const workspaceName = [repo?.name, worktree.branch].filter(Boolean).join(' / ') || 'Shared workspace'
+  const capability: Capability = { version: 1, roomId: `workspace:${worktreeId}`, worktreeId, hostMachineId: getMachineId(), permission, nonce: randomUUID(), workspaceName: workspaceName.slice(0, 200), hostName: getMachineName().slice(0, 100) }
   const invitation = signCapability(capability, secret())
   // Sharing has one current invitation per workspace. Replacing it revokes old
   // control grants at the host, including requests saved before a downgrade.
@@ -129,6 +142,9 @@ export function getInvitation(roomId: string) {
   return { invitation, ...verifyCapability(invitation, secret()) }
 }
 
+/** The current invitation for a grant, or undefined once replaced. */
+export function grantInvitation(grantId: string): string | undefined { return getState().grants[grantId] }
+
 export function prepareRelay(roomId: string, sessionId: string, content: string, requestId: string) {
   const { invitation, nonce } = getInvitation(roomId)
   return signRelay({ type: 'relay', roomId, grantId: nonce, requestId, sessionId, content, authorName: getMachineName(), authorMachineId: getMachineId() }, invitation)
@@ -146,6 +162,20 @@ export class SyncManager {
   private generation = 0
 
   constructor(readonly workspaceId: string) { this.roomId = `workspace:${workspaceId}` }
+  private root: string | null | undefined
+  /** Whether a terminal's directory belongs to this shared worktree. */
+  contains(directory: string) {
+    if (!this.room) return false
+    if (this.root === undefined) {
+      const worktreePath = getDb().select().from(worktrees).where(eq(worktrees.id, this.workspaceId)).get()?.worktreePath
+      try { this.root = worktreePath ? fs.realpathSync(worktreePath) : null } catch { this.root = null }
+    }
+    if (!this.root) return false
+    try {
+      const target = fs.realpathSync(directory)
+      return target === this.root || target.startsWith(this.root + path.sep)
+    } catch { return false }
+  }
   isEnabled() { return isCollaborationEnabled() }
   connect(): Promise<void> {
     if (!this.connecting) this.connecting = this.open().catch((error) => { this.connecting = undefined; throw error })
@@ -156,9 +186,9 @@ export class SyncManager {
     if (!worktree?.collaborative) throw new Error('Workspace sharing is disabled')
     await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
     const client = createClient({
-      authEndpoint: () => token(this.roomId, true),
+      authEndpoint: () => token(this.roomId, 'host'),
       polyfills: { WebSocket: WebSocket as never, fetch },
-      throttle: 100,
+      throttle: 50,
     })
     const { room, leave } = client.enterRoom<any, SharedStorage, SyncEvent>(this.roomId, {
       initialPresence: { name: getMachineName(), machineId: getMachineId(), color: '#22c55e', service: true },
@@ -171,6 +201,7 @@ export class SyncManager {
     this.leave = leave
     room.subscribe('event', ({ event }) => {
       if (event.type === 'relay') void this.receive(event)
+      else if (event.type === 'rpc-request' && event.roomId === this.roomId) void this.answer(event)
     })
     room.subscribe('status', (status) => {
       if (status === 'connected') {
@@ -200,32 +231,22 @@ export class SyncManager {
       if (!worktree?.collaborative) { this.close(); return }
       const { root } = await room.getStorage()
       if (this.room !== room || this.generation !== generation) return
-      // Existing rooms from earlier versions may not have transcripts yet.
-      if (!root.get('transcripts')) root.set('transcripts', new LiveMap())
       const all = db.select().from(sessions).where(eq(sessions.worktreeId, this.workspaceId)).all()
       const sessionIds = new Set(all.map((session) => session.id))
       for (const id of root.get('sessions').keys()) {
         if (!sessionIds.has(id)) {
           root.get('sessions').delete(id)
-          root.get('transcripts').delete(id)
-          root.get('messages').delete(id)
           this.cache.delete(id)
-          this.cache.delete(`messages:${id}`)
         }
       }
+      // Guests read transcripts from the host on demand; earlier versions copied them here.
+      const transcripts = root.get('transcripts')
+      if (transcripts) for (const id of [...transcripts.keys()]) transcripts.delete(id)
       for (const session of all) {
         const data: SessionData = { id: session.id, worktreeId: session.worktreeId, agentType: session.agentType, model: session.model, status: session.status, title: session.title, createdAt: session.createdAt, updatedAt: session.updatedAt, hostMachineId: getMachineId(), hostMachineName: getMachineName(), createdByUserId: null }
         const encoded = JSON.stringify(data)
         if (this.cache.get(session.id) !== encoded) {
           root.get('sessions').set(session.id, new LiveObject(data)); this.cache.set(session.id, encoded)
-        }
-        const methods = agentMethods(session.agentType)
-        const handler = methods && router.get(methods.messages)
-        if (!handler) continue
-        const transcript = JSON.stringify(await handler({ sessionId: session.id }))
-        if (this.room !== room || this.generation !== generation) return
-        if (this.cache.get(`messages:${session.id}`) !== transcript) {
-          root.get('transcripts').set(session.id, transcript); this.cache.set(`messages:${session.id}`, transcript)
         }
       }
     } finally {
@@ -253,8 +274,8 @@ export class SyncManager {
       const receipt = getState().receipts[receiptKey]
       if (receipt) error = receipt.error
       else {
-        const methods = agentMethods(session.agentType)
-        const send = methods && router.get(methods.send)
+        const method = sendMethod(session.agentType)
+        const send = method && router.getLocal(method)
         if (!send) throw new Error('Remote control is unavailable for this session type')
         // Persist before dispatch so reconnects/replayed requests cannot execute twice.
         claimed = true
@@ -273,7 +294,44 @@ export class SyncManager {
     this.room?.broadcastEvent(result)
     return result
   }
-  close() { this.generation++; clearInterval(this.syncTimer); this.leave?.(); this.room = undefined; this.connecting = undefined; this.cache.clear() }
+  /** Answers a guest's read with the host's own handler, after the scope checks. */
+  async answer(request: RemoteRequest) {
+    const outcome = await executeRemoteRequest(request, { roomId: this.roomId, worktreeId: this.workspaceId, hostMachineId: getMachineId(), secret: secret(), grant: grantInvitation })
+    for (const chunk of responseChunks(request.requestId, outcome)) this.room?.broadcastEvent(chunk)
+    return outcome
+  }
+  private pendingMessages = new Map<string, { params: JsonObject; timer: NodeJS.Timeout }>()
+  private pendingOutput = new Map<string, { data: string; timer: NodeJS.Timeout }>()
+  /** Live events for guests. Streaming deltas are coalesced; guests refetch the transcript anyway. */
+  forward(method: string, params: JsonObject & { sessionId: string; data?: string }) {
+    if (!this.room) return
+    if (method === 'message') {
+      const pending = this.pendingMessages.get(params.sessionId)
+      if (pending) { pending.params = params; return }
+      this.pendingMessages.set(params.sessionId, { params, timer: setTimeout(() => {
+        const latest = this.pendingMessages.get(params.sessionId)
+        this.pendingMessages.delete(params.sessionId)
+        if (latest) this.room?.broadcastEvent({ type: 'notify', method, params: latest.params })
+      }, 200) })
+      return
+    }
+    if (method === 'pty.data') {
+      const pending = this.pendingOutput.get(params.sessionId)
+      if (pending) { pending.data += params.data ?? ''; return }
+      this.pendingOutput.set(params.sessionId, { data: params.data ?? '', timer: setTimeout(() => {
+        const latest = this.pendingOutput.get(params.sessionId)
+        this.pendingOutput.delete(params.sessionId)
+        if (latest) this.room?.broadcastEvent({ type: 'notify', method, params: { sessionId: params.sessionId, data: latest.data } })
+      }, 50) })
+      return
+    }
+    this.room.broadcastEvent({ type: 'notify', method, params })
+  }
+  close() {
+    this.generation++; clearInterval(this.syncTimer); this.leave?.(); this.room = undefined; this.connecting = undefined; this.cache.clear()
+    for (const pending of [...this.pendingMessages.values(), ...this.pendingOutput.values()]) clearTimeout(pending.timer)
+    this.pendingMessages.clear(); this.pendingOutput.clear()
+  }
   async syncSession(_session?: unknown) { await this.connect(); await this.sync() }
   async addMessage(_sessionId?: string, _message?: unknown) { await this.sync() }
   async updateSessionStatus(_sessionId?: string, _status?: string) { await this.sync() }
@@ -289,11 +347,26 @@ export function initializeCollaboration() {
   for (const worktree of getDb().select().from(worktrees).where(eq(worktrees.collaborative, true)).all()) {
     void getSyncManager(worktree.id).connect().catch((error) => console.error('[Sync]', error.message))
   }
+  const sessionWorktrees = new Map<string, string | null>()
   getNotificationEmitter().subscribe((method, params) => {
-    if (!['message', 'sessionStatus'].includes(method)) return
-    const sessionId = (params as { sessionId?: string })?.sessionId
+    const payload = params as JsonObject & { sessionId?: string; data?: string }
+    const sessionId = payload?.sessionId
     if (!sessionId) return
-    const session = getDb().select().from(sessions).where(eq(sessions.id, sessionId)).get()
-    if (session?.worktreeId) void managers.get(session.worktreeId)?.sync().catch((error) => console.error('[Sync]', error.message))
+    if (method === 'message' || method === 'sessionStatus') {
+      if (!sessionWorktrees.has(sessionId) || method === 'sessionStatus') {
+        sessionWorktrees.set(sessionId, getDb().select().from(sessions).where(eq(sessions.id, sessionId)).get()?.worktreeId ?? null)
+      }
+      const manager = managers.get(sessionWorktrees.get(sessionId) ?? '')
+      if (!manager) return
+      manager.forward(method, { ...payload, sessionId })
+      if (method === 'sessionStatus') void manager.sync().catch((error) => console.error('[Sync]', error.message))
+      return
+    }
+    if (method !== 'pty.data' && method !== 'pty.exit') return
+    const pty = getPty({ sessionId })
+    if (!pty) return
+    for (const manager of managers.values()) {
+      if (manager.contains(pty.workingDirectory)) manager.forward(method, { ...payload, sessionId })
+    }
   })
 }

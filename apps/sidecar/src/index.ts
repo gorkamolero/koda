@@ -148,6 +148,7 @@ import {
   closePty,
   getPty,
   listPtySessions,
+  snapshotPty,
   setOnDataCallback,
   setOnExitCallback,
   cleanupAllSessions,
@@ -156,6 +157,7 @@ import {
   ResizePtySchema,
   ClosePtySchema,
   GetPtySchema,
+  SnapshotPtySchema,
 } from './handlers/pty.js';
 
 // Import diff handlers
@@ -303,6 +305,7 @@ function registerMethods() {
   router.register('pty.close', closePty, ClosePtySchema);
   router.register('pty.get', getPty, GetPtySchema);
   router.register('pty.list', listPtySessions);
+  router.register('pty.snapshot', snapshotPty, SnapshotPtySchema);
 
   // Diff management (for MCP tools)
   router.register('workspace.getDiff', getWorkspaceDiff, GetWorkspaceDiffSchema);

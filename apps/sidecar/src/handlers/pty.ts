@@ -19,7 +19,11 @@ interface PtySession {
   pty: pty.IPty
   workingDirectory: string
   createdAt: Date
+  /** Recent output, so a collaborator who opens the workspace later sees the screen. */
+  output: string
 }
+
+const OUTPUT_LIMIT = 200_000
 
 // Active PTY sessions
 const sessions = new Map<string, PtySession>()
@@ -55,6 +59,10 @@ export const ClosePtySchema = z.object({
 })
 
 export const GetPtySchema = z.object({
+  sessionId: z.string(),
+})
+
+export const SnapshotPtySchema = z.object({
   sessionId: z.string(),
 })
 
@@ -103,11 +111,13 @@ export function createPty(params: z.infer<typeof CreatePtySchema>): {
     pty: ptyProcess,
     workingDirectory: workingDirectory || process.env.HOME || '/',
     createdAt: new Date(),
+    output: '',
   }
   sessions.set(sessionId, session)
 
   // Handle data output
   ptyProcess.onData((data) => {
+    session.output = (session.output + data).slice(-OUTPUT_LIMIT)
     if (onDataCallback) {
       onDataCallback(sessionId, data)
     }
@@ -205,6 +215,15 @@ export function getPty(params: z.infer<typeof GetPtySchema>): {
     workingDirectory: session.workingDirectory,
     createdAt: session.createdAt.toISOString(),
   }
+}
+
+/**
+ * Recent output of a PTY session
+ */
+export function snapshotPty(params: z.infer<typeof SnapshotPtySchema>): { data: string } {
+  const session = sessions.get(params.sessionId)
+  if (!session) throw new Error(`PTY session not found: ${params.sessionId}`)
+  return { data: session.output }
 }
 
 /**

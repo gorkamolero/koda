@@ -4,8 +4,16 @@ import type { RpcHandler, RpcRouterMap } from '../types/rpc.js';
 /**
  * Type-safe RPC router with Zod validation
  */
+export type RpcInterceptor = (method: string, params: unknown) => Promise<{ result: unknown } | undefined>
+
 export class RpcRouter {
   private handlers: RpcRouterMap = {};
+  private interceptor: RpcInterceptor | undefined;
+
+  /** Lets shared workspaces answer calls for IDs that live on another machine. */
+  setInterceptor(interceptor: RpcInterceptor | undefined): void {
+    this.interceptor = interceptor;
+  }
 
   /**
    * Register a method handler with optional schema validation
@@ -38,6 +46,17 @@ export class RpcRouter {
    * Get handler for a method
    */
   get(method: string): RpcHandler | undefined {
+    const local = this.handlers[method];
+    const interceptor = this.interceptor;
+    if (!local || !interceptor) return local;
+    return async (params) => {
+      const routed = await interceptor(method, params);
+      return routed ? routed.result : local(params);
+    };
+  }
+
+  /** The handler on this machine, never forwarded. */
+  getLocal(method: string): RpcHandler | undefined {
     return this.handlers[method];
   }
 

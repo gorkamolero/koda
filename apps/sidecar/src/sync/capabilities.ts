@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
+import type { JsonObject } from '@liveblocks/client'
 
 export const CapabilitySchema = z.object({
   version: z.literal(1),
@@ -8,6 +9,9 @@ export const CapabilitySchema = z.object({
   hostMachineId: z.string(),
   permission: z.enum(['view', 'control']),
   nonce: z.string().uuid(),
+  // Display-only labels, signed with the invitation so guests can list it offline.
+  workspaceName: z.string().max(200).optional(),
+  hostName: z.string().max(100).optional(),
 })
 export type Capability = z.infer<typeof CapabilitySchema>
 
@@ -54,3 +58,20 @@ export function verifyRelay(command: RelayCommand, invitation: string): void {
   const expected = Buffer.from(signRelay(command, invitation).signature, 'base64url')
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error('Invalid relay signature')
 }
+
+/** Guest reads of a shared workspace, executed by the host after scope checks. */
+export type RemoteRequest = { type: 'rpc-request'; roomId: string; grantId: string; requestId: string; method: string; params: string; signature: string }
+function remoteBody(request: Omit<RemoteRequest, 'signature'>): string {
+  return JSON.stringify([request.roomId, request.grantId, request.requestId, request.method, request.params])
+}
+export function signRemoteRequest(request: Omit<RemoteRequest, 'signature'>, invitation: string): RemoteRequest {
+  return { ...request, signature: createHmac('sha256', invitation).update(remoteBody(request)).digest('base64url') }
+}
+export function verifyRemoteRequest(request: RemoteRequest, invitation: string): void {
+  const actual = Buffer.from(request.signature, 'base64url')
+  const expected = Buffer.from(signRemoteRequest(request, invitation).signature, 'base64url')
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new Error('Invalid request signature')
+}
+/** Responses can exceed one Liveblocks message, so they travel in ordered chunks. */
+export type RemoteResponse = { type: 'rpc-response'; requestId: string; index: number; total: number; data: string }
+export type RemoteNotification = { type: 'notify'; method: string; params: JsonObject }

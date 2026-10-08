@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { router } from '../rpc/router.js'
+import { routeRemoteCall } from './guest.js'
 import { authorizeRoom, getInvitation, getMachineId, getMachineName, getSyncManager, initializeCollaboration, isCollaborationEnabled, joinWorkspace, listSharedWorkspaces, prepareRelay, shareWorkspace } from './LiveblocksClient.js'
 
 export function registerCollaborationMethods() {
@@ -13,5 +14,7 @@ export function registerCollaborationMethods() {
   // The same authoritative receiver used by the realtime relay. Exposed locally for
   // retries/diagnostics and for negative authorization tests; it never trusts UI permission.
   router.register('collaboration.relay', async (input) => getSyncManager(input.worktreeId).receive({ ...input, type: 'relay' }), z.object({ worktreeId: z.string().uuid(), roomId: z.string(), grantId: z.string(), signature: z.string(), authorName: z.string().max(100).optional(), authorMachineId: z.string().max(100).optional(), requestId: z.string(), sessionId: z.string(), content: z.string() }))
+  // Calls about a joined workspace are answered by its host.
+  router.setInterceptor(routeRemoteCall)
   initializeCollaboration()
 }
