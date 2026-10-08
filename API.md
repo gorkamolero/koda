@@ -168,8 +168,21 @@ Pseudo-terminal management for agent command execution.
 | `pty.close` | `{ sessionId }` | Close terminal |
 | `pty.get` | `{ sessionId }` | Get terminal session |
 | `pty.list` | none | List active terminals |
+| `pty.snapshot` | `{ sessionId }` | Recent output of a terminal (up to 200 KB) |
 
 **Notifications:** PTY data streams via `pty.data` notification.
+
+### Collaboration
+
+| Method | Params | Description |
+|--------|--------|-------------|
+| `collaboration.status` | none | Whether Liveblocks is configured, plus this machine's ID and name |
+| `collaboration.share` | `{ worktreeId, permission: 'view' \| 'control' }` | Create the workspace's invitation; replaces earlier invitations |
+| `collaboration.join` | `{ invitation }` | Store an invitation from another machine |
+| `collaboration.list` | none | Joined workspaces with permission, workspace name and host name |
+| `collaboration.auth` | `{ roomId, name? }` | Liveblocks token for this machine's UI |
+
+On a collaborator's machine, calls about a joined workspace are answered by the host: `worktree.get`, `worktree.getDiff`, `session.list`, `checkpoint.list`, `github.getChecks`, `activity.list`, `activity.unreadCount`, the Codex and Claude `get`, `getMessages` and `models` methods, `fs.readDirectory` and `fs.readFile` inside the worktree, and `pty.list` and `pty.snapshot` for the worktree's terminals. `worktree.get` adds `remote: { roomId, permission, hostName, hostMachineId }`. `codex.send` and `claude.send` travel through the signed relay and need control permission. Every other method for a joined workspace is refused. The host checks each request against the current invitation and keeps it inside the shared worktree. Its `message`, `sessionStatus`, `pty.data` and `pty.exit` notifications are replayed on the collaborator's machine.
 
 ---
 

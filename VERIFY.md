@@ -69,7 +69,7 @@ This exercises the same repository, worktree, streamed task, diff, and checkpoin
 pnpm --filter e2e test:proof:collaboration
 ```
 
-Each agent's collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control, user B joins, and both see presence and the streamed conversation. B sends a message to A's actual Codex or Claude session through Liveblocks. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation.
+Each agent's collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control and user B joins from B's own sidebar, which keeps B's projects and lists A's workspace under Shared. B gets the normal workspace view of A's session: the streamed conversation with tool calls, A's changes, and a read-only mirror of A's terminal, with presence on both sides. B sends a message to A's actual Codex or Claude session through Liveblocks, and each message shows its author. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation.
 
 Run all proofs together:
 
@@ -80,17 +80,19 @@ pnpm --filter e2e exec playwright show-report proof-report
 
 Screenshots, structured evidence, and logs are written under `e2e/proof-results/`; the HTML report is `e2e/proof-report/`. Both directories are ignored. Failure traces may include invitation credentials, so keep them local. The tests stop their own processes and remove their temporary data directories.
 
-## Record the collaboration
+## Record the collaboration on two machines
 
-After the live proofs pass, with Claude signed in, Liveblocks configured, and `ffmpeg` available:
+The recording uses two Macs. This one hosts the workspace and runs Claude; the collaborator Mac runs its own Koda sidecar, frontend and headless Chromium. Both need this checkout at `~/Developer/koda` on the collaborator, built dependencies, a `.env.local` with the same Liveblocks development secret, Tailscale, and SSH access by host alias. The collaborator does not need Claude or Codex.
 
 ```sh
-pnpm --filter e2e record:collaboration
+pnpm --filter e2e record:two-machine
 ```
 
-The recording shows two actual browser clients and isolated sidecars side by side at 1920×1080: Claude drafts a launch plan, a collaborator requests a revision through the relay, then a view-only collaborator watches another update. The setup and invitations are kept outside the filmed sequence. The host runs the real Claude CLI; the collaborator sends requests and receives the shared transcript through Liveblocks.
+`KODA_COLLABORATOR_SSH` selects the collaborator's SSH alias (default `cyberyogin`); `KODA_HOST_NAME` and `KODA_GUEST_NAME` set the names shown in the session (default `Gorka` and `Alex`). The collaborator's browser listens only on its Tailscale address behind a random path for the length of the run.
 
-The original `user-A.raw.webm` and `user-B.raw.webm` recordings, a synchronized side-by-side `collaboration.mp4`, a final frame, and `evidence.json` are retained under `proof-results/collaboration-video/<timestamp>/`. The evidence records synchronization and the composition of the two actual browser recordings. This is a silent browser recording, not native macOS window capture. Temporary repositories, data directories, processes, and the test Liveblocks room are cleaned up after recording.
+Before filming, the script creates both users' projects, starts a Claude session, shares it with control permission and joins it from the collaborator, so no invitation appears on screen. It then captures both screens on one clock while the collaborator opens the shared workspace from their own sidebar, the host asks Claude for a change, the collaborator asks for a follow-up that arrives under their name, and the host's terminal output appears in the collaborator's read-only mirror.
+
+Each screen is a 1280×1440 window captured at 1920×2160, so the two fill a 3840×2160 frame side by side. `A.mp4`, `B.mp4`, the raw frames and `timeline.json` (beat times for editing) are kept under `proof-results/two-machine-video/<timestamp>/`. Repositories, data directories, collaborator processes and the Liveblocks room are removed afterwards. The capture is Chromium rendering the production UI, not native macOS window capture.
 
 ## Native macOS launch
 

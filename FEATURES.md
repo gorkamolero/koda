@@ -104,8 +104,8 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] Conversation forking via `forked_from_session_id`
 
 ### Sync Layer
-- [x] Sidecar publishes sessions and streaming transcripts through Liveblocks.
-- [x] Both users see presence; a guest can view the host's sessions and messages.
+- [x] A collaborator opens a shared workspace from their own sidebar, which keeps their projects, and gets the normal workspace view: conversation with tool calls, changes, files, checks and a read-only mirror of the host's terminal. The host's sidecar answers those reads through Liveblocks, scoped to the shared worktree.
+- [x] Both users see presence, and each shared message shows its author.
 - [x] Share/join controls issue signed view or control invitations.
 - [x] Control messages reach the host's real Codex or Claude session and both users see its live reply.
 - [x] View access is enforced by the host as well as the UI; replacing an invitation revokes the previous grant.
