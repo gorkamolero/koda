@@ -182,7 +182,7 @@ pub async fn send_rpc_request(
     method: String,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    tracing::info!("RPC request: method={}, params={:?}", method, params);
+    tracing::info!("RPC request: method={}", method);
 
     // Get client
     let client = state

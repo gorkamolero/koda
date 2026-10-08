@@ -6,6 +6,7 @@
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "app": "node scripts/run.mjs app",
+    "app:built": "node scripts/run.mjs built",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",

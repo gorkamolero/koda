@@ -18,7 +18,17 @@ static SIDECAR_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 /// Kill the sidecar process if it's running
 fn kill_sidecar() {
     if let Some(mut child) = SIDECAR_PROCESS.lock().unwrap().take() {
-        tracing::info!("Killing sidecar process (PID: {:?})", child.id());
+        tracing::info!("Stopping sidecar process (PID: {:?})", child.id());
+        #[cfg(unix)]
+        {
+            // Let Node close sockets and abort its agent children before forcing
+            // termination. Child::kill alone sends SIGKILL and skips all cleanup.
+            let _ = Command::new("/bin/kill").arg("-TERM").arg(child.id().to_string()).status();
+            for _ in 0..50 {
+                if matches!(child.try_wait(), Ok(Some(_))) { return; }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
         if let Err(e) = child.kill() {
             tracing::warn!("Failed to kill sidecar: {}", e);
         }
@@ -29,13 +39,30 @@ fn kill_sidecar() {
 
 /// Initialize the Tauri application with plugins and setup
 pub fn run() {
+    let mut context = tauri::generate_context!();
+    let mut window_state = tauri_plugin_window_state::Builder::default();
+    if let Some(directory) = std::env::var_os("KODA_DATA_DIR") {
+        let directory = PathBuf::from(directory);
+        std::fs::create_dir_all(&directory).expect("failed to create KODA_DATA_DIR");
+        let directory = directory.canonicalize().expect("invalid KODA_DATA_DIR");
+        let identifier = webview_store_identifier(&directory).expect("failed to initialize isolated webview profile");
+        for window in &mut context.config_mut().app.windows {
+            // WKWebView requires a distinct data-store identifier on macOS14+.
+            // A data directory alone would leave both users sharing localStorage.
+            #[cfg(target_os = "macos")]
+            { window.data_store_identifier = Some(identifier); }
+            #[cfg(not(target_os = "macos"))]
+            { window.data_directory = Some(directory.join("webview")); }
+        }
+        window_state = window_state.with_filename(directory.join("window-state.json").to_string_lossy());
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(window_state.build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -51,13 +78,34 @@ pub fn run() {
             setup_app(app)?;
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             if let RunEvent::Exit = event {
                 kill_sidecar();
             }
         });
+}
+
+/// Persist the profile identifier so browser storage also survives a restart.
+fn webview_store_identifier(directory: &std::path::Path) -> Result<[u8; 16], Box<dyn std::error::Error>> {
+    let file = directory.join("webview-profile.json");
+    if file.exists() {
+        return Ok(serde_json::from_slice(&std::fs::read(file)?)?);
+    }
+    // Two stable FNV hashes distinguish independent directories without adding a
+    // dependency. This identifier is a namespace, never an authentication token.
+    let mut first = 0xcbf29ce484222325u64;
+    let mut second = 0x84222325cbf29ce4u64;
+    for byte in directory.to_string_lossy().bytes() {
+        first = (first ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+        second = (second ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+    }
+    let mut identifier = [0u8; 16];
+    identifier[..8].copy_from_slice(&first.to_le_bytes());
+    identifier[8..].copy_from_slice(&second.to_le_bytes());
+    std::fs::write(file, serde_json::to_vec(&identifier)?)?;
+    Ok(identifier)
 }
 
 /// Configure tracing/logging
@@ -79,10 +127,9 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Get app data directory
-    let app_dir = app
-        .path()
-        .app_data_dir()
-        .expect("failed to get app data directory");
+    let app_dir = std::env::var_os("KODA_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| app.path().app_data_dir().expect("failed to get app data directory"));
 
     // Ensure app data directory exists
     std::fs::create_dir_all(&app_dir)?;
@@ -93,17 +140,14 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let socket_path = std::env::var("KODA_SOCKET")
         .unwrap_or_else(|_| get_socket_path(&app_dir));
     tracing::info!("Socket path: {}", socket_path);
+    #[cfg(unix)]
+    if std::os::unix::net::UnixStream::connect(&socket_path).is_ok() {
+        return Err("Another Koda instance already uses this data directory. Choose a separate KODA_DATA_DIR.".into());
+    }
 
     // Ensure socket directory exists (for test mode)
     if let Some(parent) = std::path::Path::new(&socket_path).parent() {
         std::fs::create_dir_all(parent).ok();
-    }
-
-    // Clean up stale socket file from previous runs
-    let socket_file = std::path::Path::new(&socket_path);
-    if socket_file.exists() {
-        tracing::info!("Removing stale socket file");
-        std::fs::remove_file(socket_file).ok();
     }
 
     // Spawn sidecar immediately during setup (before frontend loads)
@@ -112,7 +156,7 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     // Build sidecar command with env vars
     // Inherit KODA_TEST_DB and KODA_SOCKET from parent process for test isolation
-    let mut cmd = Command::new("node");
+    let mut cmd = Command::new(std::env::var("KODA_NODE_PATH").unwrap_or_else(|_| "node".into()));
     cmd.env("KODA_SOCKET", &socket_path)
         .arg(sidecar_path.to_str().unwrap())
         .arg("--app-dir")
@@ -124,18 +168,35 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         cmd.env("KODA_TEST_DB", test_db);
     }
 
-    let child = cmd
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
     let pid = child.id();
     tracing::info!("Sidecar spawned with PID: {}", pid);
 
-    // Store process handle for cleanup
+    // Wait for the actual sidecar socket, and surface early failures such as a
+    // missing build or a second instance attempting to reuse the same data.
+    let mut ready = false;
+    for _ in 0..100 {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Some(status) = child.try_wait()? {
+            return Err(format!("Koda sidecar exited before startup ({status}). Check its output above.").into());
+        }
+        #[cfg(unix)]
+        if std::os::unix::net::UnixStream::connect(&socket_path).is_ok() {
+            ready = true;
+            break;
+        }
+        #[cfg(not(unix))]
+        { ready = true; break; }
+    }
+    if !ready {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Koda sidecar did not become ready within 10 seconds".into());
+    }
     *SIDECAR_PROCESS.lock().unwrap() = Some(child);
-
-    // Wait a moment for socket to be ready
-    std::thread::sleep(std::time::Duration::from_millis(500));
 
     // Register sidecar state with the PID
     let state = SidecarState::new(socket_path.clone());
@@ -163,7 +224,7 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 fn get_sidecar_path(app: &App) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if cfg!(debug_assertions) {
         // Dev mode: workspace relative path
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
         Ok(PathBuf::from(&manifest_dir)
             .join("..")
             .join("..")

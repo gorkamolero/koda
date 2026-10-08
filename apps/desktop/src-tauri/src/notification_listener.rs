@@ -78,7 +78,7 @@ async fn run_listener(socket_path: &str, app_handle: &AppHandle) -> Result<(), B
                 // Ignore responses (they're handled by request-response flow)
             }
             Err(e) => {
-                tracing::warn!("[NotificationListener] Failed to parse: {} - {}", e, &line[..line.len().min(100)]);
+                tracing::warn!("[NotificationListener] Failed to parse notification: {}", e);
             }
         }
     }
