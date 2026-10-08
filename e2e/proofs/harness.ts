@@ -137,10 +137,11 @@ export class KodaInstance {
     }, { timeout: 30_000, message: 'Real frontend startup' }).toBe(200)
   }
 
-  async rpc<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+  async rpc<T = unknown>(method: string, params: unknown = {}, options: { timeoutMs?: number } = {}): Promise<T> {
     const response = await fetch(`http://localhost:${this.rpcPort}/rpc`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
     })
     const data = await response.json() as { result: T; error?: { message: string } }
     if (data.error) throw new Error(`${method}: ${data.error.message}`)
@@ -172,7 +173,7 @@ export class KodaInstance {
     try {
       for (const session of this.claudeSessions.values()) {
         // Capture before stopping the app. Stop/restart alone must preserve it.
-        await this.rpc('claude.get', { sessionId: session.sessionId })
+        await this.rpc('claude.get', { sessionId: session.sessionId }, { timeoutMs: 5000 })
       }
     } catch (error) { captureError = error }
     finally { await this.stop() }

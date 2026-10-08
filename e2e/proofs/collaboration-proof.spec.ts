@@ -33,7 +33,9 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
   let roomId: string | undefined
   try {
     host.createRepo()
-    await Promise.all([host.start(), guest.start()])
+    const starts = await Promise.allSettled([host.start(), guest.start()])
+    const startupErrors = starts.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+    if (startupErrors.length) throw new AggregateError(startupErrors, 'Collaboration instances failed to start')
     if (agent === 'claude') await requireClaude(host)
     expect(host.dataDir).not.toBe(guest.dataDir)
     expect(host.rpcPort).not.toBe(guest.rpcPort)
@@ -104,15 +106,23 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
       proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} SDK and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
     }, null, 2))
   } finally {
-    await Promise.all([contextA.close(), contextB.close()])
-    await Promise.all([host.cleanup(), guest.cleanup()])
-    // Only delete the exact Liveblocks room created by this isolated proof.
-    if (roomId) {
-      const response = await fetch(`https://api.liveblocks.io/v2/rooms/${encodeURIComponent(roomId)}`, {
-        method: 'DELETE', headers: { Authorization: `Bearer ${process.env.LIVEBLOCKS_SECRET_KEY}` },
-      })
-      if (!response.ok && response.status !== 404) throw new Error(`Proof room cleanup failed (${response.status}) for ${roomId}`)
+    const cleanupErrors: unknown[] = []
+    // Every independently owned resource gets a cleanup attempt even if an
+    // earlier browser, native session, or process cleanup failed.
+    for (const cleanup of [
+      () => contextA.close(), () => contextB.close(),
+      () => host.cleanup(), () => guest.cleanup(),
+      async () => {
+        if (!roomId) return
+        const response = await fetch(`https://api.liveblocks.io/v2/rooms/${encodeURIComponent(roomId)}`, {
+          method: 'DELETE', headers: { Authorization: `Bearer ${process.env.LIVEBLOCKS_SECRET_KEY}` }, signal: AbortSignal.timeout(15_000),
+        })
+        if (!response.ok && response.status !== 404) throw new Error(`Proof room cleanup failed (${response.status}) for ${roomId}`)
+      },
+    ]) {
+      try { await cleanup() } catch (error) { cleanupErrors.push(error) }
     }
+    if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'Collaboration proof cleanup failed')
   }
 })
 }
