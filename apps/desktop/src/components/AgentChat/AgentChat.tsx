@@ -47,37 +47,51 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
   const isCustomModel = customModel || (model !== 'default' && !models.some(option => option.model === model))
   const loadedModelSession = useRef<string | undefined>()
   const activeSessionRef = useRef(sessionId)
-  const loadingRef = useRef(false)
-  const sendingRef = useRef(false)
+  const loadingVersionRef = useRef<number | null>(null)
+  const sendingRef = useRef<{ sessionId?: string } | null>(null)
+  const mountedRef = useRef(false)
+  const scopeVersionRef = useRef(0)
   const lastRevisionRef = useRef('')
 
   useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  useEffect(() => {
+    scopeVersionRef.current++
+    lastRevisionRef.current = ''
     activeSessionRef.current = sessionId
     setCurrentWorkspaceId(`${worktreeId}:${sessionId ?? 'new'}`)
     setMessages([])
     setIsStreaming(false)
     setSelectedModel('codex')
     setError(null)
-    return () => { setCurrentWorkspaceId(null) }
+    return () => {
+      scopeVersionRef.current++
+      activeSessionRef.current = undefined
+      setCurrentWorkspaceId(null)
+    }
   }, [worktreeId, sessionId, setCurrentWorkspaceId, setMessages, setIsStreaming, setSelectedModel])
 
   const refresh = useCallback(async () => {
     const id = activeSessionRef.current
-    if (!id || loadingRef.current) return
-    loadingRef.current = true
+    const version = scopeVersionRef.current
+    if (!mountedRef.current || !id || loadingVersionRef.current === version) return
+    loadingVersionRef.current = version
     try {
       const [session, events] = await Promise.all([
         rpcRequest<Session>('codex.get', { sessionId: id }),
         rpcRequest<AgentEvent[]>('codex.getMessages', { sessionId: id }),
       ])
       // Never apply a response from a previously selected conversation.
-      if (activeSessionRef.current !== id) return
+      if (!mountedRef.current || scopeVersionRef.current !== version || activeSessionRef.current !== id) return
       if (loadedModelSession.current !== id) {
         loadedModelSession.current = id
         setModel(session.model || 'default')
         setCustomModel(false)
       }
-      setIsStreaming(session.status === 'running' || sendingRef.current)
+      setIsStreaming(session.status === 'running' || sendingRef.current?.sessionId === id)
       setError(null)
       const revision = `${id}:${events.length}:${session.status}`
       if (lastRevisionRef.current === revision) return
@@ -89,9 +103,9 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
         void queryClient.invalidateQueries({ queryKey: ['workspace-diff-stats', worktreeId] })
       }
     } catch (err) {
-      if (activeSessionRef.current === id) setError(err instanceof Error ? err.message : 'Unable to load conversation')
+      if (mountedRef.current && scopeVersionRef.current === version && activeSessionRef.current === id) setError(err instanceof Error ? err.message : 'Unable to load conversation')
     } finally {
-      loadingRef.current = false
+      if (loadingVersionRef.current === version) loadingVersionRef.current = null
     }
   }, [queryClient, worktreeId, setMessages, setIsStreaming])
 
@@ -108,8 +122,9 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
   }, [refresh, sessionId])
 
   const handleSendMessage = useCallback(async (content: string) => {
-    if (sendingRef.current) return
-    sendingRef.current = true
+    if (sendingRef.current && sendingRef.current.sessionId === activeSessionRef.current) return
+    const request = { sessionId: activeSessionRef.current }
+    sendingRef.current = request
     setIsStreaming(true)
     setError(null)
     try {
@@ -117,19 +132,26 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
       if (!id) {
         const created = await rpcRequest<{ id: string; sessionId: string }>('codex.start', { worktreeId, model: model.trim() || 'default' })
         id = created.sessionId ?? created.id
-        activeSessionRef.current = id
-        onSessionChange?.(id)
+        // Navigation does not cancel an already submitted task, but its result
+        // must never select a conversation in the newly opened workspace.
+        if (mountedRef.current && activeSessionRef.current === request.sessionId) {
+          activeSessionRef.current = id
+          onSessionChange?.(id)
+        }
+        request.sessionId = id
         void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
       }
       await rpcRequest('codex.send', { sessionId: id, message: content, stream: true, model: model.trim() || 'default' })
       await refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to send message'
-      setError(message)
       showToast({ type: 'error', title: 'Codex', message })
-      setIsStreaming(false)
+      if (mountedRef.current && activeSessionRef.current === request.sessionId) {
+        setError(message)
+        setIsStreaming(false)
+      }
     } finally {
-      sendingRef.current = false
+      if (sendingRef.current === request) sendingRef.current = null
       void refresh()
     }
   }, [worktreeId, model, onSessionChange, queryClient, refresh, setIsStreaming, showToast])
