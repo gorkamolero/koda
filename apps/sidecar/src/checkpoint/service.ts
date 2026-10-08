@@ -10,7 +10,10 @@
  * - diffCheckpoints: Show changes between two checkpoints
  */
 
-import { execSync, type ExecSyncOptions } from 'node:child_process';
+import { execSync, execFileSync, type ExecSyncOptions } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -132,26 +135,19 @@ export function saveCheckpoint(
  * 4. Restoring the original index
  */
 function captureWorktreeTree(repoPath: string): string {
-  // Save the current index
-  const originalIndex = git(repoPath, 'write-tree');
-
+  // Never stage or check out the user's real index. Restoring it with
+  // checkout-index would overwrite the very unstaged edits being captured.
+  const directory = mkdtempSync(join(tmpdir(), 'koda-checkpoint-'));
+  const env = { ...process.env, GIT_INDEX_FILE: join(directory, 'index') };
+  const run = (...args: string[]) => execFileSync('git', args, {
+    cwd: repoPath, env, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
   try {
-    // Add all files (including untracked) to the index
-    // Using -A to add all, including deletions
-    gitMayFail(repoPath, 'add -A');
-
-    // Write the tree with all current files
-    const worktreeTree = git(repoPath, 'write-tree');
-
-    return worktreeTree;
+    run('read-tree', 'HEAD');
+    run('add', '-A');
+    return run('write-tree');
   } finally {
-    // Restore the original index
-    // We need to reset the index to match the original tree
-    git(repoPath, `read-tree ${originalIndex}`);
-
-    // Also restore any untracked files that were staged
-    // by checking out the index
-    gitMayFail(repoPath, 'checkout-index -a -f');
+    rmSync(directory, { recursive: true, force: true });
   }
 }
 
@@ -215,8 +211,9 @@ export function restoreCheckpoint(
   // 3. Clean up any files that aren't in the checkpoint
   // checkout-index only writes files from the index; it doesn't delete
   // files that exist in the worktree but not in the tree
-  // Use -x to also remove ignored files, -ff for nested git repos
-  git(repoPath, 'clean -fdx');
+  // Ignored files (credentials, dependencies) are outside the checkpoint and
+  // must survive restore. Only remove non-ignored files absent from its tree.
+  git(repoPath, 'clean -fd');
 
   // 4. Restore the index to the checkpoint's staged state
   git(repoPath, `read-tree ${indexTree}`);

@@ -119,6 +119,21 @@ describe('Git Checkpoint System', () => {
       cleanupTestRepo(localRepoPath);
     });
 
+    it('does not overwrite unstaged edits or alter the real index while saving', () => {
+      const file = path.join(localRepoPath, 'README.md');
+      fs.writeFileSync(file, '# Staged version\n');
+      execSync('git add README.md', { cwd: localRepoPath });
+      fs.writeFileSync(file, '# Unstaged version\n');
+      fs.writeFileSync(path.join(localRepoPath, 'new.txt'), 'untracked\n');
+      const beforeIndex = execSync('git write-tree', { cwd: localRepoPath, encoding: 'utf-8' });
+      const beforeStatus = execSync('git status --porcelain', { cwd: localRepoPath, encoding: 'utf-8' });
+      const checkpoint = saveCheckpoint(db, { worktreeId: testWorktreeId, turnId: 'preserve-edits', repoPath: localRepoPath });
+      expect(fs.readFileSync(file, 'utf-8')).toBe('# Unstaged version\n');
+      expect(execSync('git write-tree', { cwd: localRepoPath, encoding: 'utf-8' })).toBe(beforeIndex);
+      expect(execSync('git status --porcelain', { cwd: localRepoPath, encoding: 'utf-8' })).toBe(beforeStatus);
+      expect(execSync(`git show ${checkpoint.worktreeTree}:README.md`, { cwd: localRepoPath, encoding: 'utf-8' })).toBe('# Unstaged version\n');
+    });
+
     it('should save a checkpoint with HEAD, index, and worktree state', () => {
       const input: SaveCheckpointInput = {
         worktreeId: testWorktreeId,
