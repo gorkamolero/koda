@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
-import { runCodexTurn, type CodexApproval, type CodexTurnOptions } from '../src/agents/codexTransport.js';
+import { CodexAppServer, runCodexTurn, type CodexApproval, type CodexTurnOptions } from '../src/agents/codexTransport.js';
 
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
@@ -13,6 +13,7 @@ describe('Codex app-server turn transport', () => {
   let onTurn: () => void;
   let onReply: (message: any) => void;
   let threadOverrides: Record<string, unknown>;
+  let holdInitialize: boolean;
   let controller: AbortController;
   let options: CodexTurnOptions;
   const write = (message: unknown) => child.stdout.write(JSON.stringify(message) + '\n');
@@ -31,13 +32,15 @@ describe('Codex app-server turn transport', () => {
     onTurn = finish;
     onReply = () => {};
     threadOverrides = {};
-    child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null });
+    holdInitialize = false;
+    child = Object.assign(new EventEmitter(), { pid: 1234, stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null });
     child.stdin = new Writable({ write(chunk, _encoding, callback) {
       const message = JSON.parse(chunk.toString());
       sent.push(message);
       queueMicrotask(() => {
         if (!message.method) { onReply(message); return; }
         if (!message.id) return;
+        if (message.method === 'initialize' && holdInitialize) return;
         let result: unknown;
         if (message.method === 'initialize') result = {};
         if (message.method === 'model/list') result = { data: [{ model: 'configured-default', isDefault: true }] };
@@ -62,7 +65,7 @@ describe('Codex app-server turn transport', () => {
     controller = new AbortController();
     options = { threadId: null, workingDirectory: '/workspace', model: 'default', permissionMode: 'default', message: 'Task', signal: controller.signal, approve: vi.fn(async () => ({ decision: 'deny' })) };
   });
-  afterEach(() => vi.clearAllMocks());
+  afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
   it('streams real delta notifications and selects the discovered default with workspace approvals', async () => {
     const events = await collect();
@@ -129,6 +132,53 @@ describe('Codex app-server turn transport', () => {
     expect(request.signal.aborted).toBe(true);
     expect(sent.some(message => message.method === 'turn/interrupt')).toBe(true);
     expect(sent.find(message => message.id === 'server-approval')?.result).toEqual({ decision: 'decline' });
+  });
+
+  it('waits for process exit when startup cancellation and finally both close the server', async () => {
+    holdInitialize = true;
+    child.kill = vi.fn(); // The process has received SIGTERM but has not exited yet.
+    let settled = false;
+    const pending = collect().finally(() => { settled = true; });
+    const rejected = expect(pending).rejects.toThrow('closed');
+    await vi.waitFor(() => expect(sent.some(message => message.method === 'initialize')).toBe(true));
+    controller.abort();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(settled).toBe(false);
+    child.signalCode = 'SIGTERM';
+    child.emit('exit', null, 'SIGTERM');
+    await rejected;
+    expect(settled).toBe(true);
+  });
+
+  it('shares close completion and still waits for exit after SIGKILL escalation', async () => {
+    const server = new CodexAppServer('/workspace');
+    await server.initialize();
+    vi.useFakeTimers();
+    child.kill = vi.fn();
+    const closing = server.close();
+    expect(server.close()).toBe(closing);
+    let settled = false;
+    void closing.then(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(settled).toBe(false);
+    child.signalCode = 'SIGKILL';
+    child.emit('exit', null, 'SIGKILL');
+    await closing;
+    expect(settled).toBe(true);
+  });
+
+  it('ignores a stale nested turn completion while waiting for the current approval', async () => {
+    onTurn = () => {
+      notify('turn/completed', { turn: { id: 'previous-turn', status: 'completed' } });
+      ask();
+    };
+    onReply = finish;
+    const events = await collect();
+    expect(options.approve).toHaveBeenCalledOnce();
+    expect(events.filter(event => event.type === 'turn.completed')).toHaveLength(1);
+    expect(events.find(event => event.type === 'item.completed' && event.item.text === 'Done')).toBeDefined();
   });
 
   it('revokes stale prompts when the server resolves them without host input', async () => {

@@ -264,6 +264,25 @@ describe('durable Claude runtime', () => {
     expect(() => approvals.respond({ sessionId: session.id, approvalId: pending.id, decision: 'allow' })).toThrow('no longer pending');
   });
 
+  it('removes a provider-withdrawn approval without treating it as a host rejection', async () => {
+    const turn = new AbortController();
+    const providerRequest = new AbortController();
+    const onQuestion = vi.fn();
+    const canUseTool = claudeToolPermissions('session', turn.signal, approvals, onQuestion);
+    const pending = canUseTool('Bash', { command: 'fixture command', dangerouslyDisableSandbox: true }, {
+      signal: providerRequest.signal, toolUseID: 'provider-tool',
+    });
+    const request = approvals.list()[0];
+    // Claude can withdraw its SDK prompt when an existing PermissionRequest
+    // hook resolves it. This is not a click on Koda's Deny button or Stop.
+    providerRequest.abort();
+    expect(await pending).toMatchObject({ behavior: 'deny', message: 'Tool request cancelled', toolUseID: 'provider-tool' });
+    expect(approvals.list()).toEqual([]);
+    expect(turn.signal.aborted).toBe(false);
+    expect(onQuestion).not.toHaveBeenCalled();
+    expect(() => approvals.respond({ sessionId: 'session', approvalId: request.id, decision: 'allow' })).toThrow('no longer pending');
+  });
+
   it('waits for SDK teardown before Stop resolves so settings can save immediately afterward', async () => {
     let release!: () => void;
     const teardown = new Promise<void>(resolve => { release = resolve; });

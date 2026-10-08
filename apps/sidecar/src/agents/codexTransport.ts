@@ -46,6 +46,7 @@ export class CodexAppServer {
   private reader: ReturnType<typeof createInterface>;
   private nextId = 0;
   private closed = false;
+  private closePromise?: Promise<void>;
   private failure?: Error;
   private incoming = new Set<RequestId>();
   private pending = new Map<RequestId, { resolve: (value: any) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
@@ -125,16 +126,25 @@ export class CodexAppServer {
     this.pending.clear();
     this.onFailure(error);
   }
-  async close(): Promise<void> {
-    if (this.closed) return;
+  close(): Promise<void> {
+    return this.closePromise ??= this.closeProcess();
+  }
+  private async closeProcess(): Promise<void> {
     this.fail(new Error('Codex app-server closed'));
     this.closed = true;
     this.reader.close();
     this.child.stdin.end();
-    if (this.child.exitCode !== null || this.child.signalCode !== null) return;
+    if (this.child.exitCode !== null || this.child.signalCode !== null || this.child.pid === undefined) return;
     await new Promise<void>(resolve => {
-      const timer = setTimeout(() => { this.child.kill('SIGKILL'); resolve(); }, 2_000);
-      this.child.once('exit', () => { clearTimeout(timer); resolve(); });
+      const finish = () => {
+        clearTimeout(timer);
+        this.child.removeListener('exit', finish);
+        this.child.removeListener('close', finish);
+        resolve();
+      };
+      const timer = setTimeout(() => { this.child.kill('SIGKILL'); }, 2_000);
+      this.child.once('exit', finish);
+      this.child.once('close', finish);
       this.child.kill('SIGTERM');
     });
   }
@@ -166,6 +176,7 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   let turnId: string | null = null;
   let usage: CodexUsage | undefined;
   let completed = false;
+  let startRequested = false;
   let interrupt: Promise<unknown> | undefined;
   const denyPending = () => {
     for (const [requestId, controller] of approvals) {
@@ -204,10 +215,14 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
   server.onNotification = (method, params) => {
     if (params.threadId && params.threadId !== threadId) return;
     if (params.turnId && turnId && params.turnId !== turnId) return;
+    // Completion notifications carry their turn ID inside `turn`, unlike
+    // item/delta notifications. A resumed thread may deliver older turn state.
+    if (method === 'turn/completed' && (!turnId || params.turn?.id !== turnId)) return;
     if (method === 'serverRequest/resolved') {
       server.forgetRequest(params.requestId);
       approvals.get(params.requestId)?.abort(); approvals.delete(params.requestId);
     } else if (method === 'turn/started') {
+      if (!startRequested || (turnId && params.turn?.id !== turnId)) return;
       turnId = params.turn.id;
     } else if (method === 'item/started' || method === 'item/completed') {
       const item = params.item;
@@ -249,6 +264,7 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
     threadId = thread.thread.id;
     if (options.threadId && threadId !== options.threadId) throw new Error('Codex resumed a different thread');
     yield { type: 'thread.started', thread_id: threadId! };
+    startRequested = true;
     const started = await server.request('turn/start', {
       threadId, input: [{ type: 'text', text: options.message }], cwd: options.workingDirectory, model,
       approvalPolicy: permissions.approvalPolicy, approvalsReviewer: permissions.approvalsReviewer, sandboxPolicy: permissions.sandboxPolicy,
