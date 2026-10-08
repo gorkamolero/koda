@@ -19,6 +19,7 @@ import { detectMentionContext, completeMention, parseMentions } from '@/hooks/us
 interface InputAreaProps {
   onSendMessage?: (message: string, mentions?: MessageMention[]) => void
   onSwitchTab?: (tab: string) => void
+  disabled?: boolean
 }
 
 /**
@@ -30,7 +31,7 @@ interface InputAreaProps {
  * │ [MODEL:opus] [THINK] [PLAN]           [+] [SEND] │
  * └──────────────────────────────────────────────────┘
  */
-export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React.ReactElement {
+export function InputArea({ onSendMessage, onSwitchTab, disabled = false }: InputAreaProps): React.ReactElement {
   const [inputValue, setInputValue] = useAtom(inputValueAtom)
   const isStreaming = useAtomValue(isStreamingAtom)
   const addMessage = useSetAtom(addMessageAtom)
@@ -132,7 +133,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
 
   const handleSend = useCallback(() => {
     const trimmedValue = inputValue.trim()
-    if (!trimmedValue || isStreaming) return
+    if (!trimmedValue || isStreaming || disabled) return
 
     const parsedMentions = parseMentions(trimmedValue)
     const mentions: MessageMention[] = parsedMentions.map(m => ({
@@ -145,7 +146,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
       textareaRef.current.style.height = 'auto'
     }
     onSendMessage?.(trimmedValue, mentions.length > 0 ? mentions : undefined)
-  }, [inputValue, isStreaming, setInputValue, onSendMessage])
+  }, [inputValue, isStreaming, disabled, setInputValue, onSendMessage])
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -255,7 +256,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
     selectedModel.includes('sonnet') ? 'SNNT' :
     selectedModel.includes('haiku') ? 'HAIK' : 'CLDE'
 
-  const canSend = inputValue.trim().length > 0 && !isStreaming
+  const canSend = inputValue.trim().length > 0 && !isStreaming && !disabled
 
   return (
     <div className="px-4 py-3 font-mono bg-[#000000]">
@@ -303,7 +304,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
               onPaste={handlePaste}
               onSelect={(e) => { setCursorPosition(e.currentTarget.selectionStart) }}
               placeholder="type message, @mention files, use /commands..."
-              disabled={isStreaming}
+              disabled={isStreaming || disabled}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"

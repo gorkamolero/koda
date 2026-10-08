@@ -35,7 +35,7 @@ interface TopBarProps {
   worktreeId?: string
   activeTab: Tab
   onTabChange: (tab: Tab) => void
-  sessions?: { id: string; name: string }[]
+  sessions?: { id: string; name: string; agentType?: string }[]
   activeSessionId?: string
   onSessionChange?: (sessionId: string) => void
   onNewSession?: () => void
@@ -301,7 +301,7 @@ export function TopBar({
                   onSessionChange?.(session.id)
                   onTabChange('chat')
                 }}
-                label={`CHAT${sessions.length > 1 ? index + 1 : ''}`}
+                label={`${session.agentType?.toUpperCase() || 'CHAT'}${sessions.length > 1 ? index + 1 : ''}`}
                 testId={`tab-session-${session.id}`}
                 closable
                 onClose={() => {
@@ -316,6 +316,10 @@ export function TopBar({
               label="CHAT"
               testId="tab-chat"
             />
+          )}
+
+          {sessions.length > 0 && !activeSessionId && (
+            <TerminalTab active={activeTab === 'chat'} onClick={() => onTabChange('chat')} label="NEW CHAT" testId="tab-chat" />
           )}
 
           {/* New chat button */}

@@ -381,7 +381,8 @@ export interface RemoveWorktreeFromWorkspaceParams {
  */
 export type SessionStatus = 'idle' | 'running' | 'paused' | 'compacting' | 'completed' | 'error' | 'cancelled'
 export type PermissionMode = 'default' | 'plan' | 'auto-approve'
-export type AgentType = 'claude' | 'codex' | 'kimi' | 'other'
+export type CodingAgent = 'codex' | 'claude'
+export type AgentType = CodingAgent | 'kimi' | 'other'
 
 /**
  * Session - Conductor-style with all fields

@@ -24,8 +24,8 @@ import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCre
 import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
-import { rpcRequest, isTauriContext } from '@/lib/tauri'
-import { useQueryClient } from '@tanstack/react-query'
+import { isTauriContext } from '@/lib/tauri'
+import type { AgentType, CodingAgent } from '@/lib/rpc'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 type ConnectStep = 'idle' | 'repo' | 'branch'
@@ -53,7 +53,6 @@ export function WorkspaceView() {
   const { workspaceId, worktreeId } = useParams({ from: '/workspace/$workspaceId/$worktreeId' })
   const search = useSearch({ from: '/workspace/$workspaceId/$worktreeId' })
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const openFiles = useAtomValue(openFilesAtom)
 
@@ -78,7 +77,7 @@ export function WorkspaceView() {
   const notFound = !isLoading && !worktree && !standaloneWorkspace
 
   // Fetch sessions for this workspace (only if we have a worktree)
-  const { data: sessions } = useSessions(worktree ? worktreeId : '')
+  const { data: sessions, isLoading: isLoadingSessions } = useSessions(worktree ? worktreeId : '')
 
   // Register MCP tool handlers (GetWorkspaceDiff, DiffComment) for Claude
   useSidecarRpcHandlers(worktree?.id ?? '')
@@ -101,28 +100,28 @@ export function WorkspaceView() {
   const [connectError, setConnectError] = useState<string | null>(null)
 
   // Active session tracking
-  const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
+  const [chatSelection, setChatSelection] = useState<{
+    worktreeId: string
+    session?: { id: string; agentType: AgentType }
+  } | null>(null)
+  const activeSession = chatSelection?.worktreeId === worktreeId ? chatSelection.session : undefined
+  const activeSessionId = activeSession?.id
 
-  useEffect(() => { setActiveSessionId(undefined) }, [worktreeId])
-
-  const handleNewSession = async () => {
-    try {
-      const session = await rpcRequest<{ id: string; sessionId: string }>('codex.start', { worktreeId })
-      setActiveSessionId(session.sessionId ?? session.id)
-      void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
-    } catch (error) {
-      setConnectError(error instanceof Error ? error.message : 'Unable to create session')
-    }
+  const handleSelectSession = (id: string, createdAgent?: CodingAgent) => {
+    const session = sessions?.find(item => item.id === id)
+    if (!session && !createdAgent) return
+    setChatSelection({ worktreeId, session: { id, agentType: createdAgent ?? session?.agentType ?? 'codex' } })
   }
 
   // Set initial active session when sessions load
   useEffect(() => {
-    if (sessions && sessions.length > 0 && !activeSessionId) {
+    // An explicit empty selection is a new draft, even if older chats exist.
+    if (sessions && chatSelection?.worktreeId !== worktreeId) {
       const runningSession = sessions.find((s) => s.status === 'running')
-      const mostRecentSession = sessions[0]
-      setActiveSessionId(runningSession?.id ?? mostRecentSession?.id)
+      const session = runningSession ?? sessions[0]
+      setChatSelection({ worktreeId, session: session ? { id: session.id, agentType: session.agentType ?? 'codex' } : undefined })
     }
-  }, [sessions, activeSessionId])
+  }, [sessions, worktreeId, chatSelection])
 
   // Check if we should start in interview mode
   const startMode = (search as { mode?: string }).mode
@@ -297,10 +296,10 @@ export function WorkspaceView() {
           worktreeId={worktreeId}
           activeTab={activeTab}
           onTabChange={(tab) => { setActiveTab(tab as Tab) }}
-          sessions={sessions?.map(s => ({ id: s.id, name: s.title ?? 'Chat' })) ?? []}
+          sessions={sessions?.map(s => ({ id: s.id, name: s.title ?? 'Chat', agentType: s.agentType })) ?? []}
           activeSessionId={activeSessionId}
-          onSessionChange={setActiveSessionId}
-          onNewSession={worktree ? () => void handleNewSession() : undefined}
+          onSessionChange={handleSelectSession}
+          onNewSession={worktree ? () => { setChatSelection({ worktreeId }); setActiveTab('chat') } : undefined}
           onEnableCollaboration={() => { enableCollaboration.mutate(worktreeId) }}
           onDisableCollaboration={() => { disableCollaboration.mutate(worktreeId) }}
           isCollaborationPending={enableCollaboration.isPending || disableCollaboration.isPending}
@@ -518,7 +517,10 @@ export function WorkspaceView() {
 
           {/* Normal content when worktree exists and no files open */}
           {!isLoading && worktree && activeTab === 'chat' && openFiles.length === 0 && (
-            <AgentChat key={worktreeId} worktreeId={worktreeId} sessionId={activeSessionId} workingDirectory={rootPath} onSessionChange={setActiveSessionId} />
+            isLoadingSessions ? <div className="p-4 text-xs text-text-muted">Loading conversations…</div> :
+            activeSession && activeSession.agentType !== 'codex' && activeSession.agentType !== 'claude' ?
+              <div role="alert" className="p-4 text-xs text-status-error">The {activeSession.agentType} agent is not available. Start a new Codex or Claude chat.</div> :
+              <AgentChat key={`${worktreeId}:${activeSessionId ?? 'new'}`} worktreeId={worktreeId} sessionId={activeSessionId} agentType={activeSession?.agentType as CodingAgent | undefined} workingDirectory={rootPath} onSessionChange={handleSelectSession} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (

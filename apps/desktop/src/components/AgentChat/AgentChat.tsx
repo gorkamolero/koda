@@ -7,7 +7,7 @@ import {
 } from '@/store/chat'
 import { rpcRequest, onNotification } from '@/lib/tauri'
 import { agentEventsToMessages, type AgentEvent } from '@/lib/agentMessages'
-import type { Session } from '@/lib/rpc'
+import type { CodingAgent, Session } from '@/lib/rpc'
 import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { PlanModeIndicator } from './PlanModeIndicator'
@@ -16,12 +16,16 @@ import { useNotifications } from '@/hooks/useNotifications'
 interface AgentChatProps {
   worktreeId: string
   sessionId?: string
+  agentType?: CodingAgent
   workingDirectory?: string
-  onSessionChange?: (sessionId: string) => void
+  onSessionChange?: (sessionId: string, agentType: CodingAgent) => void
 }
 
+const agentNames: Record<CodingAgent, string> = { codex: 'Codex', claude: 'Claude' }
+const preferredModel = (agent: CodingAgent) => localStorage.getItem(`settings:${agent}Model`) || 'default'
+
 /** Conversations are hydrated from the sidecar, including after an app restart. */
-export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionChange }: AgentChatProps) {
+export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingDirectory, onSessionChange }: AgentChatProps) {
   const queryClient = useQueryClient()
   const setCurrentWorkspaceId = useSetAtom(currentWorkspaceIdAtom)
   const setMessages = useSetAtom(messagesAtom)
@@ -36,19 +40,24 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
   const [error, setError] = useState<string | null>(null)
   const [checkpointId, setCheckpointId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [model, setModel] = useState(() => localStorage.getItem('settings:codexModel') || 'default')
+  const [draftAgent, setDraftAgent] = useState<CodingAgent>('codex')
+  const agent = sessionId ? agentType : draftAgent
+  const agentName = agentNames[agent]
+  const [model, setModel] = useState(() => preferredModel(agent))
   const [customModel, setCustomModel] = useState(false)
-  const { data: models = [] } = useQuery({
-    queryKey: ['codex', 'models'],
-    queryFn: () => rpcRequest<Array<{ id: string; model: string; displayName: string; isDefault: boolean }>>('codex.models'),
+  const { data: models = [], error: modelsError, isPending: modelsPending } = useQuery({
+    queryKey: [agent, 'models'],
+    queryFn: () => rpcRequest<Array<{ id: string; model: string; displayName: string; isDefault?: boolean }>>(`${agent}.models`),
     staleTime: 60_000,
     retry: false,
   })
-  const isCustomModel = customModel || (model !== 'default' && !models.some(option => option.model === model))
+  const isCustomModel = customModel || (model !== 'default' && !modelsPending && !models.some(option => option.model === model))
+  const [loadedSession, setLoadedSession] = useState<string | null>(null)
   const loadedModelSession = useRef<string | undefined>()
   const activeSessionRef = useRef(sessionId)
+  const activeAgentRef = useRef(agent)
   const loadingVersionRef = useRef<number | null>(null)
-  const sendingRef = useRef<{ sessionId?: string } | null>(null)
+  const sendingRef = useRef<{ sessionId?: string; agent: CodingAgent; version: number } | null>(null)
   const mountedRef = useRef(false)
   const scopeVersionRef = useRef(0)
   const lastRevisionRef = useRef('')
@@ -62,41 +71,47 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
     scopeVersionRef.current++
     lastRevisionRef.current = ''
     activeSessionRef.current = sessionId
-    setCurrentWorkspaceId(`${worktreeId}:${sessionId ?? 'new'}`)
+    activeAgentRef.current = agent
+    loadedModelSession.current = undefined
+    setLoadedSession(null)
+    if (!sessionId) { setModel(preferredModel(agent)); setCustomModel(false) }
+    setCurrentWorkspaceId(`${worktreeId}:${sessionId ?? `new:${agent}`}`)
     setMessages([])
     setIsStreaming(false)
-    setSelectedModel('codex')
+    setSelectedModel(agent)
     setError(null)
     return () => {
       scopeVersionRef.current++
       activeSessionRef.current = undefined
       setCurrentWorkspaceId(null)
     }
-  }, [worktreeId, sessionId, setCurrentWorkspaceId, setMessages, setIsStreaming, setSelectedModel])
+  }, [worktreeId, sessionId, agent, setCurrentWorkspaceId, setMessages, setIsStreaming, setSelectedModel])
 
   const refresh = useCallback(async () => {
     const id = activeSessionRef.current
     const version = scopeVersionRef.current
-    if (!mountedRef.current || !id || loadingVersionRef.current === version) return
+    if (!mountedRef.current || activeAgentRef.current !== agent || !id || loadingVersionRef.current === version) return
     loadingVersionRef.current = version
     try {
       const [session, events] = await Promise.all([
-        rpcRequest<Session>('codex.get', { sessionId: id }),
-        rpcRequest<AgentEvent[]>('codex.getMessages', { sessionId: id }),
+        rpcRequest<Session>(`${agent}.get`, { sessionId: id }),
+        rpcRequest<AgentEvent[]>(`${agent}.getMessages`, { sessionId: id }),
       ])
       // Never apply a response from a previously selected conversation.
       if (!mountedRef.current || scopeVersionRef.current !== version || activeSessionRef.current !== id) return
+      if (session.agentType && session.agentType !== agent) throw new Error(`This conversation belongs to ${session.agentType}, not ${agentName}`)
       if (loadedModelSession.current !== id) {
         loadedModelSession.current = id
         setModel(session.model || 'default')
         setCustomModel(false)
       }
+      setLoadedSession(id)
       setIsStreaming(session.status === 'running' || sendingRef.current?.sessionId === id)
       setError(null)
       const revision = `${id}:${events.length}:${session.status}`
       if (lastRevisionRef.current === revision) return
       lastRevisionRef.current = revision
-      setMessages(agentEventsToMessages(events))
+      setMessages(agentEventsToMessages(events, agent))
       if (session.status !== 'running') {
         void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
         void queryClient.invalidateQueries({ queryKey: ['worktree-diff', worktreeId] })
@@ -107,7 +122,7 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
     } finally {
       if (loadingVersionRef.current === version) loadingVersionRef.current = null
     }
-  }, [queryClient, worktreeId, setMessages, setIsStreaming])
+  }, [queryClient, worktreeId, agent, agentName, setMessages, setIsStreaming])
 
   useEffect(() => {
     let disposed = false
@@ -121,32 +136,33 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
     return () => { disposed = true; clearInterval(timer); unlisten?.() }
   }, [refresh, sessionId])
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    if (sendingRef.current && sendingRef.current.sessionId === activeSessionRef.current) return
-    const request = { sessionId: activeSessionRef.current }
+  const handleSendMessage = useCallback(async (content?: string) => {
+    if (sessionId && loadedSession !== sessionId) return
+    if (sendingRef.current && sendingRef.current.sessionId === activeSessionRef.current && sendingRef.current.agent === agent) return
+    const request = { sessionId: activeSessionRef.current, agent, version: scopeVersionRef.current }
     sendingRef.current = request
     setIsStreaming(true)
     setError(null)
     try {
       let id = activeSessionRef.current
       if (!id) {
-        const created = await rpcRequest<{ id: string; sessionId: string }>('codex.start', { worktreeId, model: model.trim() || 'default' })
+        const created = await rpcRequest<{ id: string; sessionId: string }>(`${agent}.start`, { worktreeId, model: model.trim() || 'default' })
         id = created.sessionId ?? created.id
         // Navigation does not cancel an already submitted task, but its result
         // must never select a conversation in the newly opened workspace.
-        if (mountedRef.current && activeSessionRef.current === request.sessionId) {
+        if (mountedRef.current && scopeVersionRef.current === request.version && activeAgentRef.current === agent && activeSessionRef.current === request.sessionId) {
           activeSessionRef.current = id
-          onSessionChange?.(id)
+          onSessionChange?.(id, agent)
         }
         request.sessionId = id
         void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
       }
-      await rpcRequest('codex.send', { sessionId: id, message: content, stream: true, model: model.trim() || 'default' })
+      if (content !== undefined) await rpcRequest(`${agent}.send`, { sessionId: id, message: content, stream: true, model: model.trim() || 'default' })
       await refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to send message'
-      showToast({ type: 'error', title: 'Codex', message })
-      if (mountedRef.current && activeSessionRef.current === request.sessionId) {
+      showToast({ type: 'error', title: agentName, message })
+      if (mountedRef.current && activeAgentRef.current === agent && activeSessionRef.current === request.sessionId) {
         setError(message)
         setIsStreaming(false)
       }
@@ -154,14 +170,14 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
       if (sendingRef.current === request) sendingRef.current = null
       void refresh()
     }
-  }, [worktreeId, model, onSessionChange, queryClient, refresh, setIsStreaming, showToast])
+  }, [worktreeId, sessionId, loadedSession, agent, agentName, model, onSessionChange, queryClient, refresh, setIsStreaming, showToast])
 
   useEffect(() => {
-    if (pendingPrompt) {
+    if (pendingPrompt && (!sessionId || loadedSession === sessionId)) {
       setPendingPrompt(null)
       void handleSendMessage(pendingPrompt)
     }
-  }, [pendingPrompt, handleSendMessage, setPendingPrompt])
+  }, [pendingPrompt, sessionId, loadedSession, handleSendMessage, setPendingPrompt])
 
   const saveCheckpoint = async () => {
     if (!workingDirectory) return
@@ -178,30 +194,38 @@ export function AgentChat({ worktreeId, sessionId, workingDirectory, onSessionCh
   }
 
   return (
-    <div data-testid="agent-chat-container" data-session-id={sessionId ?? ''} className="h-full flex flex-col">
+    <div data-testid="agent-chat-container" data-session-id={sessionId ?? ''} data-agent-type={agent} className="h-full flex flex-col">
       <PlanModeIndicator isActive={planMode.isActive} planTitle={planMode.planTitle} steps={planMode.steps} currentStepIndex={planMode.currentStepIndex} onExitPlanMode={exitPlanMode} />
       <div className="flex items-center gap-3 px-4 py-2 border-b border-dashed border-border-subtle text-xs text-text-muted">
-        <span data-testid="active-agent">Codex</span>
+        <span data-testid="active-agent">{agentName}</span>
+        <label className="flex items-center gap-1">Agent
+          <select aria-label="Agent" data-testid="agent-select" value={agent} disabled={Boolean(sessionId) || isStreaming} className="bg-surface-card border border-border-subtle p-1" onChange={event => setDraftAgent(event.target.value as CodingAgent)}>
+            <option value="codex">Codex</option>
+            <option value="claude">Claude</option>
+          </select>
+        </label>
         <label className="flex items-center gap-1">Model
-          <select aria-label="Codex model" data-testid="codex-model-select" value={isCustomModel ? 'custom' : model} disabled={isStreaming} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
+          <select aria-label={`${agentName} model`} data-testid={`${agent}-model-select`} value={isCustomModel ? 'custom' : model} disabled={isStreaming || modelsPending || Boolean(sessionId && loadedSession !== sessionId)} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
             const custom = event.target.value === 'custom'
             setCustomModel(custom)
-            if (!custom) { setModel(event.target.value); localStorage.setItem('settings:codexModel', event.target.value) }
+            if (!custom) { setModel(event.target.value); localStorage.setItem(`settings:${agent}Model`, event.target.value) }
           }}>
-            <option value="default">Codex default</option>
+            <option value="default">{agentName} default</option>
             {models.map(option => <option key={option.id} value={option.model}>{option.displayName}{option.isDefault ? ' (default)' : ''}</option>)}
             <option value="custom">Custom model…</option>
           </select>
         </label>
-        {isCustomModel && <input aria-label="Codex model ID" data-testid="codex-model-input" value={model === 'default' ? '' : model} disabled={isStreaming} placeholder="Model ID" className="w-40 bg-transparent border border-border-subtle p-1" onChange={event => { setModel(event.target.value); localStorage.setItem('settings:codexModel', event.target.value) }} />}
+        {isCustomModel && <input aria-label={`${agentName} model ID`} data-testid={`${agent}-model-input`} value={model === 'default' ? '' : model} disabled={isStreaming || Boolean(sessionId && loadedSession !== sessionId)} placeholder="Model ID" className="w-40 bg-transparent border border-border-subtle p-1" onChange={event => { setModel(event.target.value); localStorage.setItem(`settings:${agent}Model`, event.target.value) }} />}
+        {!sessionId && <button data-testid="start-chat-button" disabled={isStreaming} onClick={() => void handleSendMessage()} className="hover:text-text-primary disabled:opacity-40">Start chat</button>}
         <button data-testid="save-checkpoint" disabled={saving || isStreaming || !workingDirectory} onClick={() => void saveCheckpoint()} className="hover:text-text-primary disabled:opacity-40">
           {saving ? 'Saving…' : 'Save checkpoint'}
         </button>
         {checkpointId && <span data-testid="checkpoint-saved" data-checkpoint-id={checkpointId}>Checkpoint saved</span>}
       </div>
+      {modelsError && <div role="alert" data-testid="agent-model-error" className="px-4 py-2 text-xs text-status-error">{agentName} models: {modelsError.message}</div>}
       {error && <div role="alert" className="px-4 py-2 text-xs text-status-error">{error}</div>}
       <div className="flex-1 overflow-hidden"><MessageList /></div>
-      <InputArea onSendMessage={(message) => void handleSendMessage(message)} />
+      <InputArea disabled={Boolean(sessionId && loadedSession !== sessionId)} onSendMessage={(message) => void handleSendMessage(message)} />
     </div>
   )
 }
