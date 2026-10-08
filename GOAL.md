@@ -1,5 +1,7 @@
 # Goal
 
+You are Astra Ultra, so delegate grunt work to subagents and stay high-level.
+
 Get Koda (this repo) fully working end to end on macOS with Codex as the agent, then prove that its existing collaboration works.
 
 ## Context
