@@ -5,20 +5,24 @@ import { KodaInstance, createWorkspace, pairScreenshot, requireClaude, requireCo
 
 async function share(page: Page, permission: 'control' | 'view') {
   await page.getByTestId('share-workspace').click()
-  await page.getByTestId('share-permission').selectOption(permission)
+  await page.getByTestId(`share-permission-${permission}`).click()
   await page.getByTestId('create-invitation').click()
   await expect(page.getByTestId('share-invitation')).toBeVisible({ timeout: 40_000 })
   const invitation = await page.getByTestId('share-invitation').inputValue()
-  await page.getByRole('dialog', { name: 'Share workspace', exact: true }).getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Share workspace', exact: true }).getByRole('button', { name: '[ESC] CLOSE', exact: true }).click()
   return invitation
 }
 
-async function join(page: Page, invitation: string) {
+/** The collaborator joins from their own sidebar and lands in the normal workspace view. */
+async function join(page: Page, invitation: string, permission: 'control' | 'view') {
   await page.getByTestId('join-workspace').click()
   await page.getByTestId('join-invitation').fill(invitation)
   await page.getByTestId('join-confirm').click()
-  await expect(page.getByTestId('shared-status')).toHaveText('connected', { timeout: 40_000 })
+  await expect(page.getByTestId('shared-workspace-badge')).toHaveAttribute('data-permission', permission, { timeout: 40_000 })
+  await expect(page.getByTestId('agent-chat-container')).toBeVisible()
 }
+
+const assistant = (page: Page, text: string) => page.locator('[data-message-role="assistant"]').filter({ hasText: text })
 
 for (const agent of ['codex', 'claude'] as const) {
 test(`Liveblocks ${agent}: two separate instances, live streaming/presence, control relay, enforced view access`, async ({ browser }, testInfo) => {
@@ -49,43 +53,51 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     if (agent === 'claude') host.trackClaudeSession(sessionId!, workspace.worktreePath)
     roomId = `workspace:${workspace.worktreeId}`
     const controlInvitation = await share(a, 'control')
-    await join(b, controlInvitation)
+    await join(b, controlInvitation, 'control')
     expect((await guest.rpc<Array<{ roomId: string }>>('collaboration.list'))[0]?.roomId).toBe(roomId)
+    // B's sidebar keeps B's own (empty) projects and lists A's workspace under Shared.
     expect(await guest.rpc('worktree.listAll')).toEqual([])
-    await expect(b.getByTestId('shared-workspace-name')).toHaveText('codex/proof-A')
-    await expect(b.getByTestId('shared-permission')).toHaveText('control')
-    await expect(b.getByTestId('shared-session')).toContainText(agent)
-    await expect(b.getByTestId('shared-presence')).toContainText('User A')
+    await expect(b.getByTestId('shared-workspace-link')).toContainText('codex/proof-A')
+    await expect(b.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', sessionId!)
+    await expect(b.getByTestId('active-agent')).toHaveText(agent === 'claude' ? 'Claude' : 'Codex')
+    await expect(b.getByTestId('presence-avatars').getByTitle('User A', { exact: true })).toBeVisible()
     await expect(a.getByTestId('presence-avatars').getByTitle('User B', { exact: true })).toBeVisible()
+    // The host's terminal is mirrored read-only, including output typed after B joined.
+    await expect(b.getByTestId(/^remote-terminal-tab-/)).toHaveCount(1)
+    await a.getByTestId('terminal-viewport').click()
+    await a.keyboard.type('echo HOST_TERMINAL_$((40+2))')
+    await a.keyboard.press('Enter')
+    await expect(b.getByTestId('terminal-viewport')).toContainText('HOST_TERMINAL_42', { timeout: 20_000 })
     await pairScreenshot(browser, a, b, testInfo, '01-two-instances-control-and-presence')
 
     await send(a, 'First announce A_STREAM_VISIBLE in an assistant message. Then run a shell command sleeping 5 seconds. Create collaboration.txt containing "HOST_TASK". Finish with A_TASK_FINISHED. Do not commit.')
-    await expect(b.getByTestId('shared-running')).toBeVisible()
-    await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'A_STREAM_VISIBLE' })).toBeVisible({ timeout: 120_000 })
+    await expect(assistant(b, 'A_STREAM_VISIBLE')).toBeVisible({ timeout: 120_000 })
     expect((await host.rpc<{ status: string }>(`${agent}.get`, { sessionId })).status).toBe('running')
+    await expect(b.getByTestId('chat-input')).toBeDisabled()
     await pairScreenshot(browser, a, b, testInfo, `02-${agent}-messages-stream-to-b`)
-    await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'A_TASK_FINISHED' })).toBeVisible({ timeout: 150_000 })
-    await expect(b.getByTestId('shared-composer')).toBeEnabled()
+    await expect(assistant(b, 'A_TASK_FINISHED')).toBeVisible({ timeout: 150_000 })
+    // B sees who wrote each message, and the host's changes panel.
+    await expect(b.locator('[data-message-role="user"]').filter({ hasText: 'A_STREAM_VISIBLE' }).getByTestId('message-author')).toHaveText('User A')
+    await expect(b.getByTestId('right-panel').getByText('collaboration.txt')).toBeVisible({ timeout: 20_000 })
+    await expect(b.getByTestId('chat-input')).toBeEnabled()
 
     const remotePrompt = 'B_RELAY_REQUEST: First announce B_STREAM_VISIBLE. Then run a shell command sleeping 5 seconds. Append "GUEST_TASK" to collaboration.txt. Finish with B_RELAY_FINISHED. Do not commit.'
-    await b.getByTestId('shared-composer').fill(remotePrompt)
-    await b.getByTestId('shared-send').click()
-    await expect(a.locator('[data-message-role="user"]').filter({ hasText: 'B_RELAY_REQUEST' })).toBeVisible()
-    await expect(a.locator('[data-message-role="assistant"]').filter({ hasText: 'B_STREAM_VISIBLE' })).toBeVisible({ timeout: 120_000 })
+    await send(b, remotePrompt)
+    await expect(a.locator('[data-message-role="user"]').filter({ hasText: 'B_RELAY_REQUEST' }).getByTestId('message-author')).toHaveText('User B')
+    await expect(assistant(a, 'B_STREAM_VISIBLE')).toBeVisible({ timeout: 120_000 })
     expect((await host.rpc<{ status: string }>(`${agent}.get`, { sessionId })).status).toBe('running')
     await pairScreenshot(browser, a, b, testInfo, '03-b-message-and-live-reply-on-a')
-    await expect(a.locator('[data-message-role="assistant"]').filter({ hasText: 'B_RELAY_FINISHED' })).toHaveAttribute('data-message-status', 'complete', { timeout: 150_000 })
-    await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'B_RELAY_FINISHED' })).toBeVisible()
+    await expect(assistant(a, 'B_RELAY_FINISHED')).toHaveAttribute('data-message-status', 'complete', { timeout: 150_000 })
+    await expect(assistant(b, 'B_RELAY_FINISHED')).toBeVisible()
     await pairScreenshot(browser, a, b, testInfo, '04-relay-complete-on-both')
 
-    // Replace B's joined grant with a view invitation; establish the live room again.
-    await b.getByRole('button', { name: 'Back to local workspaces' }).click()
+    // Replace B's joined grant with a view invitation; B rejoins from the sidebar.
     const revokedCommand = await guest.rpc<Record<string, unknown>>('collaboration.prepareRelay', { roomId, sessionId, content: 'REVOKED_CONTROL_MUST_NOT_RUN', requestId: randomUUID() })
     const viewInvitation = await share(a, 'view')
-    await join(b, viewInvitation)
-    await expect(b.getByTestId('view-only-notice')).toBeVisible()
-    await expect(b.getByTestId('shared-composer')).toBeDisabled()
-    await expect(b.getByTestId('shared-send')).toBeDisabled()
+    await join(b, viewInvitation, 'view')
+    await expect(b.getByTestId('chat-input')).toBeDisabled()
+    await expect(b.getByTestId('chat-input')).toHaveAttribute('placeholder', /view only/)
+    await expect(b.getByTestId('send-button')).toBeDisabled()
     const revoked = await host.rpc<{ error: string }>('collaboration.relay', { ...revokedCommand, worktreeId: workspace.worktreeId })
     expect(revoked.error).toContain('revoked')
     const before = await host.rpc<Array<unknown>>(`${agent}.getMessages`, { sessionId })
@@ -98,7 +110,7 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     await pairScreenshot(browser, a, b, testInfo, '05-view-permission-enforced')
 
     await send(a, 'Without tools, reply exactly VIEW_CAN_STILL_WATCH.')
-    await expect(b.getByTestId('shared-message-assistant').filter({ hasText: 'VIEW_CAN_STILL_WATCH' })).toBeVisible({ timeout: 120_000 })
+    await expect(assistant(b, 'VIEW_CAN_STILL_WATCH')).toBeVisible({ timeout: 120_000 })
     await pairScreenshot(browser, a, b, testInfo, '06-viewer-still-receives-live-messages')
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
       hostPids: host.pids, guestPids: guest.pids, separateDataDirectories: host.dataDir !== guest.dataDir,

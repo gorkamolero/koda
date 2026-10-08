@@ -67,16 +67,24 @@ async function deleteClaudeProofSession(session: ClaudeProofSession) {
 }
 
 export class KodaInstance {
-  readonly root = mkdtempSync(join(tmpdir(), 'koda-proof-'))
-  readonly dataDir = join(this.root, 'data')
-  readonly repoPath = join(this.root, 'throwaway-repo')
-  readonly profilePath = join(this.root, 'browser')
+  readonly root: string
+  readonly dataDir: string
+  readonly repoPath: string
+  readonly profilePath: string
+  readonly userName: string
   rpcPort = 0
   vitePort = 0
   private children: ManagedProcess[] = []
   private claudeSessions = new Map<string, ClaudeProofSession>()
   private generation = 0
-  constructor(readonly label: string, readonly testInfo: TestInfo) { mkdirSync(this.dataDir, { recursive: true }) }
+  constructor(readonly label: string, readonly testInfo: TestInfo, options: { userName?: string; root?: string } = {}) {
+    this.root = options.root ? (mkdirSync(options.root, { recursive: true }), options.root) : mkdtempSync(join(tmpdir(), 'koda-proof-'))
+    this.dataDir = join(this.root, 'data')
+    this.repoPath = join(this.root, 'throwaway-repo')
+    this.profilePath = join(this.root, 'browser')
+    this.userName = options.userName ?? `User ${label}`
+    mkdirSync(this.dataDir, { recursive: true })
+  }
   get url() { return `http://localhost:${this.vitePort}` }
   get pids() { return this.children.map(child => child.process.pid) }
 
@@ -113,7 +121,7 @@ export class KodaInstance {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       KODA_DATA_DIR: this.dataDir,
-      KODA_USER_NAME: `User ${this.label}`,
+      KODA_USER_NAME: this.userName,
       KODA_DB_PATH: join(this.dataDir, 'koda.db'),
       KODA_SOCKET: join(this.root, 'koda.sock'),
       KODA_HTTP_HOST: 'localhost', KODA_HTTP_PORT: String(this.rpcPort),
