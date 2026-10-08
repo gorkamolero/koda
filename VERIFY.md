@@ -90,6 +90,8 @@ KODA_DATA_DIR="$PWD/.koda-local/user-b" KODA_HTTP_PORT=3849 KODA_USER_NAME="User
 
 Each instance has its own database, worktrees, socket, identity, window state, and macOS webview profile. macOS 14 or newer supports the separate webview profiles. This debug bundle references the checkout's sidecar; it is a local development build, not a standalone signed release.
 
+If startup reports an unsupported legacy database, Koda preserves it and stops before the old destructive migration. Keep that data directory for recovery and use a new `KODA_DATA_DIR`; automatic conversion of populated pre-0005 databases is not implemented.
+
 ## Supporting checks
 
 ```sh
