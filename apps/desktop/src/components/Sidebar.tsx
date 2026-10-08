@@ -49,35 +49,6 @@ function formatTimeAgo(date: string | null | undefined): string {
 }
 
 // ============================================================================
-// ASCII Progress Bar
-// ============================================================================
-
-interface UsageBarProps {
-  label: string
-  value: number
-  max: number
-}
-
-function UsageBar({ label, value, max }: UsageBarProps): React.ReactElement {
-  const percent = Math.min(100, Math.round((value / max) * 100))
-  const filled = Math.round(percent / 10)
-  const empty = 10 - filled
-  const isHigh = percent > 80
-
-  return (
-    <div className="font-mono text-[10px] flex items-center gap-2">
-      <span className="text-text-dim w-14 uppercase">{label}</span>
-      <span className={cn('tracking-tighter', isHigh ? 'text-status-warning' : 'text-border-accent')}>
-        [{`${'█'.repeat(filled)}${'░'.repeat(empty)}`}]
-      </span>
-      <span className={cn('w-8 text-right tabular-nums', isHigh ? 'text-status-warning' : 'text-text-dim')}>
-        {percent}%
-      </span>
-    </div>
-  )
-}
-
-// ============================================================================
 // Terminal Dropdown Menu
 // ============================================================================
 
@@ -651,12 +622,6 @@ function SidebarFooter({ onAddRepo, hasWorkspace }: { onAddRepo: () => void; has
           </button>
         </div>
       )}
-
-      {/* Usage stats */}
-      <div className="px-3 py-2 space-y-1 border-t border-dashed border-text-dim/20">
-        <UsageBar label="SESSION" value={45} max={100} />
-        <UsageBar label="WEEKLY" value={230} max={1000} />
-      </div>
 
       {/* Bottom status bar */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-text-dim/20 text-[10px]">

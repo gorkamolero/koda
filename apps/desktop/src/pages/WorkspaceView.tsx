@@ -20,10 +20,12 @@ import {
 import { workspaceTypeAtom } from '@/store/interview'
 import { openFilesAtom } from '@/store/fileExplorer'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree, useEnableCollaboration, useDisableCollaboration } from '@/hooks/useRpc'
+import { useWorktree, useWorkspace, useSessions, useRepos, useCreateRepo, useCreateWorktree, useAttachRepo, useEnableCollaboration, useDisableCollaboration } from '@/hooks/useRpc'
 import { useSidecarRpcHandlers } from '@/hooks/useSidecarRpcHandlers'
 import { useResizable } from '@/hooks/useResizable'
 import { cn } from '@/lib/utils'
+import { rpcRequest, isTauriContext } from '@/lib/tauri'
+import { useQueryClient } from '@tanstack/react-query'
 
 type Tab = 'chat' | 'spec' | 'scratchpad'
 type ConnectStep = 'idle' | 'repo' | 'branch'
@@ -51,6 +53,7 @@ export function WorkspaceView() {
   const { workspaceId, worktreeId } = useParams({ from: '/workspace/$workspaceId/$worktreeId' })
   const search = useSearch({ from: '/workspace/$workspaceId/$worktreeId' })
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const workspaceType = useAtomValue(workspaceTypeAtom)
   const openFiles = useAtomValue(openFilesAtom)
 
@@ -84,6 +87,7 @@ export function WorkspaceView() {
   const { data: repos } = useRepos()
   const createRepo = useCreateRepo()
   const createWorktree = useCreateWorktree()
+  const attachRepo = useAttachRepo()
 
   // Collaboration toggle
   const enableCollaboration = useEnableCollaboration()
@@ -93,10 +97,23 @@ export function WorkspaceView() {
   const [connectStep, setConnectStep] = useState<ConnectStep>('idle')
   const [selectedRepoId, setSelectedRepoId] = useState<string>('')
   const [branchName, setBranchName] = useState('')
+  const [repoPath, setRepoPath] = useState('')
   const [connectError, setConnectError] = useState<string | null>(null)
 
   // Active session tracking
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
+
+  useEffect(() => { setActiveSessionId(undefined) }, [worktreeId])
+
+  const handleNewSession = async () => {
+    try {
+      const session = await rpcRequest<{ id: string; sessionId: string }>('codex.start', { worktreeId })
+      setActiveSessionId(session.sessionId ?? session.id)
+      void queryClient.invalidateQueries({ queryKey: ['sessions', worktreeId] })
+    } catch (error) {
+      setConnectError(error instanceof Error ? error.message : 'Unable to create session')
+    }
+  }
 
   // Set initial active session when sessions load
   useEffect(() => {
@@ -217,11 +234,11 @@ export function WorkspaceView() {
 
   const handleAddRepo = async () => {
     try {
-      const selected = await open({
+      const selected = isTauriContext() ? await open({
         directory: true,
         multiple: false,
         title: 'Select Git Repository',
-      })
+      }) : repoPath.trim()
 
       if (selected && typeof selected === 'string') {
         const repo = await createRepo.mutateAsync({ rootPath: selected })
@@ -238,6 +255,7 @@ export function WorkspaceView() {
     if (!selectedRepoId || !branchName.trim()) return
 
     try {
+      await attachRepo.mutateAsync({ workspaceId, repoId: selectedRepoId })
       // Create worktree with the workspace ID to associate it
       const newWorktree = await createWorktree.mutateAsync({
         repoId: selectedRepoId,
@@ -282,6 +300,7 @@ export function WorkspaceView() {
           sessions={sessions?.map(s => ({ id: s.id, name: s.title ?? 'Chat' })) ?? []}
           activeSessionId={activeSessionId}
           onSessionChange={setActiveSessionId}
+          onNewSession={worktree ? () => void handleNewSession() : undefined}
           onEnableCollaboration={() => { enableCollaboration.mutate(worktreeId) }}
           onDisableCollaboration={() => { disableCollaboration.mutate(worktreeId) }}
           isCollaborationPending={enableCollaboration.isPending || disableCollaboration.isPending}
@@ -316,7 +335,7 @@ export function WorkspaceView() {
                       <div>└────────────────────────────┘</div>
                     </div>
                     <p className="text-text-muted mb-4">
-                      Connect a repository to start chatting with Claude about your code.
+                      Connect a repository to start chatting with Codex about your code.
                     </p>
                     <button
                       type="button"
@@ -367,6 +386,9 @@ export function WorkspaceView() {
 
                     {/* Add new repo */}
                     <div className="pl-2">
+                      {!isTauriContext() && (
+                        <input aria-label="Repository path" data-testid="repository-path" value={repoPath} onChange={event => setRepoPath(event.target.value)} placeholder="/absolute/path/to/repository" className="w-full mb-2 p-2 bg-transparent border border-dashed border-border-subtle" />
+                      )}
                       <button
                         onClick={() => void handleAddRepo()}
                         disabled={createRepo.isPending}
@@ -496,7 +518,7 @@ export function WorkspaceView() {
 
           {/* Normal content when worktree exists and no files open */}
           {!isLoading && worktree && activeTab === 'chat' && openFiles.length === 0 && (
-            <AgentChat worktreeId={worktreeId} sessionId={activeSessionId} workingDirectory={rootPath} />
+            <AgentChat key={worktreeId} worktreeId={worktreeId} sessionId={activeSessionId} workingDirectory={rootPath} onSessionChange={setActiveSessionId} />
           )}
 
           {activeTab === 'spec' && workspaceType === 'spec-driven' && (

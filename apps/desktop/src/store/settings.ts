@@ -16,7 +16,7 @@ import type { AgentType } from '@/lib/rpc'
 /**
  * Default agent model to use for new sessions
  */
-export const defaultModelAtom = atomWithStorage<AgentType>('settings:defaultModel', 'claude')
+export const defaultModelAtom = atomWithStorage<AgentType>('settings:defaultModel', 'codex')
 
 /**
  * Available models (static for now, could be dynamic later)
@@ -250,7 +250,7 @@ export const soundEffectsEnabledAtom = atomWithStorage('settings:soundEffectsEna
  */
 export const resetAllSettingsAtom = atom(null, (_get, set) => {
   // Model settings
-  set(defaultModelAtom, 'claude')
+  set(defaultModelAtom, 'codex')
   set(thinkingEnabledDefaultAtom, true)
   set(planModeEnabledAtom, false)
 

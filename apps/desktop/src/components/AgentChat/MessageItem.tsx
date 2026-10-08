@@ -214,6 +214,7 @@ export const MessageItem = memo(function MessageItem({
         data-message-role="user"
         className="py-3 px-6 font-mono"
       >
+        {message.authorName && <div className="text-xs text-text-muted mb-1" data-testid="message-author">{message.authorName}</div>}
         <div className="flex gap-2 text-sm">
           <span className="text-text-accent flex-shrink-0">&gt;</span>
           <div className="text-text-primary whitespace-pre-wrap break-words">
@@ -230,6 +231,7 @@ export const MessageItem = memo(function MessageItem({
       data-testid={`message-${message.id}`}
       data-turn-index={turnIndex}
       data-message-role="assistant"
+      data-message-status={message.status}
       className="py-3 px-6 font-mono text-xs"
     >
       {/* Tool call summary row */}
@@ -271,6 +273,9 @@ export const MessageItem = memo(function MessageItem({
           <div className="prose prose-sm prose-invert prose-pre:bg-[#0a0a0a] prose-pre:border prose-pre:border-dashed prose-pre:border-border-subtle max-w-none">
             {hasContentBlocks && message.contentBlocks ? (
               <div className="space-y-3">
+                {message.content && !message.contentBlocks.some(block => block.type === 'text') && (
+                  <MessageResponse>{message.content}</MessageResponse>
+                )}
                 {message.contentBlocks.map((block, idx) => (
                   <div key={`${block.type}-${String(idx)}`}>
                     {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSetAtom } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -122,10 +122,12 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const openFile = useSetAtom(openFileAtom)
   const { readFile } = useFileSystem()
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
 
   // Fetch worktree diff
   const { data: diffData, isLoading } = useWorktreeDiff(workspaceId)
   const files = diffData?.files ?? []
+  const selectedDiff = files.find(file => file.path === selectedPath)
 
   // Handle file click - open in editor tab
   const handleFileClick = useCallback(
@@ -234,11 +236,20 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <FileRow file={file} onClick={() => void handleFileClick(file)} />
+              <FileRow file={file} onClick={() => setSelectedPath(file.path)} />
             </div>
           )
         })}
       </div>
+      {selectedDiff && (
+        <section className="border-t border-dashed border-border-subtle p-3 text-xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-text-primary">{selectedDiff.path}</span>
+            {selectedDiff.status !== 'deleted' && <button onClick={() => void handleFileClick(selectedDiff)} className="text-text-accent">Open file</button>}
+          </div>
+          <pre data-testid="selected-file-diff" className="whitespace-pre overflow-x-auto text-text-muted">{selectedDiff.diff || 'No text diff available'}</pre>
+        </section>
+      )}
     </div>
   )
 }

@@ -201,11 +201,33 @@ export async function onNotification<T>(
   callback: (payload: T) => void
 ): Promise<UnlistenFn> {
   if (!isTauriContext()) {
-    // In E2E tests, return a no-op unlisten function
-    return () => {}
+    // The browser uses the sidecar's real notification transport.
+    let stopped = false
+    let socket: WebSocket | undefined
+    let reconnect: ReturnType<typeof setTimeout> | undefined
+    const connect = () => {
+      socket = new WebSocket(getHttpRpcUrl().replace('http:', 'ws:').replace('/rpc', '/ws'))
+      socket.onmessage = (event) => {
+        try {
+          const notification = JSON.parse(String(event.data)) as { method?: string; params?: T }
+          if (notification.method === method && notification.params) callback(notification.params)
+        } catch {
+          // Ignore malformed notifications; the persisted event log can be reloaded.
+        }
+      }
+      socket.onclose = () => {
+        if (!stopped) reconnect = setTimeout(connect, 1000)
+      }
+    }
+    connect()
+    return () => {
+      stopped = true
+      clearTimeout(reconnect)
+      socket?.close()
+    }
   }
   const { listen } = await import('@tauri-apps/api/event')
-  return listen<T>(`rpc-notification:${method}`, (event) => {
-    callback(event.payload)
+  return listen<{ method: string; params: T }>('sidecar-notification', (event) => {
+    if (event.payload.method === method) callback(event.payload.params)
   })
 }

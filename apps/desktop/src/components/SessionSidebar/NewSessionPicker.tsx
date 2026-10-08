@@ -20,8 +20,6 @@ const AVAILABLE_MODELS: ModelOption[] = [
     name: 'Claude Sonnet',
     description: 'Fast & capable',
     icon: <Zap className="w-4 h-4" />,
-    badge: 'Default',
-    badgeColor: 'bg-status-unread/20 text-status-unread',
   },
   {
     id: 'claude-opus-4-20250514',
@@ -34,6 +32,8 @@ const AVAILABLE_MODELS: ModelOption[] = [
   {
     id: 'codex',
     name: 'OpenAI Codex',
+    badge: 'Default',
+    badgeColor: 'bg-status-unread/20 text-status-unread',
     description: 'Code specialist',
     icon: <Brain className="w-4 h-4" />,
   },

@@ -375,6 +375,7 @@ function CreateWorkspaceModal({
 // ============================================================================
 
 export function WorkspaceList() {
+  const navigate = useNavigate()
   const selectedWorkspaceId = useAtomValue(selectedWorkspaceIdAtom)
   const setSelectedWorkspaceId = useSetAtom(selectedWorkspaceIdAtom)
 
@@ -385,6 +386,7 @@ export function WorkspaceList() {
 
   const handleWorkspaceCreated = (workspace: Workspace) => {
     setSelectedWorkspaceId(workspace.id)
+    void navigate({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId: workspace.id, worktreeId: workspace.id } })
   }
 
   const handleSelectWorkspace = (workspace: Workspace) => {

@@ -251,7 +251,7 @@ export function InputArea({ onSendMessage, onSwitchTab }: InputAreaProps): React
   }, [])
 
   // Model display name - terminal style
-  const modelDisplayName = selectedModel.includes('opus') ? 'OPUS' :
+  const modelDisplayName = selectedModel === 'codex' ? 'CODEX' : selectedModel === 'kimi' ? 'KIMI' : selectedModel.includes('opus') ? 'OPUS' :
     selectedModel.includes('sonnet') ? 'SNNT' :
     selectedModel.includes('haiku') ? 'HAIK' : 'CLDE'
 

@@ -117,6 +117,9 @@ export interface MessageMention {
  * A single chat message
  */
 export interface ChatMessage {
+  /** Shared-message author, persisted with the host transcript. */
+  authorName?: string
+  authorMachineId?: string
   id: string
   role: MessageRole
   content: string
@@ -153,7 +156,7 @@ function createInitialSession(workspaceId: string): ChatSession {
   return {
     workspaceId,
     messages: [],
-    selectedModel: 'claude',
+    selectedModel: 'codex',
     isStreaming: false,
     inputValue: '',
     totalTokens: 0,
@@ -217,7 +220,7 @@ export const messagesAtom = atom(
 export const selectedModelAtom = atom(
   (get) => {
     const session = get(currentChatSessionAtom)
-    return session?.selectedModel ?? 'claude'
+    return session?.selectedModel ?? 'codex'
   },
   (_get, set, model: AgentModel) => {
     set(currentChatSessionAtom, { selectedModel: model })

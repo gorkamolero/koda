@@ -51,10 +51,10 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    expect(screen.getByText(/1 tool call/)).toBeInTheDocument()
+    expect(screen.getByText('[TOOLS:1]')).toBeInTheDocument()
   })
 
-  it('should render plural for multiple tool calls', () => {
+  it('should render count for multiple tool calls', () => {
     const blocks: ContentBlock[] = [
       createToolUse('tool-1', 'read_file'),
       createToolUse('tool-2', 'write_file'),
@@ -62,7 +62,7 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    expect(screen.getByText(/3 tool calls/)).toBeInTheDocument()
+    expect(screen.getByText('[TOOLS:3]')).toBeInTheDocument()
   })
 
   it('should show completed count', () => {
@@ -73,7 +73,7 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    expect(screen.getByText(/1 completed/)).toBeInTheDocument()
+    expect(screen.getByText(/1✓/)).toBeInTheDocument()
   })
 
   it('should show running count', () => {
@@ -82,7 +82,7 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    expect(screen.getByText(/1 running/)).toBeInTheDocument()
+    expect(screen.getByText(/1◉/)).toBeInTheDocument()
   })
 
   it('should show error count', () => {
@@ -92,7 +92,7 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    expect(screen.getByText(/1 failed/)).toBeInTheDocument()
+    expect(screen.getByText(/1✗/)).toBeInTheDocument()
   })
 
   it('should expand on click', () => {
@@ -182,9 +182,9 @@ describe('ToolCallSummary', () => {
     ]
     render(<ToolCallSummary contentBlocks={blocks} />)
 
-    const summary = screen.getByText(/3 tool calls/)
-    expect(summary.textContent).toContain('1 completed')
-    expect(summary.textContent).toContain('1 running')
-    expect(summary.textContent).toContain('1 failed')
+    const summary = screen.getByRole('button')
+    expect(summary.textContent).toContain('1✓')
+    expect(summary.textContent).toContain('1◉')
+    expect(summary.textContent).toContain('1✗')
   })
 })
