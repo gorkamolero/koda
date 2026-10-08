@@ -57,7 +57,7 @@ export function ApprovalRequests({ sessionId }: { sessionId: string }) {
   const pending = requests.filter(request => request.sessionId === sessionId)
   if (!isPending && !error && !responseError && pending.length === 0) return null
 
-  return <div data-testid="approval-requests" aria-live="polite" className="shrink-0 max-h-[40%] overflow-y-auto border-b border-border-subtle px-4 py-2 text-xs space-y-2">
+  return <div data-testid="approval-requests" aria-live="polite" className="border-b border-border-subtle px-4 py-2 text-xs space-y-2">
     {isPending && <p className="text-text-muted">Checking for approval requests…</p>}
     {error && <div role="alert" className="text-status-error">Unable to load approval requests: {error.message} <button onClick={() => void refetch()} className="underline">Retry</button></div>}
     {responseError && <p role="alert" className="text-status-error">{responseError}</p>}

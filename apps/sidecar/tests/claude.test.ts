@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { ClaudeHandler, ClaudeStartParamsSchema, ClaudeUpdateSettingsParamsSchema, claudeToolPermissions } from '../src/agents/claude.js';
 import { ApprovalBroker } from '../src/agents/approvalBroker.js';
+import { QuestionBroker } from '../src/agents/questionBroker.js';
 import { initDbWithMigrations, resetDb, getDb } from '../src/db/index.js';
 import { repos, worktrees, sessions } from '../src/db/schema.js';
 import { getNotificationEmitter } from '../src/rpc/notifications.js';
@@ -18,6 +19,10 @@ vi.mock('../src/checkpoint/service.js', () => ({ saveCheckpoint: mocks.checkpoin
 const usage = { input_tokens: 17, output_tokens: 8 };
 const assistant = (id: string, content: unknown[], uuid = id) => ({ type: 'assistant', session_id: 'sdk-thread', parent_tool_use_id: null, uuid, message: { id, content } });
 const result = { type: 'result', subtype: 'success', is_error: false, result: 'Done', session_id: 'sdk-thread', usage };
+const questionInput = () => ({ questions: [
+  { header: 'Color', question: 'Which color?', options: [{ label: 'Blue', description: 'Cool' }, { label: 'Red', description: 'Warm' }], multiSelect: false },
+  { header: 'Features', question: 'Which features?', options: [{ label: 'Search' }, { label: 'Export' }], multiSelect: true },
+] });
 const events = () => [
   { type: 'system', subtype: 'init', model: 'actual-model', session_id: 'sdk-thread' },
   { type: 'stream_event', event: { type: 'message_start', message: { id: 'announce' } } },
@@ -38,6 +43,7 @@ describe('durable Claude runtime', () => {
   let databasePath: string;
   let worktreeId: string;
   let approvals: ApprovalBroker;
+  let questions: QuestionBroker;
   beforeEach(() => {
     vi.clearAllMocks();
     directory = mkdtempSync(join(tmpdir(), 'koda-claude-unit-'));
@@ -48,9 +54,10 @@ describe('durable Claude runtime', () => {
     getDb().insert(worktrees).values({ id: worktreeId, repoId, worktreePath: directory }).run();
     mocks.query.mockImplementation(() => fakeQuery());
     approvals = new ApprovalBroker({ notify: () => {} });
-    handler = new ClaudeHandler(approvals);
+    questions = new QuestionBroker({ notify: () => {} });
+    handler = new ClaudeHandler(approvals, questions);
   });
-  afterEach(async () => { approvals.dispose(); await handler.dispose(); resetDb(); rmSync(directory, { recursive: true, force: true }); vi.restoreAllMocks(); });
+  afterEach(async () => { approvals.dispose(); questions.dispose(); await handler.dispose(); resetDb(); rmSync(directory, { recursive: true, force: true }); vi.restoreAllMocks(); vi.useRealTimers(); });
 
   it('creates an idle persisted session and uses CLI defaults without changing auth', async () => {
     expect(ClaudeStartParamsSchema.safeParse({}).success).toBe(false);
@@ -213,15 +220,118 @@ describe('durable Claude runtime', () => {
     expect(approvals.list()).toEqual([]);
   });
 
-  it('ends unsupported structured questions promptly and exposes the actual question', async () => {
-    const report = vi.fn();
-    const permissions = claudeToolPermissions(randomUUID(), new AbortController().signal, approvals, report);
-    const result = await permissions('AskUserQuestion', { questions: [{ question: 'Which color?' }] }, {
-      signal: new AbortController().signal, toolUseID: 'question-1', requestId: 'request-1',
-    });
-    expect(result).toMatchObject({ behavior: 'deny', interrupt: true });
-    expect(report).toHaveBeenCalledWith(expect.stringContaining('Which color?'));
+  it('rejects malformed or ambiguous Claude questions without stranding an input request', async () => {
+    const permissions = claudeToolPermissions(randomUUID(), new AbortController().signal, approvals, questions);
+    for (const input of [{ questions: [{ question: 'Missing choices' }] },
+      { questions: [questionInput().questions[0], questionInput().questions[0]] }]) {
+      expect(await permissions('AskUserQuestion', input, { signal: new AbortController().signal, toolUseID: 'question-1' }))
+        .toMatchObject({ behavior: 'deny', interrupt: true, message: expect.stringContaining('Invalid question form') });
+    }
+    expect(questions.list()).toEqual([]); expect(approvals.list()).toEqual([]);
+  });
+
+  it.each(['default', 'bypassPermissions'] as const)('awaits structured answers in %s mode and keeps raw questions/answers out of shared events', async permissionMode => {
+    const input = questionInput();
+    let answer: unknown;
+    mocks.query.mockImplementationOnce(({ options }) => Object.assign((async function* () {
+      yield assistant('question', [{ type: 'tool_use', id: 'question-tool', name: 'AskUserQuestion', input }]);
+      answer = await options.canUseTool('AskUserQuestion', input, { signal: new AbortController().signal, toolUseID: 'question-tool' });
+      yield { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'question-tool', content: 'Private structured answers' }] } };
+      yield assistant('reply', [{ type: 'text', text: 'Ordinary final reply' }]);
+      yield result;
+    })(), { close: vi.fn() }));
+    const session = await handler.start({ worktreeId, permissionMode });
+    const running = handler.send({ sessionId: session.id, message: 'Ask me' });
+    await vi.waitFor(() => expect(questions.list()).toHaveLength(1));
+    const [request] = questions.list();
+    expect(request).toMatchObject({ sessionId: session.id, agentType: 'claude', toolUseId: 'question-tool', questions: [
+      { id: 'q1', allowOther: true, multiSelect: false }, { id: 'q2', allowOther: true, multiSelect: true },
+    ] });
+    expect(handler.getSession(session.id).status).toBe('running');
     expect(approvals.list()).toEqual([]);
+    // SDK input mutation must not alter the pending form or its answer keys.
+    input.questions[0].question = 'Mutated question';
+    questions.respond({ sessionId: session.id, requestId: request.id, decision: 'submit', answers: {
+      q1: { selected: [], text: 'Green' }, q2: { selected: ['Search', 'Export'], text: 'Import' },
+    } });
+    await running;
+    expect(answer).toMatchObject({ behavior: 'allow', toolUseID: 'question-tool', updatedInput: {
+      questions: questionInput().questions, answers: { 'Which color?': 'Green', 'Which features?': 'Search, Export, Import' },
+    } });
+    expect(handler.getMessages(session.id).map(message => message.event.type)).toEqual(['user', 'text_delta', 'result']);
+    expect(JSON.stringify(handler.getMessages(session.id))).not.toContain('Private structured answers');
+    expect(questions.list()).toEqual([]);
+  });
+
+  it.each(['cancel', 'expiry'] as const)('stops the owning Claude turn once when a question ends by %s', async action => {
+    questions.dispose();
+    questions = new QuestionBroker({ timeoutMs: 20, notify: () => {} });
+    handler = new ClaudeHandler(approvals, questions);
+    let decision: unknown;
+    mocks.query.mockImplementationOnce(({ options }) => Object.assign((async function* () {
+      decision = await options.canUseTool('AskUserQuestion', questionInput(), { signal: new AbortController().signal, toolUseID: 'question-tool' });
+      yield result;
+    })(), { close: vi.fn() }));
+    const session = await handler.start({ worktreeId });
+    const running = handler.send({ sessionId: session.id, message: 'Ask me' });
+    const [request] = questions.list();
+    if (action === 'cancel') questions.respond({ sessionId: session.id, requestId: request.id, decision: 'cancel' });
+    await running;
+    expect(decision).toMatchObject({ behavior: 'deny' });
+    expect(handler.getSession(session.id).status).toBe('cancelled');
+    expect(handler.getMessages(session.id).filter(message => message.event.type === 'result')).toHaveLength(1);
+    expect(handler.getMessages(session.id).at(-1)?.event).toMatchObject({ cancelled: true });
+    expect(questions.list()).toEqual([]);
+    await expect(handler.updateSettings(session.id, { permissionMode: 'bypassPermissions' })).resolves.toMatchObject({ permissionMode: 'bypassPermissions' });
+  });
+
+  it('withdraws the provider question without stopping its owning turn or accepting a stale answer', async () => {
+    const turn = new AbortController(), providerRequest = new AbortController(), cancel = vi.fn();
+    const sessionId = randomUUID();
+    const permissions = claudeToolPermissions(sessionId, turn.signal, approvals, questions, cancel);
+    const pending = permissions('AskUserQuestion', questionInput(), { signal: providerRequest.signal, toolUseID: 'question-tool' });
+    const [request] = questions.list();
+    providerRequest.abort();
+    expect(await pending).toMatchObject({ behavior: 'deny', message: 'Question request withdrawn' });
+    expect(cancel).not.toHaveBeenCalled(); expect(turn.signal.aborted).toBe(false); expect(questions.list()).toEqual([]);
+    expect(() => questions.respond({ sessionId, requestId: request.id, decision: 'submit', answers: {} })).toThrow('no longer pending');
+  });
+
+  it('preserves punctuation in original option labels and custom text when encoding SDK answers', async () => {
+    const input = questionInput();
+    input.questions[1].options[0].label = 'Search, everywhere';
+    const sessionId = randomUUID();
+    const permissions = claudeToolPermissions(sessionId, new AbortController().signal, approvals, questions);
+    const pending = permissions('AskUserQuestion', input, { signal: new AbortController().signal, toolUseID: 'question-tool' });
+    questions.respond({ sessionId, requestId: questions.list()[0].id, decision: 'submit', answers: {
+      q1: { selected: ['Blue'] }, q2: { selected: ['Search, everywhere', 'Export'], text: 'Import, carefully' },
+    } });
+    expect(await pending).toMatchObject({ behavior: 'allow', updatedInput: { answers: {
+      'Which color?': 'Blue', 'Which features?': 'Search, everywhere, Export, Import, carefully',
+    } } });
+  });
+
+  it('honors a host cancellation that wins just before an external signal withdrawal', async () => {
+    const providerRequest = new AbortController(), cancel = vi.fn(), sessionId = randomUUID();
+    const permissions = claudeToolPermissions(sessionId, new AbortController().signal, approvals, questions, cancel);
+    const pending = permissions('AskUserQuestion', questionInput(), { signal: providerRequest.signal, toolUseID: 'question-tool' });
+    questions.respond({ sessionId, requestId: questions.list()[0].id, decision: 'cancel' });
+    providerRequest.abort();
+    expect(await pending).toMatchObject({ behavior: 'deny', message: 'Question cancelled by user' });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it.each(['stop', 'shutdown'] as const)('cleans up pending Claude forms on %s', async action => {
+    mocks.query.mockImplementationOnce(({ options }) => Object.assign((async function* () {
+      await options.canUseTool('AskUserQuestion', questionInput(), { signal: new AbortController().signal, toolUseID: 'question-tool' });
+      yield result;
+    })(), { close: vi.fn() }));
+    const session = await handler.start({ worktreeId });
+    handler.startTurn({ sessionId: session.id, message: 'Ask me' });
+    expect(questions.list()).toHaveLength(1);
+    if (action === 'stop') await handler.cancel({ sessionId: session.id }); else await handler.dispose();
+    expect(questions.list()).toEqual([]);
+    expect(handler.getSession(session.id).status).toBe('cancelled');
   });
 
   it('persists explicit bypass settings per session across restart and can return to default', async () => {
@@ -267,8 +377,7 @@ describe('durable Claude runtime', () => {
   it('removes a provider-withdrawn approval without treating it as a host rejection', async () => {
     const turn = new AbortController();
     const providerRequest = new AbortController();
-    const onQuestion = vi.fn();
-    const canUseTool = claudeToolPermissions('session', turn.signal, approvals, onQuestion);
+    const canUseTool = claudeToolPermissions('session', turn.signal, approvals, questions);
     const pending = canUseTool('Bash', { command: 'fixture command', dangerouslyDisableSandbox: true }, {
       signal: providerRequest.signal, toolUseID: 'provider-tool',
     });
@@ -279,7 +388,7 @@ describe('durable Claude runtime', () => {
     expect(await pending).toMatchObject({ behavior: 'deny', message: 'Tool request cancelled', toolUseID: 'provider-tool' });
     expect(approvals.list()).toEqual([]);
     expect(turn.signal.aborted).toBe(false);
-    expect(onQuestion).not.toHaveBeenCalled();
+    expect(questions.list()).toEqual([]);
     expect(() => approvals.respond({ sessionId: 'session', approvalId: request.id, decision: 'allow' })).toThrow('no longer pending');
   });
 

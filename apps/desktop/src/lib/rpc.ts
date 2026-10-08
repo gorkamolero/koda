@@ -384,6 +384,31 @@ export type PermissionMode = 'default' | 'bypassPermissions'
 export type CodingAgent = 'codex' | 'claude'
 export type AgentType = CodingAgent | 'kimi' | 'other'
 
+export interface AgentQuestion {
+  id: string
+  header: string
+  question: string
+  options: Array<{ label: string; description?: string }>
+  multiSelect: boolean
+  allowOther: boolean
+  isSecret?: boolean
+}
+
+export interface QuestionRequest {
+  id: string
+  sessionId: string
+  agentType: CodingAgent
+  toolUseId?: string
+  questions: AgentQuestion[]
+  createdAt: string
+  expiresAt: string
+}
+
+export interface QuestionAnswer {
+  selected: string[]
+  text?: string
+}
+
 export interface ApprovalRequest {
   id: string
   sessionId: string

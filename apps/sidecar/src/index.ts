@@ -84,6 +84,10 @@ import {
   approvalRespond,
   getApprovalBroker,
 } from './agents/approvalBroker.js';
+import {
+  QuestionListParamsSchema, QuestionRespondParamsSchema,
+  questionList, questionRespond, getQuestionBroker,
+} from './agents/questionBroker.js';
 
 // Import Kimi agent handlers
 import {
@@ -260,6 +264,8 @@ function registerMethods() {
   router.register('codex.updateSettings', updateCodexSettings, UpdateSettingsSchema);
   router.register('approval.list', approvalList, ApprovalListParamsSchema);
   router.register('approval.respond', approvalRespond, ApprovalRespondParamsSchema);
+  router.register('question.list', questionList, QuestionListParamsSchema);
+  router.register('question.respond', questionRespond, QuestionRespondParamsSchema);
   router.register('session.list', async (input: { worktreeId: string }) => getSessionsByWorktree(getDb(), input.worktreeId), ListSessionsSchema);
 
   // Claude agent
@@ -434,6 +440,7 @@ async function main() {
       console.log(`\nShutting down${signal ? ` (${signal})` : ''}...`);
       stopFileWatching(); // Stop file watching
       getApprovalBroker().dispose();
+      getQuestionBroker().dispose();
       await getCodexHandler().cleanup();
       await getClaudeHandler().dispose();
       cleanupAllSessions(); // Close all PTY sessions

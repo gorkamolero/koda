@@ -13,7 +13,8 @@
     "test:proof:claude": "playwright test --config proof.config.ts claude-proof.spec.ts",
     "test:proof:collaboration": "playwright test --config proof.config.ts collaboration-proof.spec.ts",
     "record:collaboration": "playwright test --config video.config.ts",
-    "test:proof:approvals": "playwright test --config proof.config.ts approval-proof.spec.ts"
+    "test:proof:approvals": "playwright test --config proof.config.ts approval-proof.spec.ts",
+    "test:proof:questions": "playwright test --config proof.config.ts question-proof.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

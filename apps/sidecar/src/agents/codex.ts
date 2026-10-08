@@ -5,6 +5,7 @@ import { realpathSync } from 'node:fs';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { runCodexTurn, type CodexEvent, type CodexUsage, type CodexPermissionMode } from './codexTransport.js';
 import { getApprovalBroker, SessionPermissionModeSchema, normalizePermissionMode } from './approvalBroker.js';
+import { getQuestionBroker } from './questionBroker.js';
 import { getDb } from '../db/index.js';
 import { sessions, sessionMessages, worktrees } from '../db/schema.js';
 import { getNotificationEmitter } from '../rpc/notifications.js';
@@ -130,6 +131,7 @@ export class CodexHandler {
     const session = this.load(input.sessionId);
     const finished = this.turns.get(session.id);
     getApprovalBroker().denySession(session.id, 'Codex turn cancelled');
+    getQuestionBroker().cancelSession(session.id, 'Codex turn cancelled');
     session.abortController?.abort();
     if (finished) await finished;
     else this.status(session, 'cancelled');
@@ -186,6 +188,13 @@ export class CodexHandler {
         threadId: session.threadId, workingDirectory: session.workingDirectory, model: session.model,
         permissionMode: session.permissionMode, message: input.message, signal: session.abortController.signal,
         approve: request => getApprovalBroker().request({ ...request, sessionId: session.id, agentType: 'codex' }),
+        ask: async request => {
+          const result = await getQuestionBroker().request({ sessionId: session.id, agentType: 'codex', toolUseId: request.toolUseId, questions: request.questions }, { signal: request.signal });
+          // Preserve the winning decision even if the provider withdraws its
+          // request in the same tick as the host cancels or the question expires.
+          if (result.decision === 'cancel' && ['user', 'expired', 'disposed'].includes(result.source)) session.abortController?.abort();
+          return result;
+        },
       });
       for await (const event of stream) {
         if (event.type === 'thread.started') {
@@ -226,6 +235,7 @@ export class CodexHandler {
     } finally {
       try {
         getApprovalBroker().denySession(session.id, 'Codex turn ended');
+        getQuestionBroker().cancelSession(session.id, 'Codex turn ended');
         const cancelled = session.abortController.signal.aborted;
         if (cancelled && !completed) this.emit(session, turnId, { type: 'result', result: 'Cancelled', cancelled: true });
         session.abortController = undefined;
@@ -264,6 +274,7 @@ export class CodexHandler {
     this.stopping = true;
     for (const session of this.sessions.values()) {
       getApprovalBroker().denySession(session.id, 'Codex handler stopped');
+      getQuestionBroker().cancelSession(session.id, 'Codex handler stopped');
       session.abortController?.abort();
     }
     await Promise.allSettled([...this.turns.values()]);

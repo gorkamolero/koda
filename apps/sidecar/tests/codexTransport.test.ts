@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
-import { CodexAppServer, runCodexTurn, type CodexApproval, type CodexTurnOptions } from '../src/agents/codexTransport.js';
+import { CodexAppServer, runCodexTurn, type CodexApproval, type CodexQuestionRequest, type CodexTurnOptions } from '../src/agents/codexTransport.js';
 
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawn: mocks.spawn }));
@@ -26,6 +26,10 @@ describe('Codex app-server turn transport', () => {
     notify('turn/completed', { turn: { id: 'turn-1', status: 'completed' } });
   };
   const ask = (method = 'item/commandExecution/requestApproval', id: string | number = 'server-approval') => write({ id, method, params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'tool-1', command: 'touch /elsewhere/proof', reason: 'Write outside workspace' } });
+  const question = (overrides: Record<string, unknown> = {}) => write({ id: 'server-question', method: 'item/tool/requestUserInput', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'question-1', isBlocking: true, autoResolutionMs: null,
+    questions: [{ id: 'color', header: 'Color', question: 'Which color?', isOther: true, isSecret: false, options: [{ label: 'Blue', description: 'Cool tone' }, { label: 'Red', description: 'Warm tone' }] }], ...overrides,
+  } });
   const collect = async () => { const events = []; for await (const event of runCodexTurn(options)) events.push(event); return events; };
   beforeEach(() => {
     sent = [];
@@ -63,13 +67,13 @@ describe('Codex app-server turn transport', () => {
     child.kill = vi.fn((signal = 'SIGTERM') => { child.signalCode = signal; child.emit('exit', null, signal); });
     mocks.spawn.mockReturnValue(child);
     controller = new AbortController();
-    options = { threadId: null, workingDirectory: '/workspace', model: 'default', permissionMode: 'default', message: 'Task', signal: controller.signal, approve: vi.fn(async () => ({ decision: 'deny' })) };
+    options = { threadId: null, workingDirectory: '/workspace', model: 'default', permissionMode: 'default', message: 'Task', signal: controller.signal, approve: vi.fn(async () => ({ decision: 'deny' })), ask: vi.fn(async () => ({ decision: 'cancel', reason: 'Cancelled by user', source: 'user' })) };
   });
   afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
   it('streams real delta notifications and selects the discovered default with workspace approvals', async () => {
     const events = await collect();
-    expect(mocks.spawn).toHaveBeenCalledWith('/trusted/codex', ['app-server', '--disable', 'shell_snapshot', '--disable', 'shell_snapshot_v2'], expect.objectContaining({ cwd: '/workspace' }));
+    expect(mocks.spawn).toHaveBeenCalledWith('/trusted/codex', ['app-server', '--disable', 'shell_snapshot', '--disable', 'shell_snapshot_v2', '--enable', 'default_mode_request_user_input'], expect.objectContaining({ cwd: '/workspace' }));
     expect(events).toEqual([
       { type: 'thread.started', thread_id: 'thread-1' },
       { type: 'item.started', item: { type: 'agent_message', id: 'answer', text: '' } },
@@ -207,10 +211,98 @@ describe('Codex app-server turn transport', () => {
   });
 
   it('fails visibly and rejects unknown server requests without granting approval', async () => {
-    onTurn = () => ask('item/tool/requestUserInput');
+    onTurn = () => ask('mcpServer/elicitation/request');
     await expect(collect()).rejects.toThrow('does not support');
     expect(options.approve).not.toHaveBeenCalled();
     expect(sent.find(message => message.id === 'server-approval').error.code).toBe(-32601);
     expect(child.kill).toHaveBeenCalled();
+  });
+
+  it.each(['default', 'bypassPermissions'] as const)('holds structured questions for an explicit host answer in %s mode', async permissionMode => {
+    options.permissionMode = permissionMode;
+    let respond!: (result: any) => void;
+    options.ask = vi.fn(() => new Promise(resolve => { respond = resolve; }));
+    onTurn = () => question({ autoResolutionMs: 1 });
+    onReply = finish;
+    const pending = collect();
+    await vi.waitFor(() => expect(options.ask).toHaveBeenCalledOnce());
+    expect(sent.filter(message => message.id === 'server-question')).toEqual([]);
+    expect(options.ask).toHaveBeenCalledWith(expect.objectContaining({ toolUseId: 'question-1', questions: [{ id: 'color', header: 'Color', question: 'Which color?', options: [{ label: 'Blue', description: 'Cool tone' }, { label: 'Red', description: 'Warm tone' }], multiSelect: false, allowOther: true, isSecret: false }] }));
+    respond({ decision: 'submit', answers: { color: { selected: ['Blue'] } } });
+    await pending;
+    expect(sent.filter(message => message.id === 'server-question')).toEqual([{ id: 'server-question', result: { answers: { color: { answers: ['Blue'] } } } }]);
+    expect(options.approve).not.toHaveBeenCalled();
+  });
+
+  it('maps free-text and secret question input without manufacturing an option', async () => {
+    options.ask = vi.fn(async () => ({ decision: 'submit', answers: { note: { selected: [], text: 'Private response' } } }));
+    onTurn = () => question({ questions: [{ id: 'note', header: 'Note', question: 'Enter a note', isOther: false, isSecret: true, options: null }] });
+    onReply = finish;
+    const events = await collect();
+    expect(options.ask).toHaveBeenCalledWith(expect.objectContaining({ questions: [expect.objectContaining({ options: [], allowOther: true, isSecret: true, multiSelect: false })] }));
+    expect(sent.find(message => message.id === 'server-question').result).toEqual({ answers: { note: { answers: ['Private response'] } } });
+    expect(JSON.stringify(events)).not.toContain('Private response');
+  });
+
+  it('returns an empty answer set for a cancelled question', async () => {
+    onTurn = () => question(); onReply = finish;
+    await collect();
+    expect(sent.find(message => message.id === 'server-question').result).toEqual({ answers: {} });
+  });
+
+  it('withdraws exact questions without replying to a resolved server request', async () => {
+    let request!: CodexQuestionRequest;
+    let respond!: (result: any) => void;
+    options.ask = vi.fn(input => { request = input; return new Promise(resolve => { respond = resolve; }); });
+    onTurn = () => question();
+    const pending = collect();
+    await vi.waitFor(() => expect(options.ask).toHaveBeenCalledOnce());
+    notify('serverRequest/resolved', { requestId: 'unrelated' });
+    expect(request.signal.aborted).toBe(false);
+    notify('serverRequest/resolved', { requestId: 'server-question' });
+    expect(request.signal.aborted).toBe(true);
+    respond({ decision: 'submit', answers: { color: { selected: ['Blue'] } } });
+    finish(); await pending;
+    expect(sent.filter(message => message.id === 'server-question')).toEqual([]);
+    expect(controller.signal.aborted).toBe(false);
+  });
+
+  it.each(['cancel', 'turn-end', 'process-exit'] as const)('clears pending questions on %s and never sends a late answer', async ending => {
+    let request!: CodexQuestionRequest;
+    options.ask = vi.fn(input => { request = input; return new Promise(resolve => input.signal.addEventListener('abort', () => resolve({ decision: 'cancel', reason: 'Withdrawn', source: 'withdrawn' }), { once: true })); });
+    onTurn = () => question();
+    const pending = collect();
+    const outcome = ending === 'turn-end' ? pending : expect(pending).rejects.toThrow(ending === 'cancel' ? 'cancelled' : 'exited');
+    await vi.waitFor(() => expect(options.ask).toHaveBeenCalledOnce());
+    if (ending === 'cancel') controller.abort();
+    else if (ending === 'turn-end') finish();
+    else { child.exitCode = 1; child.emit('exit', 1, null); }
+    await outcome;
+    expect(request.signal.aborted).toBe(true);
+    expect(sent.filter(message => message.id === 'server-question')).toEqual([{ id: 'server-question', result: { answers: {} } }]);
+  });
+
+  it.each([{ threadId: 'wrong-thread' }, { turnId: 'previous-turn' }])('rejects a question for the wrong active context: %j', async overrides => {
+    onTurn = () => question(overrides);
+    await expect(collect()).rejects.toThrow('did not match');
+    expect(options.ask).not.toHaveBeenCalled();
+  });
+
+  it('fails visibly for malformed question forms', async () => {
+    onTurn = () => question({ questions: [{ id: 'broken' }] });
+    await expect(collect()).rejects.toThrow('invalid question form');
+    expect(options.ask).not.toHaveBeenCalled();
+  });
+
+  it('keeps direct question forms and answers out of normalized transcript events', async () => {
+    onTurn = () => {
+      notify('item/started', { item: { type: 'dynamicToolCall', id: 'q', tool: 'request_user_input', arguments: { questions: ['Private form'] } } });
+      notify('item/completed', { item: { type: 'functionCallOutput', id: 'q-output', name: 'request_user_input', output: 'Private answer' } });
+      notify('item/completed', { item: { type: 'agentMessage', id: 'a', text: 'Ordinary response', questions: ['Private form'] } });
+      finish();
+    };
+    const events = await collect();
+    expect(JSON.stringify(events)).not.toContain('Private');
+    expect(JSON.stringify(events)).toContain('Ordinary response');
   });
 });

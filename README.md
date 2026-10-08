@@ -46,6 +46,8 @@ Choose the default for new conversations in **Settings → Agent → New convers
 
 Settings also recommends [Destructive Command Guard](https://github.com/Dicklesworthstone/destructive_command_guard), an optional hook that blocks known destructive commands. It requires separate installation; its Codex coverage is incomplete and it is not a sandbox.
 
+When Codex or Claude asks a structured question, answer its form in the host chat. Forms support single choices, Claude multiple choices, and custom answers. **Submit answers** resumes the agent; **Cancel and stop** ends the turn. Bypass permissions still waits for your answers. Pending forms return after a UI reload while the sidecar stays running; unfinished answer drafts are not saved.
+
 For collaboration, copy `.env.example` to `.env.local` and set `LIVEBLOCKS_SECRET_KEY` to a Liveblocks development secret. It stays on the sidecar and is ignored by git. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**.
 
 See [VERIFY.md](./VERIFY.md) for the real-service proofs, screenshots, separate-instance setup, and clean-clone verification.
