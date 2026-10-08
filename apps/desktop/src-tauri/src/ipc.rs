@@ -114,6 +114,19 @@ impl SocketClient {
     pub fn is_available(&self) -> bool {
         Path::new(&self.socket_path).exists()
     }
+
+    /// A leftover socket file or an unresponsive process is not a running service.
+    pub async fn is_healthy(&self) -> bool {
+        matches!(
+            tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                self.send_request("ping".into(), serde_json::json!({}), 0),
+            )
+            .await,
+            Ok(Ok(response)) if response.error.is_none()
+                && response.result == Some(serde_json::json!("pong"))
+        )
+    }
 }
 
 #[cfg(test)]
@@ -135,6 +148,36 @@ mod tests {
             .send_request("codex.send".into(), serde_json::json!({}), 42).await.unwrap();
         assert_eq!(result.result.unwrap()["accepted"], true);
         server.await.unwrap();
+        std::fs::remove_file(socket_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn health_requires_a_live_sidecar_response() {
+        let socket_path = std::env::temp_dir().join(format!("koda-health-live-{}.sock", std::process::id()));
+        let listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let (reader, mut writer) = socket.into_split();
+            let mut request = String::new();
+            BufReader::new(reader).read_line(&mut request).await.unwrap();
+            let request: serde_json::Value = serde_json::from_str(&request).unwrap();
+            assert_eq!(request["method"], "ping");
+            writer.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":\"pong\"}\n").await.unwrap();
+        });
+        let client = SocketClient::new(&socket_path);
+        assert!(client.is_healthy().await);
+        server.await.unwrap();
+        assert!(client.is_available(), "the socket file remains after the listener closes");
+        assert!(!client.is_healthy().await, "a stale socket must not show a green status");
+        std::fs::remove_file(socket_path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn health_times_out_for_an_unresponsive_process() {
+        let socket_path = std::env::temp_dir().join(format!("koda-health-timeout-{}.sock", std::process::id()));
+        let _listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let client = SocketClient::new(&socket_path);
+        assert!(!client.is_healthy().await);
         std::fs::remove_file(socket_path).unwrap();
     }
 

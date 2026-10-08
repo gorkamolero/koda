@@ -153,10 +153,11 @@ pub async fn spawn_sidecar(
 pub async fn get_sidecar_status(state: State<'_, SidecarState>) -> Result<SidecarStatus, String> {
     let pid = *state.pid.lock().await;
     let client = SocketClient::new(&state.socket_path);
+    let running = client.is_healthy().await;
 
     Ok(SidecarStatus {
-        running: client.is_available(),
-        pid,
+        running,
+        pid: if running { pid } else { None },
         socket_path: state.socket_path.clone(),
     })
 }
