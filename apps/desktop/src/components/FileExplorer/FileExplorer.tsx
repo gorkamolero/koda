@@ -117,7 +117,7 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
   const folderName = rootPath.split('/').pop() ?? 'Files'
 
   return (
-    <div data-testid="file-explorer" className="h-full flex flex-col font-mono bg-[#000000]">
+    <div data-testid="file-explorer" className="h-full flex flex-col font-mono bg-surface-messages">
       {/* Header */}
       <div
         data-testid="file-explorer-root"

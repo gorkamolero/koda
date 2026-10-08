@@ -13,7 +13,7 @@ export function GitStatusBar({ workspace }: GitStatusBarProps) {
   const workspaceName = workspace?.worktreePath?.split('/').pop() ?? workspace?.branch ?? 'workspace'
 
   return (
-    <div className="h-6 px-3 flex items-center gap-2 text-xs font-mono bg-[#000000] border-t border-dashed border-border-subtle text-text-faint">
+    <div className="h-6 px-3 flex items-center gap-2 text-xs font-mono bg-surface-messages border-t border-dashed border-border-subtle text-text-faint">
       {/* Left border */}
       <span>└─</span>
 

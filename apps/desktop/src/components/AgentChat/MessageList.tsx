@@ -50,7 +50,7 @@ export function MessageList() {
       <div
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full w-full flex flex-col items-center justify-center font-mono bg-[#000000]"
+        className="h-full w-full flex flex-col items-center justify-center font-mono bg-surface-messages"
       >
         <pre className="text-xs text-text-faint leading-tight">
 {`┌────────────────────────────────────┐
@@ -81,7 +81,7 @@ export function MessageList() {
         ref={parentRef}
         data-testid="message-list"
         data-virtualized="true"
-        className="h-full overflow-auto font-mono bg-[#000000]"
+        className="h-full overflow-auto font-mono bg-surface-messages"
         onScroll={handleScroll}
       >
         <div

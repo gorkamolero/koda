@@ -37,7 +37,10 @@ export interface ThemeOption {
  */
 export const activeThemeIdAtom = atomWithStorage<string>(
   'minnetonka-active-theme',
-  DEFAULT_THEME
+  DEFAULT_THEME,
+  undefined,
+  // Read the saved theme at startup, before anything subscribes to it.
+  { getOnInit: true }
 )
 
 /**
@@ -45,7 +48,9 @@ export const activeThemeIdAtom = atomWithStorage<string>(
  */
 export const customThemesAtom = atomWithStorage<TranslatedTheme[]>(
   'minnetonka-custom-themes',
-  []
+  [],
+  undefined,
+  { getOnInit: true }
 )
 
 /**

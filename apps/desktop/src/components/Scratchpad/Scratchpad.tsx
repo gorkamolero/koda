@@ -228,7 +228,7 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
 
   return (
     <div 
-      className={cn('flex flex-col h-full font-mono bg-[#000000]', className)} 
+      className={cn('flex flex-col h-full font-mono bg-surface-messages', className)} 
       data-testid="scratchpad-container"
     >
       {/* Minimal header */}

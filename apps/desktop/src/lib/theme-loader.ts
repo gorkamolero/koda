@@ -121,12 +121,47 @@ export const codexDimTheme: TranslatedTheme = {
 }
 
 /**
+ * KODA Graphite - Cool gray surfaces with the same terracotta accent
+ */
+export const kodaGraphiteTheme: TranslatedTheme = {
+  name: 'KODA Graphite',
+  type: 'dark',
+  variables: {
+    '--text-primary': '#cdd0d4',
+    '--text-strong': '#eceef1',
+    '--text-emphasis': '#dde0e4',
+    '--text-muted': '#9ba1a8',
+    '--text-faint': '#6d737a',
+    '--text-dim': '#4f545a',
+    '--text-accent': 'rgba(224, 122, 95, 0.7)',
+    '--surface-sidebar': '#1a1c20',
+    '--surface-topbar': '#1a1c20',
+    '--surface-messages': '#212328',
+    '--surface-card': '#2a2d33',
+    '--surface-card-strong': '#31353b',
+    '--surface-control': '#2a2d33',
+    '--surface-hover': '#2c2f35',
+    '--surface-active': 'rgba(224, 122, 95, 0.18)',
+    '--surface-popover': '#2a2d33',
+    '--surface-bubble-user': 'rgba(224, 122, 95, 0.18)',
+    '--border-subtle': 'rgba(255, 255, 255, 0.09)',
+    '--border-strong': 'rgba(255, 255, 255, 0.14)',
+    '--border-accent': '#e07a5f',
+    '--status-success': '#4ade80',
+    '--status-warning': '#fbbf24',
+    '--status-error': '#f87171',
+    '--shadow-accent': 'rgba(0, 0, 0, 0.4)',
+  },
+}
+
+/**
  * All bundled themes.
  */
 export const BUNDLED_THEMES: Record<string, TranslatedTheme> = {
   'codex-dark': codexDarkTheme,
   'codex-light': codexLightTheme,
   'codex-dim': codexDimTheme,
+  'koda-graphite': kodaGraphiteTheme,
 }
 
 export const DEFAULT_THEME = 'codex-dark'

@@ -133,7 +133,7 @@ function ShortcutRow({ action, keys }: { action: string; keys: string }) {
  */
 export function Settings() {
   return (
-    <div className="h-full overflow-y-auto font-mono bg-[#000000]">
+    <div className="h-full overflow-y-auto font-mono bg-surface-messages">
       <div className="max-w-2xl mx-auto p-8">
         {/* ASCII Header */}
         <div className="mb-8 text-xs">
