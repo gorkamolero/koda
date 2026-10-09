@@ -5,7 +5,7 @@
  * Uses two Playwright browser contexts to simulate two separate machines.
  *
  * Prerequisites:
- * - VITE_LIVEBLOCKS_PUBLIC_KEY configured in .env.local
+ * - Collaboration configured through the sidecar (see VERIFY.md)
  * - LIVEBLOCKS_SECRET_KEY for API verification
  *
  * Tests:
@@ -20,8 +20,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 
 // Liveblocks API for verification
-const LIVEBLOCKS_SECRET_KEY =
-  'sk_dev_f3koNtPUiH6ktXtCbw9WhrtgrFwtsmwtEwkTnaItVjVKsf4wQbEXnJEzn4b6SdZF'
+const LIVEBLOCKS_SECRET_KEY = process.env.LIVEBLOCKS_SECRET_KEY
 
 // RPC helper
 async function rpcCall<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {

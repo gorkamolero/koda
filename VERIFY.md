@@ -8,7 +8,7 @@ This document covers the macOS desktop launch and real-service Playwright proofs
 - Node.js 24 (see `.nvmrc`) and pnpm 9.15.9. Node 22.12 or later is required.
 - An installed, authenticated Codex CLI: run `codex login`, then `codex login status`. Koda uses its official bidirectional app-server protocol for streaming and interactive approvals. See [Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 - An installed, authenticated Claude CLI for the Claude proofs: run `claude auth login`, then `claude auth status`. Koda runs the official Claude Agent SDK with the installed CLI; authentication remains with Claude.
-- A Liveblocks **development** secret key for the collaboration proof. Both development instances use the same Liveblocks project. No public browser key is needed.
+- A Liveblocks **development** secret key for the real collaboration proofs. Development-key instances use it locally; service-mode instances have no key, and only the local Worker receives it. No public browser key is needed.
 - Internet access for dependencies, the selected agent, and Liveblocks.
 
 Codex remains the default. Choose Codex or Claude when starting a new chat, then select its model in the UI. The agent, model, and permission mode are stored with the session. Kimi is not part of the verified flow. The Codex-only proof does not require Claude authentication.
@@ -47,13 +47,13 @@ The [SDK overview](https://code.claude.com/docs/en/agent-sdk/overview) separatel
 
 ## Clean clone
 
-These changes are committed locally and are not pushed. To verify an independent clone of this checkout's committed HEAD, configure `.env.local` as described below, commit all source changes, and run:
+To verify an independent clone of this checkout's committed HEAD, point at your ignored env file, commit all source changes, and run:
 
 ```sh
-pnpm verify:clean
+KODA_ENV_FILE=/Users/gorkolas/Developer/koda/.env.local pnpm verify:clean
 ```
 
-This clones the committed source with `git clone --no-local`, installs locked dependencies, builds from source, and runs every real-service proof. It passes credentials through the inherited environment without copying the env file. The installed agent CLIs use their own existing login stores. Reports, screenshots, logs, and a manifest identifying the tested commit are retained under `proof-results/clean-<commit>-<timestamp>/`. A successful run removes its temporary clone; a failed run reports the retained diagnostic path.
+This clones the committed source with `git clone --no-local`, installs locked dependencies, builds from source, runs lint and all Worker/sidecar/desktop unit tests, and runs every maintained real-service proof. `pnpm test` runs the unit suites once; the older native fixture suite remains available separately as `pnpm --filter e2e test`. It passes credentials through the inherited environment without copying the env file. The installed agent CLIs use their own existing login stores. Reports, screenshots, logs, and a manifest identifying the tested commit are retained under `proof-results/clean-<commit>-<timestamp>/`. A successful run removes its temporary clone; a failed run reports the retained diagnostic path.
 
 To perform the setup and proofs manually from a clean checkout containing these commits:
 
@@ -109,7 +109,7 @@ For each agent, this starts a real chat with bypass permissions, requests its bu
 pnpm --filter e2e test:proof:collaboration
 ```
 
-Each agent's collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control and user B joins from B's own sidebar, which keeps B's projects and lists A's workspace under Shared. B gets the normal workspace view of A's session: the streamed conversation with tool calls, A's changes, and a read-only mirror of A's terminal, with presence on both sides. B sends a message to A's actual Codex or Claude session through Liveblocks, and each message shows its author. With both agents, a real permission request appears on both screens and B approves it from their own Koda; the command then runs on A's machine. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation. The Claude workflow explicitly uses bypass; the approval proofs separately exercise normal mode. Backend regressions verify that a relayed message cannot carry approval or permission-mode fields, and that answers, approvals and stops from a collaborator need control and run once.
+For each agent, the suite runs development-key mode and service mode. Service mode starts `wrangler dev` with isolated local D1 and the existing secret passed through the environment; it never copies the credential file. It asserts the key is absent from both sidecar environments and checks their active service mode. Each collaboration test uses two isolated sidecars, databases, identities, frontend ports, and browser contexts. User A grants control and user B joins from B's own sidebar, which keeps B's projects and lists A's workspace under Shared. B gets the normal workspace view of A's session: the streamed conversation with tool calls, A's changes, and a read-only mirror of A's terminal, with presence on both sides. B sends a message to A's actual Codex or Claude session through Liveblocks, and each message shows its author. With both agents, a real permission request appears on both screens and B approves it from their own Koda; the command then runs on A's machine. The tests also check view-only behavior at the UI and the host's authorization boundary, including rejection of a replaced control invitation. The Claude workflow explicitly uses bypass; the approval proofs separately exercise normal mode. Backend regressions verify that a relayed message cannot carry approval or permission-mode fields, and that answers, approvals and stops from a collaborator need control and run once.
 
 Run all proofs together:
 
@@ -119,6 +119,47 @@ pnpm --filter e2e exec playwright show-report proof-report
 ```
 
 Screenshots, structured evidence, and logs are written under `e2e/proof-results/`; the HTML report is `e2e/proof-report/`. Both directories are ignored. Failure traces may include invitation credentials, so keep them local. The tests stop their own processes and remove their temporary data directories.
+
+## Hosted collaboration service
+
+The service is implemented but **not deployed**. No Cloudflare account action is part of the proofs. For ordinary use after deployment, open **Settings → Collaboration**, save your display name and the service origin under **Advanced**, then share. `KODA_USER_NAME` overrides the saved display name. URL precedence is `KODA_COLLAB_URL`, saved settings, then the build default (currently empty). HTTPS is required except for loopback development. Invitations from a different service are refused with a Settings instruction.
+
+In service mode, each install generates an Ed25519 device keypair and random host signing key on first use, saved in `collaboration.json` with mode 0600 beside its database. Every service request signs method, path, origin, millisecond timestamp, nonce and SHA-256 body hash. The Worker accepts a 60-second window and stores unique nonces in D1. Limits: 10 registrations per IP per hour, 120 token requests per device per minute, and 20 owned rooms per device. Registration and token limits count attempted requests. Room owners alone may claim/delete/invite; `host` tokens give FULL access only to owners, `ui` gives READ access to owners/granted devices, and `guest` gives READ access only to granted devices.
+
+Local Worker development (the only place a developer may supply its key in an ignored file):
+
+```sh
+pnpm --filter @koda/collab-service exec wrangler d1 migrations apply DB --local
+# Create apps/collab-service/.dev.vars privately with LIVEBLOCKS_SECRET_KEY.
+# Never copy the real /Users/gorkolas/Developer/koda/.env.local file.
+pnpm --filter @koda/collab-service dev
+```
+
+`.dev.vars`, its variants and `.wrangler/` are ignored. The proof harness instead declares the Worker secret in Wrangler config and passes it through the environment without writing a secret file. To test service mode alone:
+
+```sh
+KODA_ENV_FILE=/Users/gorkolas/Developer/koda/.env.local pnpm --filter e2e test:proof:collaboration --grep service
+```
+
+Worker tests use Miniflare/D1 with Liveblocks mocked only at the outbound HTTP boundary. Sidecar tests cover signing, registration, settings precedence, private-state permissions and invitations without the project secret:
+
+```sh
+pnpm --filter @koda/collab-service build
+pnpm --filter @koda/collab-service test
+pnpm --filter @koda/sidecar exec vitest run src/sync
+```
+
+Owner deployment steps, to run separately in the owner's Cloudflare account:
+
+```sh
+pnpm --filter @koda/collab-service exec wrangler login
+pnpm --filter @koda/collab-service exec wrangler d1 create koda-collaboration
+# Set database_id in apps/collab-service/wrangler.toml to the returned ID.
+pnpm --filter @koda/collab-service exec wrangler secret put LIVEBLOCKS_SECRET_KEY
+pnpm collab:deploy
+```
+
+`collab:deploy` applies remote D1 migrations then deploys the Worker. The secret-put command reads the key interactively; never put it on the command line. After deployment, configure its HTTPS origin in Koda or `KODA_COLLAB_URL`; a release build can set its default only after that endpoint is deployed and verified.
 
 ## Record the collaboration on two machines
 
@@ -177,7 +218,7 @@ cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
 
 The host owns the session transcript and validates signed relay requests before dispatching the session's agent. Browser participants receive read/presence access rather than permission to rewrite the transcript. Control invitations must be kept private; relay broadcasts do not include the invitation token. View invitations do not authorize commands. Local HTTP RPC and WebSocket subscriptions reject untrusted browser origins using exact configured-origin matches, including simple POST requests that do not require a browser preflight.
 
-This same-machine development setup gives both sidecars a Liveblocks project secret. It is not a production identity service for mutually untrusted machines. Cross-machine deployment and production account/permission management require their own verification.
+Development-key mode gives both sidecars a Liveblocks project secret and is intended for trusted development/self-host setups. Service mode keeps it solely in the Worker. Guests parse invitation labels locally, redeem the service join code for read access, and send signed relay requests that only the host verifies with its own invitation key. Replacing a code removes every grant from that code and replaces the host's current invitation. Already issued Liveblocks tokens remain usable until they expire; host relay authorization rejects the old invitation immediately. There are no user accounts, device recovery, or active-token eviction in this version. Keep control invitations private and use a dedicated Liveblocks project for the deployed service. Cross-machine hosted deployment still needs its own verification.
 
 ## Verification record
 

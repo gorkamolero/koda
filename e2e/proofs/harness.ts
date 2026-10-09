@@ -95,7 +95,9 @@ export class KodaInstance {
   private claudeSessions = new Map<string, ClaudeProofSession>()
   private codexSessions = new Map<string, ClaudeProofSession>()
   private generation = 0
-  constructor(readonly label: string, readonly testInfo: TestInfo, options: { userName?: string; root?: string } = {}) {
+  private readonly serviceUrl?: string
+  constructor(readonly label: string, readonly testInfo: TestInfo, options: { userName?: string; root?: string; serviceUrl?: string } = {}) {
+    this.serviceUrl = options.serviceUrl
     this.root = options.root ? (mkdirSync(options.root, { recursive: true }), options.root) : mkdtempSync(join(tmpdir(), 'koda-proof-'))
     this.dataDir = join(this.root, 'data')
     this.repoPath = join(this.root, 'throwaway-repo')
@@ -158,11 +160,21 @@ export class KodaInstance {
     }
     // KODA_TEST_DB used to wipe on every start. Use the normal persisted path.
     delete env.KODA_TEST_DB
+    if (this.serviceUrl) {
+      delete env.LIVEBLOCKS_SECRET_KEY
+      delete env.KODA_ENV_FILE
+      env.KODA_COLLAB_URL = this.serviceUrl
+      expect('LIVEBLOCKS_SECRET_KEY' in env).toBe(false)
+    }
     const sidecar = this.launch(['dist/index.js'], join(projectRoot, 'apps/sidecar'), env, 'sidecar')
     await expect.poll(async () => {
       if (sidecar.exitCode !== null) throw new Error(`Sidecar exited ${sidecar.exitCode}; inspect ${this.label} sidecar log`)
       try { return await this.rpc('ping') } catch { return null }
     }, { timeout: 30_000, message: 'Real sidecar startup' }).toBe('pong')
+    if (this.serviceUrl) {
+      const status = await this.rpc<{ mode: string; reachable: boolean }>('collaboration.status')
+      expect(status.mode).toBe('service'); expect(status.reachable).toBe(true)
+    }
     const vite = this.launch(['node_modules/vite/bin/vite.js', '--host', 'localhost'], join(projectRoot, 'apps/desktop'), env, 'frontend')
     await expect.poll(async () => {
       if (vite.exitCode !== null) throw new Error(`Frontend exited ${vite.exitCode}; inspect ${this.label} frontend log`)
@@ -225,6 +237,42 @@ export class KodaInstance {
       writeFileSync(this.testInfo.outputPath(`${this.label}-codex-cleanup.json`), JSON.stringify({ temporaryThreadsArchived: archived, providerArchiveVerified: true }, null, 2))
     }
     // Only this test's mkdtemp tree; never a shared database or arbitrary port.
+    rmSync(this.root, { recursive: true, force: true })
+  }
+}
+
+/** Real local Worker + isolated D1. The secret stays in the Worker environment. */
+export class CollaborationWorker {
+  readonly root = mkdtempSync(join(tmpdir(), 'koda-worker-proof-'))
+  url = ''
+  private child?: ChildProcess
+  private log?: WriteStream
+  constructor(readonly testInfo: TestInfo) {}
+  async start() {
+    requireLiveblocks()
+    const port = await freePort()
+    this.url = `http://127.0.0.1:${port}`
+    const cwd = join(projectRoot, 'apps/collab-service')
+    const cli = join(cwd, 'node_modules/wrangler/bin/wrangler.js')
+    const env = { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true' }
+    // Wrangler declares only LIVEBLOCKS_SECRET_KEY as a required secret and
+    // reads it from this environment; no secret appears in arguments or files.
+    execFileSync(process.execPath, [cli, 'd1', 'migrations', 'apply', 'DB', '--local', '--persist-to', this.root], { cwd, env, stdio: 'pipe', timeout: 60000 })
+    this.log = createWriteStream(this.testInfo.outputPath('collaboration-worker.log'))
+    this.child = spawn(process.execPath, [cli, 'dev', '--local', '--ip', '127.0.0.1', '--port', String(port), '--persist-to', this.root], { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    this.child.stdout?.pipe(this.log, { end: false }); this.child.stderr?.pipe(this.log, { end: false })
+    await expect.poll(async () => {
+      if (this.child?.exitCode !== null) throw new Error('Local Worker exited; inspect collaboration-worker.log')
+      try { return (await fetch(`${this.url}/health`)).ok } catch { return false }
+    }, { timeout: 30000 }).toBe(true)
+  }
+  async cleanup() {
+    if (this.child?.pid && this.child.exitCode === null) {
+      try { process.kill(-this.child.pid, 'SIGTERM') } catch { /* already stopped */ }
+      await Promise.race([new Promise(resolve => this.child!.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))])
+      if (this.child.exitCode === null) { try { process.kill(-this.child.pid, 'SIGKILL') } catch { /* already stopped */ } }
+    }
+    this.log?.end()
     rmSync(this.root, { recursive: true, force: true })
   }
 }

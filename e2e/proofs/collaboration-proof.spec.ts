@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join as joinPath } from 'node:path'
-import { KodaInstance, createWorkspace, outsideFixture, pairScreenshot, requireClaude, requireCodex, requireLiveblocks, send, writePrompt } from './harness'
+import { CollaborationWorker, KodaInstance, createWorkspace, outsideFixture, pairScreenshot, requireClaude, requireCodex, requireLiveblocks, send, writePrompt } from './harness'
 
 async function share(page: Page, permission: 'control' | 'view') {
   await page.getByTestId('share-workspace').click()
@@ -25,12 +25,15 @@ async function join(page: Page, invitation: string, permission: 'control' | 'vie
 
 const assistant = (page: Page, text: string) => page.locator('[data-message-role="assistant"]').filter({ hasText: text })
 
+for (const mode of ['development-key', 'service'] as const) {
 for (const agent of ['codex', 'claude'] as const) {
-test(`Liveblocks ${agent}: two separate instances, live streaming/presence, control relay, enforced view access`, async ({ browser }, testInfo) => {
+test(`Liveblocks ${mode} ${agent}: two separate instances, live streaming/presence, control relay, enforced view access`, async ({ browser }, testInfo) => {
   if (agent === 'codex') requireCodex()
   requireLiveblocks()
-  const host = new KodaInstance('A', testInfo)
-  const guest = new KodaInstance('B', testInfo)
+  const worker = mode === 'service' ? new CollaborationWorker(testInfo) : undefined
+  if (worker) { try { await worker.start() } catch (error) { await worker.cleanup(); throw error } }
+  const host = new KodaInstance('A', testInfo, { serviceUrl: worker?.url })
+  const guest = new KodaInstance('B', testInfo, { serviceUrl: worker?.url })
   const contextA = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const contextB = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const a = await contextA.newPage()
@@ -141,7 +144,7 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     expect(upstreamSession.threadId).toBeTruthy()
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
       hostPids: host.pids, guestPids: guest.pids, separateDataDirectories: host.dataDir !== guest.dataDir,
-      agent, permissionMode, sessionId, threadId: upstreamSession.threadId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
+      mode, sidecarsHaveDevelopmentKey: mode === 'development-key', agent, permissionMode, sessionId, threadId: upstreamSession.threadId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
       proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} runtime and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
     }, null, 2))
   } finally {
@@ -150,18 +153,22 @@ test(`Liveblocks ${agent}: two separate instances, live streaming/presence, cont
     // earlier browser, native session, or process cleanup failed.
     for (const cleanup of [
       () => contextA.close(), () => contextB.close(),
-      () => host.cleanup(), () => guest.cleanup(),
       async () => {
         if (!roomId) return
+        if (worker) { await host.rpc('collaboration.deleteRoom', { roomId }); return }
         const response = await fetch(`https://api.liveblocks.io/v2/rooms/${encodeURIComponent(roomId)}`, {
           method: 'DELETE', headers: { Authorization: `Bearer ${process.env.LIVEBLOCKS_SECRET_KEY}` }, signal: AbortSignal.timeout(15_000),
         })
         if (!response.ok && response.status !== 404) throw new Error(`Proof room cleanup failed (${response.status}) for ${roomId}`)
       },
+      () => host.cleanup(), () => guest.cleanup(),
+      async () => { await worker?.cleanup() },
     ]) {
       try { await cleanup() } catch (error) { cleanupErrors.push(error) }
     }
     if (cleanupErrors.length) throw new AggregateError(cleanupErrors, 'Collaboration proof cleanup failed')
   }
 })
+}
+
 }

@@ -190,9 +190,11 @@ Pseudo-terminal management for agent command execution.
 
 | Method | Params | Description |
 |--------|--------|-------------|
-| `collaboration.status` | none | Whether Liveblocks is configured, plus this machine's ID and name |
+| `collaboration.status` | none | Active mode (`development-key`, `service`, `not-configured`), enabled/reachable status, machine ID/name, effective URL and saved settings |
+| `collaboration.settings` | `{ displayName, serviceUrl }` | Save local collaboration settings; environment overrides still apply |
+| `collaboration.deleteRoom` | `{ roomId }` | Delete a room through the configured service (owner only) or development key |
 | `collaboration.share` | `{ worktreeId, permission: 'view' \| 'control' }` | Create the workspace's invitation; replaces earlier invitations |
-| `collaboration.join` | `{ invitation }` | Store an invitation from another machine |
+| `collaboration.join` | `{ invitation }` | Parse/store an invitation; service mode also registers the device and redeems its join code |
 | `collaboration.list` | none | Joined workspaces with permission, workspace name and host name |
 | `collaboration.auth` | `{ roomId, name? }` | Liveblocks token for this machine's UI |
 

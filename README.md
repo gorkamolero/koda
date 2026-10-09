@@ -48,16 +48,18 @@ Settings also recommends [Destructive Command Guard](https://github.com/Dicklesw
 
 When Codex or Claude asks a structured question, answer its form in the host chat. Forms support single choices, Claude multiple choices, and custom answers. **Submit answers** resumes the agent; **Cancel and stop** ends the turn. Bypass permissions still waits for your answers. Pending forms return after a UI reload while the sidecar stays running; unfinished answer drafts are not saved.
 
-For collaboration, copy `.env.example` to `.env.local` and set `LIVEBLOCKS_SECRET_KEY` to a Liveblocks development secret. It stays on the sidecar and is ignored by git. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**.
+For collaboration, choose a display name in **Settings → Collaboration** and set the host's service URL under **Advanced** (or set `KODA_COLLAB_URL`). The release default is empty until the owner deploys the service. Your first share registers this install automatically; collaborators need no Liveblocks key. Open a worktree's **Share workspace** dialog to create a control or view invitation; the other instance joins through **Shared workspaces**. Both installs must use the same service.
+
+Each install keeps its device private key and host invitation key in its private local state. The hosted Cloudflare Worker holds the Liveblocks secret and authorizes only owned or granted rooms. `LIVEBLOCKS_SECRET_KEY` in an ignored `.env.local` still selects development/self-host mode. See [VERIFY.md](./VERIFY.md#hosted-collaboration-service) for local testing and owner deployment.
 
 See [VERIFY.md](./VERIFY.md) for the real-service proofs, screenshots, separate-instance setup, and clean-clone verification.
 
 ### Test
 
 ```bash
-pnpm test      # Run all tests
+pnpm test      # Run Worker, sidecar and desktop unit tests
 pnpm --filter @koda/sidecar test   # Sidecar unit tests
-pnpm --filter e2e test             # E2E tests (Playwright)
+pnpm --filter e2e test:proof        # Maintained real-service proofs (Playwright)
 ```
 
 ---

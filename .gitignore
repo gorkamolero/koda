@@ -64,3 +64,4 @@ proof-cleanup-results/
 .dev.vars
 .dev.vars.*
 .wrangler/
+collaboration.json

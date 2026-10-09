@@ -89,6 +89,8 @@ try {
   await run('Install locked dependencies', 'pnpm', ['install', '--frozen-lockfile'])
   await run('Install Chromium', 'pnpm', ['--filter', 'e2e', 'exec', 'playwright', 'install', 'chromium'])
   await run('Build from source', 'pnpm', ['build', '--force'])
+  await run('Lint source', 'pnpm', ['lint'])
+  await run('Run unit tests', 'pnpm', ['test'])
   await run('Run all real service proofs', 'pnpm', ['--filter', 'e2e', 'test:proof'])
   retainProofs()
   if (git('rev-parse', 'HEAD') !== head || git('status', '--porcelain', '--untracked-files=normal')) {

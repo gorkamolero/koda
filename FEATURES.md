@@ -120,7 +120,7 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] View/control checks and revoked-control rejection proved at the host's authorization boundary.
 - [ ] Cross-machine test (two Macs), after the same-machine proof
 
-The development proof uses a backend `LIVEBLOCKS_SECRET_KEY` in an ignored env file on each sidecar. It is not production authentication for mutually untrusted machines. Playwright captures Chromium windows; native WKWebView automation is not claimed.
+Hosted collaboration uses a Cloudflare Worker with D1, signed Ed25519 install identities, room ownership and revocable join-code grants. Only the Worker holds the Liveblocks secret. Settings supplies the display name and advanced service URL; first share registers automatically. There are no accounts or device recovery in this version. The service has not been deployed, and the release default URL is empty. Development/self-host mode still accepts a local `LIVEBLOCKS_SECRET_KEY`. Playwright proofs run both modes with real Liveblocks; Chromium captures do not claim native WKWebView automation.
 
 ### Sync Technology Options
 1. **Liveblocks** — Managed real-time sync, presence, shared state
