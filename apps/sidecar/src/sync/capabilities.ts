@@ -12,6 +12,8 @@ export const CapabilitySchema = z.object({
   // Display-only labels, signed with the invitation so guests can list it offline.
   workspaceName: z.string().max(200).optional(),
   hostName: z.string().max(100).optional(),
+  serviceUrl: z.string().url().optional(),
+  joinCode: z.string().max(100).optional(),
 })
 export type Capability = z.infer<typeof CapabilitySchema>
 
@@ -30,6 +32,16 @@ export function verifyCapability(token: string, secret: string): Capability {
   }
   const capability = CapabilitySchema.parse(JSON.parse(Buffer.from(body, 'base64url').toString('utf8')))
   if (capability.roomId !== `workspace:${capability.worktreeId}`) throw new Error('Invitation workspace mismatch')
+  return capability
+}
+
+/** Guests parse display/scope data; only the host authenticates its signature. */
+export function parseCapability(token: string): Capability {
+  const [body, signature, extra] = token.split('.')
+  if (!body || !signature || extra || token.length > 8192) throw new Error('Invalid workspace invitation')
+  const capability = CapabilitySchema.parse(JSON.parse(Buffer.from(body, 'base64url').toString('utf8')))
+  if (capability.roomId !== `workspace:${capability.worktreeId}`) throw new Error('Invitation workspace mismatch')
+  if (Boolean(capability.serviceUrl) !== Boolean(capability.joinCode)) throw new Error('Incomplete service invitation')
   return capability
 }
 

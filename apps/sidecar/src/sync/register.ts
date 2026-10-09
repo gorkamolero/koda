@@ -1,10 +1,12 @@
 import { z } from 'zod'
 import { router } from '../rpc/router.js'
 import { routeRemoteCall } from './guest.js'
-import { authorizeRoom, getInvitation, getMachineId, getMachineName, getSyncManager, initializeCollaboration, isCollaborationEnabled, joinWorkspace, listSharedWorkspaces, prepareRelay, shareWorkspace } from './LiveblocksClient.js'
+import { collaborationStatus, setCollaborationSettings, deleteCollaborationRoom, authorizeRoom, getInvitation, getSyncManager, initializeCollaboration, isCollaborationEnabled, joinWorkspace, listSharedWorkspaces, prepareRelay, shareWorkspace } from './LiveblocksClient.js'
 
 export function registerCollaborationMethods() {
-  router.register('collaboration.status', async () => ({ enabled: isCollaborationEnabled(), machineId: getMachineId(), name: getMachineName() }))
+  router.register('collaboration.status', collaborationStatus)
+  router.register('collaboration.settings', async (settings) => setCollaborationSettings(settings), z.object({ displayName: z.string().trim().max(100), serviceUrl: z.string().trim().max(2048) }))
+  router.register('collaboration.deleteRoom', async ({ roomId }) => deleteCollaborationRoom(roomId), z.object({ roomId: z.string() }))
   router.register('collaboration.share', async ({ worktreeId, permission }) => shareWorkspace(worktreeId, permission), z.object({ worktreeId: z.string().uuid(), permission: z.enum(['view', 'control']) }))
   router.register('collaboration.join', async ({ invitation }) => joinWorkspace(invitation), z.object({ invitation: z.string().min(1).max(8192) }))
   router.register('collaboration.list', async () => isCollaborationEnabled() ? listSharedWorkspaces() : [])

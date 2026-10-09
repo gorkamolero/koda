@@ -2,7 +2,7 @@
 import { Liveblocks } from '@liveblocks/node'
 import { createClient, LiveList, LiveMap, LiveObject, type JsonObject, type Room } from '@liveblocks/client'
 import WebSocket from 'ws'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,7 +13,8 @@ import { router } from '../rpc/router.js'
 import { getNotificationEmitter } from '../rpc/notifications.js'
 import { config } from '../config.js'
 import { getPty } from '../handlers/pty.js'
-import { authorizeRelay, signCapability, verifyCapability, signRelay, verifyRelay, type RelayCommand, type Capability, type RemoteRequest, type RemoteResponse, type RemoteNotification } from './capabilities.js'
+import { authorizeRelay, signCapability, verifyCapability, parseCapability, signRelay, verifyRelay, type RelayCommand, type Capability, type RemoteRequest, type RemoteResponse, type RemoteNotification } from './capabilities.js'
+import { CollaborationService, createDeviceIdentity, serviceOrigin, type DeviceIdentity } from './serviceClient.js'
 import { executeRemoteRequest } from './remoteAccess.js'
 
 export type SessionData = {
@@ -51,7 +52,7 @@ export function responseChunks(requestId: string, outcome: { result?: unknown; e
   return Array.from({ length: total }, (_, index) => ({ type: 'rpc-response', requestId, index, total, data: data.slice(index * RESPONSE_CHUNK, (index + 1) * RESPONSE_CHUNK) }))
 }
 
-type StoredState = { machineId: string; invitations: Record<string, string>; grants: Record<string, string>; receipts: Record<string, { error: string | null }> }
+type StoredState = { device?: DeviceIdentity; signingKey?: string; settings?: { displayName: string; serviceUrl: string }; machineId: string; invitations: Record<string, string>; grants: Record<string, string>; receipts: Record<string, { error: string | null }> }
 let state: StoredState | undefined
 function stateFile() { return path.join(process.env.KODA_DATA_DIR || path.dirname(config.dbPath), 'collaboration.json') }
 function getState(): StoredState {
@@ -70,7 +71,7 @@ function saveState(value = getState()) {
   fs.renameSync(temporary, stateFile())
 }
 export function getMachineId(): string { return getState().machineId }
-export function getMachineName(): string { return process.env.KODA_USER_NAME || os.hostname() || getMachineId().slice(0, 6) }
+export function getMachineName(): string { return process.env.KODA_USER_NAME || getState().settings?.displayName || os.hostname() || getMachineId().slice(0, 6) }
 function secret(): string {
   const key = process.env.LIVEBLOCKS_SECRET_KEY
   if (!key) throw new Error('Collaboration requires LIVEBLOCKS_SECRET_KEY in the local env file')
@@ -78,10 +79,50 @@ function secret(): string {
 }
 let api: Liveblocks | undefined
 function getApi() { return api ??= new Liveblocks({ secret: secret() }) }
-export function isCollaborationEnabled() { return Boolean(process.env.LIVEBLOCKS_SECRET_KEY) }
+// Replaced by release tooling once a service has been deployed.
+const DEFAULT_COLLAB_URL = ''
+export function getServiceUrl() { const value = process.env.KODA_COLLAB_URL || getState().settings?.serviceUrl || DEFAULT_COLLAB_URL; return value ? serviceOrigin(value) : '' }
+export function isCollaborationEnabled() { return Boolean(process.env.LIVEBLOCKS_SECRET_KEY || getServiceUrl()) }
+function signingKey() {
+  if (process.env.LIVEBLOCKS_SECRET_KEY) return secret()
+  const value = getState()
+  if (!value.signingKey) { value.signingKey = randomBytes(32).toString('base64url'); saveState() }
+  return value.signingKey
+}
+let service: CollaborationService | undefined
+function getService() {
+  const origin = getServiceUrl()
+  if (!origin) throw new Error('Configure collaboration in Settings before sharing or joining')
+  const value = getState()
+  if (!value.device) { value.device = createDeviceIdentity(); saveState() }
+  if (!service || service.origin !== origin) service = new CollaborationService(origin, value.device, getMachineName, getMachineId())
+  return service
+}
+function guestCapability(invitation: string) {
+  const capability = parseCapability(invitation)
+  if (capability.serviceUrl) {
+    if (process.env.LIVEBLOCKS_SECRET_KEY || serviceOrigin(capability.serviceUrl) !== getServiceUrl()) throw new Error('This invitation uses a different collaboration service. Set its URL in Settings first.')
+  } else if (!process.env.LIVEBLOCKS_SECRET_KEY) throw new Error('This invitation requires development-key mode; ask the host for a service invitation')
+  return capability
+}
+export function collaborationSettings() { return { displayName: getState().settings?.displayName || '', serviceUrl: getState().settings?.serviceUrl || '' } }
+export function setCollaborationSettings(settings: { displayName: string; serviceUrl: string }) {
+  if (settings.serviceUrl) settings.serviceUrl = serviceOrigin(settings.serviceUrl)
+  getState().settings = settings; saveState(); return collaborationSettings()
+}
+export async function collaborationStatus() {
+  const mode = process.env.LIVEBLOCKS_SECRET_KEY ? 'development-key' : getServiceUrl() ? 'service' : 'not-configured'
+  const reachable = mode === 'service' ? await getService().reachable() : mode === 'development-key'
+  return { enabled: isCollaborationEnabled(), mode, reachable, machineId: getMachineId(), name: getMachineName(), serviceUrl: getServiceUrl(), settings: collaborationSettings() }
+}
+export async function deleteCollaborationRoom(roomId: string) {
+  if (process.env.LIVEBLOCKS_SECRET_KEY) await getApi().deleteRoom(roomId)
+  else await getService().delete(roomId)
+}
 
 /** The host service writes storage; the UI and a guest's service only read it and broadcast. */
 export async function token(roomId: string, role: 'host' | 'ui' | 'guest' = 'ui', name = getMachineName()) {
+  if (!process.env.LIVEBLOCKS_SECRET_KEY) return getService().token(roomId, role)
   const session = getApi().prepareSession(`${getMachineId()}:${role}`, {
     userInfo: { name, machineId: getMachineId(), color: '#22c55e' },
   })
@@ -97,14 +138,14 @@ export async function authorizeRoom(roomId: string, name?: string) {
   if (worktree?.collaborative) await getSyncManager(id).connect()
   else {
     const invitation = getState().invitations[roomId]
-    if (!invitation || verifyCapability(invitation, secret()).roomId !== roomId) throw new Error('Join this shared workspace first')
+    if (!invitation || guestCapability(invitation).roomId !== roomId) throw new Error('Join this shared workspace first')
   }
   // UI clients, including the owner's, never mutate the authoritative transcript.
   return token(roomId, 'ui', name)
 }
 
 export async function shareWorkspace(worktreeId: string, permission: 'view' | 'control') {
-  secret()
+  if (!isCollaborationEnabled()) throw new Error('Configure collaboration in Settings before sharing')
   const db = getDb()
   const worktree = db.select().from(worktrees).where(eq(worktrees.id, worktreeId)).get()
   if (!worktree) throw new Error('Workspace not found')
@@ -116,30 +157,38 @@ export async function shareWorkspace(worktreeId: string, permission: 'view' | 'c
   const repo = worktree.repoId ? db.select().from(repos).where(eq(repos.id, worktree.repoId)).get() : undefined
   const workspaceName = [repo?.name, worktree.branch].filter(Boolean).join(' / ') || 'Shared workspace'
   const capability: Capability = { version: 1, roomId: `workspace:${worktreeId}`, worktreeId, hostMachineId: getMachineId(), permission, nonce: randomUUID(), workspaceName: workspaceName.slice(0, 200), hostName: getMachineName().slice(0, 100) }
-  const invitation = signCapability(capability, secret())
+  if (!process.env.LIVEBLOCKS_SECRET_KEY) {
+    capability.serviceUrl = getServiceUrl()
+    capability.joinCode = (await getService().code(capability.roomId)).code
+  }
+  const invitation = signCapability(capability, signingKey())
   // Sharing has one current invitation per workspace. Replacing it revokes old
   // control grants at the host, including requests saved before a downgrade.
   for (const [nonce, previous] of Object.entries(getState().grants)) {
-    if (verifyCapability(previous, secret()).worktreeId === worktreeId) delete getState().grants[nonce]
+    if (verifyCapability(previous, signingKey()).worktreeId === worktreeId) delete getState().grants[nonce]
   }
   getState().grants[capability.nonce] = invitation
   saveState()
   return { invitation, ...capability }
 }
 
-export function joinWorkspace(invitation: string) {
-  const capability = verifyCapability(invitation.trim(), secret())
+export async function joinWorkspace(invitation: string) {
+  const capability = guestCapability(invitation.trim())
+  if (capability.joinCode) {
+    const redeemed = await getService().redeem(capability.joinCode)
+    if (redeemed.roomId !== capability.roomId) throw new Error('Invitation workspace mismatch')
+  }
   getState().invitations[capability.roomId] = invitation.trim()
   saveState()
   return capability
 }
 export function listSharedWorkspaces() {
-  return Object.values(getState().invitations).map((invitation) => ({ ...verifyCapability(invitation, secret()), invitation }))
+  return Object.values(getState().invitations).map((invitation) => ({ ...guestCapability(invitation), invitation }))
 }
 export function getInvitation(roomId: string) {
   const invitation = getState().invitations[roomId]
   if (!invitation) throw new Error('Join this shared workspace first')
-  return { invitation, ...verifyCapability(invitation, secret()) }
+  return { invitation, ...guestCapability(invitation) }
 }
 
 /** The current invitation for a grant, or undefined once replaced. */
@@ -184,7 +233,8 @@ export class SyncManager {
   private async open() {
     const worktree = getDb().select().from(worktrees).where(eq(worktrees.id, this.workspaceId)).get()
     if (!worktree?.collaborative) throw new Error('Workspace sharing is disabled')
-    await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
+    if (process.env.LIVEBLOCKS_SECRET_KEY) await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
+    else await getService().claim(this.roomId)
     const client = createClient({
       authEndpoint: () => token(this.roomId, 'host'),
       polyfills: { WebSocket: WebSocket as never, fetch },
@@ -262,7 +312,7 @@ export class SyncManager {
       const invitation = getState().grants[event.grantId]
       if (!invitation) throw new Error('Unknown or revoked invitation')
       verifyRelay(event, invitation)
-      const capability = verifyCapability(invitation, secret())
+      const capability = verifyCapability(invitation, signingKey())
       if (event.roomId !== this.roomId) throw new Error('Relay room mismatch')
       const db = getDb()
       const session = db.select().from(sessions).where(eq(sessions.id, event.sessionId)).get()
@@ -297,7 +347,7 @@ export class SyncManager {
   /** Answers a guest's read with the host's own handler, after the scope checks. */
   async answer(request: RemoteRequest) {
     const outcome = await executeRemoteRequest(request, {
-      roomId: this.roomId, worktreeId: this.workspaceId, hostMachineId: getMachineId(), secret: secret(), grant: grantInvitation,
+      roomId: this.roomId, worktreeId: this.workspaceId, hostMachineId: getMachineId(), secret: signingKey(), grant: grantInvitation,
       claim: (id) => {
         const key = `${this.roomId}:control:${id}`
         if (getState().receipts[key]) return false
@@ -352,8 +402,7 @@ export function getSyncManager(workspaceId: string) {
   return manager
 }
 export function initializeCollaboration() {
-  if (!isCollaborationEnabled()) return
-  for (const worktree of getDb().select().from(worktrees).where(eq(worktrees.collaborative, true)).all()) {
+  if (isCollaborationEnabled()) for (const worktree of getDb().select().from(worktrees).where(eq(worktrees.collaborative, true)).all()) {
     void getSyncManager(worktree.id).connect().catch((error) => console.error('[Sync]', error.message))
   }
   const sessionWorktrees = new Map<string, string | null>()
