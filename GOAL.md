@@ -43,7 +43,7 @@ Get Koda (this repo) fully working end to end on macOS with Codex as the agent, 
 
 ## Rules
 
-- Commit in small steps with clear messages. Do not push.
+- Commit in small steps with clear messages.
 - Keep `FEATURES.md` accurate as things get proven or fixed.
 - Write `VERIFY.md` at the repo root with the exact commands to reproduce both proofs from a clean clone.
 
