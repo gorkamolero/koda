@@ -270,7 +270,8 @@ export async function* runCodexTurn(options: CodexTurnOptions): AsyncGenerator<C
         tool_input: fileChange ? { command: patchText(item) }
           : { command: Array.isArray(command) ? command.join(' ') : command, ...(typeof params.reason === 'string' ? { description: params.reason } : {}) },
       };
-      const external = runPermissionHooks(permissionHooks, hookInput, hooksDone.signal);
+      // KODA_USER_HOOKS=off (proof runs) keeps the user's own approval apps out of the loop.
+      const external = process.env.KODA_USER_HOOKS === 'off' ? Promise.resolve(undefined) : runPermissionHooks(permissionHooks, hookInput, hooksDone.signal);
       const inKoda = options.approve({
         toolName: fileChange ? 'file_change' : params.networkApprovalContext ? 'network_access' : 'command_execution',
         input: { ...params, ...(item ? { item } : {}) }, reason: params.reason ?? undefined,

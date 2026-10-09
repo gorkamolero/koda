@@ -122,6 +122,17 @@ describe('Codex app-server turn transport', () => {
     expect(reply.result).toEqual({ decision: 'accept' });
     expect(hookSignal?.aborted).toBe(true);
   });
+  it("leaves the user's hooks out when KODA_USER_HOOKS is off", async () => {
+    vi.stubEnv('KODA_USER_HOOKS', 'off');
+    options.approve = vi.fn(async () => ({ decision: 'allow' as const }));
+    let reply: any;
+    onTurn = () => ask();
+    onReply = message => { reply = message; finish(); };
+    await collect();
+    vi.unstubAllEnvs();
+    expect(reply.result).toEqual({ decision: 'accept' });
+    expect(mocks.runHooks).not.toHaveBeenCalled();
+  });
   it('gives a hook the patch for a file change, as apply_patch', async () => {
     let reply: any;
     onTurn = () => { notify('item/started', { item: { type: 'fileChange', id: 'tool-1', status: 'inProgress', changes: [{ path: '/elsewhere/note.txt', kind: { type: 'add' }, diff: 'hello' }] } }); ask('item/fileChange/requestApproval', 0); };

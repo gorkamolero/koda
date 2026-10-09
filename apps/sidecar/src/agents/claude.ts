@@ -240,6 +240,7 @@ export class ClaudeHandler {
         ...(session.model === 'default' ? {} : { model: session.model }),
         systemPrompt: { type: 'preset', preset: 'claude_code' },
         settingSources: ['user', 'project', 'local'], permissionMode: session.permissionMode,
+        ...(process.env.KODA_USER_HOOKS === 'off' ? { settings: { disableAllHooks: true } } : {}),
         ...(session.permissionMode === 'bypassPermissions'
           ? { allowDangerouslySkipPermissions: true, sandbox: { enabled: false } }
           : { sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true, allowUnsandboxedCommands: true,

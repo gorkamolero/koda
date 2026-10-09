@@ -157,6 +157,8 @@ export class KodaInstance {
       KODA_CORS_ORIGINS: this.url,
       // Git never prompts in a proof, and identities belong only to the fixture.
       GIT_TERMINAL_PROMPT: '0',
+      // Proof approvals are answered in Koda; the user's hook apps (e.g. a notch) must not prompt or race them.
+      KODA_USER_HOOKS: 'off',
     }
     // KODA_TEST_DB used to wipe on every start. Use the normal persisted path.
     delete env.KODA_TEST_DB
