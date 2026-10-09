@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAtom } from 'jotai'
 import { cn } from '@/lib/utils'
 import { ThemeSelector } from '@/components/ThemeSelector'
 import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
-import { isTauriContext } from '@/lib/tauri'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCollaborationSetup } from '@/hooks/useCollaborationSetup'
+import { isTauriContext, rpcRequest } from '@/lib/tauri'
 import type { CodingAgent, PermissionMode } from '@/lib/rpc'
 
 const guardSetupUrl = 'https://github.com/Dicklesworthstone/destructive_command_guard#quick-install'
@@ -132,6 +134,44 @@ function ShortcutRow({ action, keys }: { action: string; keys: string }) {
   )
 }
 
+function CollaborationSettings() {
+  const { data, isPending, error } = useCollaborationSetup()
+  const queryClient = useQueryClient()
+  const [displayName, setDisplayName] = useState('')
+  const [serviceUrl, setServiceUrl] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (data) { setDisplayName(data.settings.displayName); setServiceUrl(data.settings.serviceUrl) }
+  }, [data])
+  async function save() {
+    setSaving(true); setSaveError('')
+    try {
+      await rpcRequest('collaboration.settings', { displayName, serviceUrl })
+      await queryClient.invalidateQueries({ queryKey: ['collaboration'] })
+    } catch (e) { setSaveError(e instanceof Error ? e.message : String(e)) }
+    finally { setSaving(false) }
+  }
+  const inputClass = 'w-full px-3 py-2 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-primary focus:outline-none focus:border-text-accent'
+  return <TerminalSection title="COLLABORATION" description="Share workspaces using your install identity. Your first share registers it automatically.">
+    <div className="space-y-4">
+      <TerminalField label="DISPLAY NAME">
+        <input aria-label="Collaboration display name" data-testid="collaboration-display-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={100} className={inputClass} />
+      </TerminalField>
+      <details>
+        <summary className="cursor-pointer text-text-muted">[ADVANCED]</summary>
+        <div className="mt-3"><TerminalField label="SERVICE URL" description="Use the service address supplied by your host. Environment configuration takes precedence.">
+          <input aria-label="Collaboration service URL" data-testid="collaboration-service-url" value={serviceUrl} onChange={e => setServiceUrl(e.target.value)} placeholder="https://collaboration.example.com" className={inputClass} />
+        </TerminalField></div>
+      </details>
+      <p data-testid="collaboration-setup-status" className="text-text-accent">{isPending ? 'Checking...' : data?.mode === 'development-key' ? 'Development key' : data?.reachable ? 'Connected' : data?.enabled ? 'Service unreachable' : 'Not configured'}</p>
+      {data?.name && <p className="text-text-muted">Name in shared workspaces: {data.name}</p>}
+      <button data-testid="collaboration-save" disabled={saving || isPending} onClick={() => void save()} className="text-text-accent border border-dashed border-border-subtle px-3 py-2 disabled:opacity-50">{saving ? 'SAVING...' : '[SAVE]'}</button>
+      {(saveError || error) && <p role="alert" className="text-status-error">{saveError || error?.message}</p>}
+    </div>
+  </TerminalSection>
+}
+
 /**
  * Terminal-style Settings page
  * ┌─────────────────────────────────────────────┐
@@ -213,6 +253,8 @@ export function Settings() {
               </div>
             </div>
           </TerminalSection>
+
+          <CollaborationSettings />
 
           {/* Git Configuration */}
           <TerminalSection

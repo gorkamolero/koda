@@ -15,7 +15,6 @@ import { createClient, LiveList, LiveMap, LiveObject } from '@liveblocks/client'
 import { createRoomContext, createLiveblocksContext } from '@liveblocks/react'
 import type { Presence } from '@/types/collaboration'
 import { rpcRequest } from '@/lib/tauri'
-import { getMachineName } from '@/lib/machineId'
 
 // =============================================================================
 // Liveblocks Client
@@ -28,7 +27,7 @@ import { getMachineName } from '@/lib/machineId'
 const client = createClient({
   authEndpoint: async (room) => {
     if (!room) throw new Error('A workspace room is required')
-    return rpcRequest<{ token: string }>('collaboration.auth', { roomId: room, name: getMachineName() })
+    return rpcRequest<{ token: string }>('collaboration.auth', { roomId: room })
   },
   throttle: 100,
 })
@@ -178,7 +177,7 @@ const roomContext = client
 // Export room context hooks (will throw helpful errors if used without Liveblocks)
 function createNoopHook(name: string) {
   return () => {
-    throw new Error(`${name} requires Liveblocks to be configured (VITE_LIVEBLOCKS_PUBLIC_KEY)`)
+    throw new Error(`${name} requires collaboration to be configured in Settings`)
   }
 }
 

@@ -10,7 +10,7 @@ import { ApprovalRequests } from '@/components/AgentChat/ApprovalRequests'
 import type { ChatMessage } from '@/store/chat'
 import type { RemoteWorktree } from '@/lib/rpc'
 
-const { rpcRequest, onNotification, navigate } = vi.hoisted(() => ({ rpcRequest: vi.fn(), onNotification: vi.fn(), navigate: vi.fn() }))
+const { rpcRequest, onNotification, navigate } = vi.hoisted(() => ({ rpcRequest: vi.fn<[method: string, params?: { sessionId?: string; workingDirectory?: string; data?: string; [key: string]: unknown }], Promise<unknown>>(), onNotification: vi.fn<[method: string, callback: (payload: { sessionId: string }) => void], Promise<() => void>>(), navigate: vi.fn() }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest, onNotification }))
 vi.mock('@/hooks/useNotifications', () => ({ useNotifications: () => ({ showToast: vi.fn() }) }))
 vi.mock('@/components/AgentChat/MessageList', () => ({ MessageList: () => null }))
@@ -20,8 +20,8 @@ vi.mock('@/components/AgentChat/InputArea', () => ({
     <button disabled={disabled} title={placeholder} onClick={() => onSendMessage('remote task')}>Send task</button>,
 }))
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ params, children, ...props }: { params: { workspaceId: string; worktreeId: string }; children: React.ReactNode }) =>
-    <a href={`/workspace/${params.workspaceId}/${params.worktreeId}`} {...props}>{children}</a>,
+  Link: ({ params, to, children, ...props }: { params?: { workspaceId: string; worktreeId: string }; to?: string; children: React.ReactNode }) =>
+    <a href={params ? `/workspace/${params.workspaceId}/${params.worktreeId}` : to} {...props}>{children}</a>,
   useParams: () => ({}),
   useNavigate: () => navigate,
 }))
@@ -141,6 +141,7 @@ describe('shared workspaces in the sidebar', () => {
   it('joins from an invitation and opens the shared workspace', async () => {
     rpcRequest.mockImplementation(async (method: string) => {
       if (method === 'collaboration.list') return []
+      if (method === 'collaboration.status') return { enabled: true, reachable: true, mode: 'development-key' }
       if (method === 'collaboration.join') return { roomId: 'workspace:w2', worktreeId: 'w2', permission: 'view' }
       return {}
     })
@@ -149,6 +150,7 @@ describe('shared workspaces in the sidebar', () => {
     render(<Provider store={createStore()}><QueryClientProvider client={client}><SharedWorkspacesSection /></QueryClientProvider></Provider>)
     fireEvent.click(screen.getByTestId('join-workspace'))
     fireEvent.change(screen.getByTestId('join-invitation'), { target: { value: 'invitation-token' } })
+    await waitFor(() => expect(screen.getByTestId('join-confirm')).toBeEnabled())
     fireEvent.click(screen.getByTestId('join-confirm'))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/workspace/$workspaceId/$worktreeId', params: { workspaceId: 'shared', worktreeId: 'w2' } }))
     expect(rpcRequest).toHaveBeenCalledWith('collaboration.join', { invitation: 'invitation-token' })

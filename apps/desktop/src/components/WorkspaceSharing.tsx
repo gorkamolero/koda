@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { Check, Copy, Share2 } from 'lucide-react'
 import { rpcRequest } from '@/lib/tauri'
+import { useCollaborationSetup } from '@/hooks/useCollaborationSetup'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { useSharedWorkspaces, type Share, type SharePermission } from '@/hooks/useSharedWorkspaces'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,15 @@ function Modal({ title, onClose, children, label }: { title: string; label: stri
   )
 }
 
+function CollaborationSetupState({ onClose }: { onClose: () => void }) {
+  const { data, isPending } = useCollaborationSetup()
+  if (data?.enabled && data.reachable !== false) return null
+  return <div className="text-xs text-text-muted border border-dashed border-text-dim/30 p-3 space-y-2" data-testid="collaboration-setup">
+    <p>{isPending ? 'Checking collaboration...' : data?.enabled ? 'The collaboration service is unavailable. Check the service URL and your connection.' : 'Choose your display name and collaboration service in Settings to share or join a workspace.'}</p>
+    {!isPending && <Link to="/settings" onClick={onClose} className="text-border-accent">[→] COLLABORATION SETTINGS</Link>}
+  </div>
+}
+
 const actionButton = 'w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50'
 const errorBox = 'text-status-error text-xs border border-dashed border-status-error p-2'
 
@@ -44,6 +54,7 @@ const shareDialogsAtom = atom<Record<string, ShareDialogState>>({})
 
 export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
   const queryClient = useQueryClient()
+  const { data: setup } = useCollaborationSetup()
   const [dialogs, setDialogs] = useAtom(shareDialogsAtom)
   const [copied, setCopied] = useState(false)
   const { open, permission, invitation, error, pending } = dialogs[worktreeId] || defaultShareDialog
@@ -73,6 +84,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
     </button>
     {open && <Modal title="SHARE WORKSPACE" label="Share workspace" onClose={() => update({ open: false })}>
       <div className="p-4 space-y-4">
+        <CollaborationSetupState onClose={() => update({ open: false })} />
         <p className="text-[11px] text-text-muted leading-relaxed">
           Your collaborator opens this workspace in their own Koda, with the same chat, changes, files and terminal you see. The agent keeps running on this machine. A new invitation replaces the previous one.
         </p>
@@ -97,7 +109,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
             ))}
           </div>
         </div>
-        <button className={actionButton} data-testid="create-invitation" disabled={pending} onClick={() => void create()}>
+        <button className={actionButton} data-testid="create-invitation" disabled={pending || !setup?.enabled || setup.reachable === false} onClick={() => void create()}>
           {pending ? 'CONNECTING...' : '[+] CREATE INVITATION'}
         </button>
         {invitation && <div>
@@ -125,6 +137,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
 export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { data: setup } = useCollaborationSetup()
   const [invitation, setInvitation] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
@@ -142,6 +155,7 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="JOIN SHARED WORKSPACE" label="Join workspace" onClose={onClose}>
       <div className="p-4 space-y-4">
+        <CollaborationSetupState onClose={onClose} />
         <div>
           <p className="text-[10px] text-text-dim mb-2 uppercase">INVITATION:</p>
           <div className="flex items-start gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
@@ -157,7 +171,7 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
             />
           </div>
         </div>
-        <button data-testid="join-confirm" className={actionButton} disabled={!invitation.trim() || pending} onClick={() => void join()}>
+        <button data-testid="join-confirm" className={actionButton} disabled={!invitation.trim() || pending || !setup?.enabled || setup.reachable === false} onClick={() => void join()}>
           {pending ? 'JOINING...' : '[→] JOIN WORKSPACE'}
         </button>
         {error && <p role="alert" className={errorBox}>ERROR: {error}</p>}
