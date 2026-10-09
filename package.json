@@ -9,6 +9,7 @@
     "app:built": "node scripts/run.mjs built",
     "verify:clean": "node scripts/run.mjs verify-clean",
     "dev": "turbo run dev",
+    "collab:deploy": "pnpm --filter @koda/collab-service deploy",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",

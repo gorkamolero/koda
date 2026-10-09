@@ -59,3 +59,8 @@ proof-cleanup-results/
 # Sockets
 *.sock
 .worktrees/
+
+# Collaboration Worker local secrets and storage
+.dev.vars
+.dev.vars.*
+.wrangler/

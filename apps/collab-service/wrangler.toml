@@ -1,0 +1,13 @@
+name = "koda-collaboration"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[secrets]
+required = ["LIVEBLOCKS_SECRET_KEY"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "koda-collaboration"
+# Replace with the ID from `wrangler d1 create koda-collaboration` before deploying.
+database_id = "00000000-0000-4000-8000-000000000000"
+migrations_dir = "migrations"
