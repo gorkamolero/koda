@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TerminalPanel } from '@/components/Terminal/TerminalPanel'
 
 const { rpcRequest, onPtyData, onPtyExit, terminals } = vi.hoisted(() => ({
-  rpcRequest: vi.fn(), onPtyData: vi.fn(), onPtyExit: vi.fn(),
+  rpcRequest: vi.fn<[method: string, params?: { sessionId?: string; workingDirectory?: string; data?: string; [key: string]: unknown }], Promise<unknown>>(), onPtyData: vi.fn(), onPtyExit: vi.fn(),
   terminals: [] as { dispose: () => void; open: (parent: HTMLElement) => void; inputDispose: () => void }[],
 }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest }))
@@ -80,7 +80,7 @@ describe('terminal lifecycle ownership', () => {
 
   it('replaces the shell when the worktree changes and rejects the previous pending result', async () => {
     const pending = deferred<ReturnType<typeof session>>()
-    rpcRequest.mockImplementation(async (method: string, params?: { workingDirectory: string }) => {
+    rpcRequest.mockImplementation(async (method: string, params?: { workingDirectory?: string }) => {
       if (method === 'pty.create') return params?.workingDirectory === '/repo/A' ? pending.promise : session('B-shell')
       return { success: true }
     })
@@ -111,10 +111,10 @@ describe('terminal lifecycle ownership', () => {
 
   it('sends keystrokes one write at a time, in order', async () => {
     const writes: Array<{ data: string; done: () => void }> = []
-    rpcRequest.mockImplementation((method: string, params?: { data: string }) => {
+    rpcRequest.mockImplementation((method: string, params?: { data?: string }) => {
       if (method === 'pty.create') return Promise.resolve(session('shell-1'))
       if (method !== 'pty.write') return Promise.resolve({ success: true })
-      return new Promise(resolve => writes.push({ data: params!.data, done: () => resolve({ success: true }) }))
+      return new Promise(resolve => writes.push({ data: params?.data ?? '', done: () => resolve({ success: true }) }))
     })
     render(<TerminalPanel workspaceId="w1" workingDirectory="/repo" />)
     await waitFor(() => expect((terminals[0] as unknown as { onData: ReturnType<typeof vi.fn> }).onData).toHaveBeenCalled())

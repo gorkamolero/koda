@@ -43,6 +43,8 @@ export default tseslint.config(
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     rules: {
       '@typescript-eslint/unbound-method': 'off',
+      // Async mocks deliberately emulate Promise-returning APIs without I/O.
+      '@typescript-eslint/require-await': 'off',
     },
   },
   // Imported AI components - they use @ts-nocheck and export multiple items

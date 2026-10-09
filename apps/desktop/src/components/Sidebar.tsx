@@ -765,7 +765,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
           key={wsRepo.id}
           repo={wsRepo}
           worktrees={worktreesByRepo.get(wsRepo.repoId) ?? []}
-          workspaceId={selectedWorkspaceId!}
+          workspaceId={selectedWorkspaceId}
           activeWorktreeId={activeWorktreeId}
           defaultBranch={wsRepo.repoDefaultBranch ?? 'main'}
         />

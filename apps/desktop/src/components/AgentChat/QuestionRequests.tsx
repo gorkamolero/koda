@@ -64,7 +64,7 @@ function QuestionForm({ request, readOnly = false, hostName }: { request: Questi
     busyRef.current = true
     setBusy(true)
     setError(null)
-    const answers: Record<string, QuestionAnswer> = Object.create(null)
+    const answers: Record<string, QuestionAnswer> = Object.create(null) as Record<string, QuestionAnswer>
     if (decision === 'submit') for (const question of request.questions) {
       const answer = draft.get(question.id)!
       answers[question.id] = { selected: answer.selected, ...((question.options.length === 0 || answer.other) ? { text: answer.text } : {}) }

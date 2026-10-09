@@ -81,7 +81,6 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
       for (const tab of scope.tabs.values()) disposeTab(tab)
       scope.tabs.clear()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, workingDirectory])
 
   // Handle resize
@@ -121,7 +120,7 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
     else activeTerminal.terminal.open(container)
     activeTerminal.fitAddon.fit()
     activeTerminal.terminal.focus()
-  }, [activeTerminal?.terminal, activeTerminal?.fitAddon])
+  }, [activeTerminal])
 
   // Navigation helpers
   const navigateToNextTab = useCallback(() => {

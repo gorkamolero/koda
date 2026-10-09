@@ -29,7 +29,8 @@ export function ApprovalRequests({ sessionId, readOnly = false, hostName }: { se
         void queryClient.invalidateQueries({ queryKey: ['approvals', sessionId] })
       }
     }).then(unlisten => { if (scopeRef.current !== scope) unlisten(); else stop = unlisten })
-    return () => { scopeRef.current++; stop?.() }
+    const scopeState = scopeRef
+    return () => { scopeState.current++; stop?.() }
   }, [sessionId, queryClient])
 
   const respond = async (request: ApprovalRequest, decision: 'allow' | 'deny') => {

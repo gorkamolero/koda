@@ -1,62 +1,7 @@
 import { memo, useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
-// ============================================================================
-// KODA ASCII Art Definitions
-// ============================================================================
-
-/**
- * Compact KODA letters using box-drawing characters
- * Each letter is 3 lines tall for inline use
- * @internal Reserved for future use in compact ASCII displays
- */
-const _KODA_COMPACT = {
-  K: ['╻ ╻', '╠╸ ', '╹ ╹'],
-  O: ['╭─╮', '│ │', '╰─╯'],
-  D: ['╭─╮', '│ │', '╰─╯'].map((_line, i) => i === 0 ? '┌─╮' : i === 2 ? '└─╯' : '│ │'),
-  A: ['╭─╮', '├─┤', '╵ ╵'],
-}
-
-/**
- * Large ASCII art KODA logo
- * Block-style letters for splash screens and loading
- */
-const KODA_LARGE = `
-██╗  ██╗ ██████╗ ██████╗  █████╗
-██║ ██╔╝██╔═══██╗██╔══██╗██╔══██╗
-█████╔╝ ██║   ██║██║  ██║███████║
-██╔═██╗ ██║   ██║██║  ██║██╔══██║
-██║  ██╗╚██████╔╝██████╔╝██║  ██║
-╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝
-`.trim()
-
-/**
- * Minimal KODA for very compact spaces
- */
-const KODA_MINIMAL = 'K·O·D·A'
-
-/**
- * KODA using braille patterns for a unique look
- * @internal Reserved for future braille animation mode
- */
-const _KODA_BRAILLE = {
-  frames: [
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // Full
-    '⣷⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',  // K animating
-    '⣯⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⣟⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⡿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣷⣿⣷⡇⣿⡇⡇⣿⣿⡇',  // O animating
-    '⣿⡇⡇⣯⣿⣯⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣟⣿⣟⡇⣿⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣷⡇⡇⣿⣿⡇',  // D animating
-    '⣿⡇⡇⣿⣿⣿⡇⣯⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣟⡇⡇⣿⣿⡇',
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣷⣿⣷',  // A animating
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣯⣿⣯',
-    '⣿⡇⡇⣿⣿⣿⡇⣿⡇⡇⣟⣿⣟',
-  ]
-}
+import { KODA_LARGE } from '@/lib/kodaArt'
 
 // ============================================================================
 // Animation Types
@@ -436,5 +381,5 @@ export const KodaSpinner = memo(function KodaSpinner({
 // Convenience exports
 // ============================================================================
 
-export { KODA_LARGE, KODA_MINIMAL, _KODA_COMPACT, _KODA_BRAILLE }
+
 export type { AnimationStyle }

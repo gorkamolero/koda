@@ -8,7 +8,7 @@ import { ShareWorkspaceButton } from '@/components/WorkspaceSharing'
 const { rpcRequest } = vi.hoisted(() => ({ rpcRequest: vi.fn<[method: string], Promise<unknown>>() }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest }))
 vi.mock('@tanstack/react-router', () => ({ Link: ({ to, children, onClick }: { to: string; children: React.ReactNode; onClick: () => void }) => <a href={to} onClick={onClick}>{children}</a> }))
-beforeEach(() => { rpcRequest.mockImplementation(method => Promise.resolve(method === 'collaboration.status' ? { enabled: true, reachable: true, mode: 'development-key' } : { invitation: 'test-invitation' })) })
+beforeEach(() => { rpcRequest.mockReset(); rpcRequest.mockImplementation(method => Promise.resolve(method === 'collaboration.status' ? { enabled: true, reachable: true, mode: 'development-key' } : { invitation: 'test-invitation' })) })
 
 describe('workspace invitation dialog', () => {
   it('keeps the returned invitation visible when enabling collaboration remounts the workspace subtree', async () => {

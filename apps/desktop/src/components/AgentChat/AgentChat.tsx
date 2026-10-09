@@ -117,8 +117,9 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
     setIsStreaming(false)
     setSelectedModel(agent)
     setError(null)
+    const scopeRef = scopeVersionRef
     return () => {
-      scopeVersionRef.current++
+      scopeRef.current++
       activeSessionRef.current = undefined
       setCurrentWorkspaceId(null)
     }

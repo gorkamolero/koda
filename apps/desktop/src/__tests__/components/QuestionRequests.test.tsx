@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuestionRequests } from '@/components/AgentChat/QuestionRequests'
 import type { AgentQuestion, QuestionRequest } from '@/lib/rpc'
 
-const { rpcRequest, onNotification } = vi.hoisted(() => ({ rpcRequest: vi.fn(), onNotification: vi.fn() }))
+const { rpcRequest, onNotification } = vi.hoisted(() => ({ rpcRequest: vi.fn<[method: string, params?: { sessionId?: string; workingDirectory?: string; data?: string; [key: string]: unknown }], Promise<unknown>>(), onNotification: vi.fn<[method: string, callback: (payload: { sessionId: string }) => void], Promise<() => void>>() }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest, onNotification }))
 const question = (changes: Partial<AgentQuestion> = {}): AgentQuestion => ({ id: 'approach', header: 'Approach', question: 'Which approach should I use?', options: [{ label: 'Fast', description: 'Make a small change' }, { label: 'Thorough', description: 'Include the wider refactor' }], multiSelect: false, allowOther: false, ...changes })
 const request = (sessionId = 'A', questions = [question()]): QuestionRequest => ({ id: `request-${sessionId}`, sessionId, agentType: 'codex', questions, createdAt: '2026-10-08T00:00:00Z', expiresAt: '2026-10-08T00:10:00Z' })
@@ -27,10 +27,10 @@ describe('local agent question forms', () => {
     expect(screen.getByTestId('question-submit')).toBeDisabled()
     fireEvent.click(screen.getByRole('radio', { name: /Fast/ }))
     fireEvent.click(screen.getByTestId('question-submit'))
-    const payload = rpcRequest.mock.calls.find(([method]) => method === 'question.respond')![1]
+    const payload = rpcRequest.mock.calls.find(([method]) => method === 'question.respond')![1] as { answers: Record<string, unknown> }
     expect(Object.prototype.hasOwnProperty.call(payload.answers, id)).toBe(true)
     expect(payload.answers[id]).toEqual({ selected: ['Fast'] })
-    expect(JSON.parse(JSON.stringify(payload)).answers[id]).toEqual({ selected: ['Fast'] })
+    expect((JSON.parse(JSON.stringify(payload)) as typeof payload).answers[id]).toEqual({ selected: ['Fast'] })
     await waitFor(() => expect(screen.queryByTestId('question-card')).not.toBeInTheDocument())
   })
 
@@ -154,7 +154,7 @@ describe('local agent question forms', () => {
 
   it('ignores a delayed list from an old chat and discards draft choices on navigation', async () => {
     const old = deferred<QuestionRequest[]>()
-    rpcRequest.mockImplementation((_method, params) => params.sessionId === 'A' ? old.promise : Promise.resolve([request('B')]))
+    rpcRequest.mockImplementation((_method, params) => params?.sessionId === 'A' ? old.promise : Promise.resolve([request('B')]))
     const { view } = setup()
     const rendered = render(view())
     expect(screen.getByText('Checking for questions…')).toBeInTheDocument()
@@ -170,7 +170,7 @@ describe('local agent question forms', () => {
 
   it.each(['resolve', 'reject'] as const)('does not apply an old response %s to the next chat', async outcome => {
     const old = deferred<object>()
-    rpcRequest.mockImplementation((method, params) => method === 'question.list' ? Promise.resolve([request(params.sessionId)]) : old.promise)
+    rpcRequest.mockImplementation((method, params) => method === 'question.list' ? Promise.resolve([request(params?.sessionId)]) : old.promise)
     const { view } = setup()
     const rendered = render(view())
     await screen.findByTestId('question-card')

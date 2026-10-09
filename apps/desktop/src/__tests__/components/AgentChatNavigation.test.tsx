@@ -8,7 +8,7 @@ import type { CodingAgent, PermissionMode } from '@/lib/rpc'
 import { defaultModelAtom, defaultPermissionModeAtom } from '@/store/settings'
 
 const { rpcRequest, onNotification, showToast } = vi.hoisted(() => ({
-  rpcRequest: vi.fn(), onNotification: vi.fn(), showToast: vi.fn(),
+  rpcRequest: vi.fn<[method: string, params?: { sessionId?: string; workingDirectory?: string; data?: string; [key: string]: unknown }], Promise<unknown>>(), onNotification: vi.fn<[method: string, callback: (payload: { sessionId: string }) => void], Promise<() => void>>(), showToast: vi.fn(),
 }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest, onNotification }))
 vi.mock('@/hooks/useNotifications', () => ({ useNotifications: () => ({ showToast }) }))
@@ -50,7 +50,7 @@ beforeEach(() => {
 
 describe('agent and model routing', () => {
   function mockAgents() {
-    rpcRequest.mockImplementation(async (method: string, params?: { sessionId: string }) => {
+    rpcRequest.mockImplementation(async (method: string, params?: { sessionId?: string }) => {
       const agent = method.split('.')[0]
       if (method.endsWith('.models')) return [{ id: 'default', model: 'default', displayName: 'SDK default' }, { id: `${agent}-model`, model: `${agent}-model`, displayName: `${agent} available model` }]
       if (method.endsWith('.start')) return { id: `${agent}-session`, sessionId: `${agent}-session` }
@@ -152,7 +152,7 @@ describe('agent and model routing', () => {
 describe('chat navigation during requests', () => {
   it.each(['worktree-B', 'worktree-A'])('keeps the newly selected transcript when navigating to %s during an old request', async (nextWorktree) => {
     const oldSession = deferred<{ status: string; model: string }>()
-    rpcRequest.mockImplementation(async (method: string, params?: { sessionId: string }) => {
+    rpcRequest.mockImplementation(async (method: string, params?: { sessionId?: string }) => {
       if (method === 'codex.models') return []
       if (method === 'codex.get') return params?.sessionId === 'A' ? oldSession.promise : { status: 'idle', model: 'default' }
       if (method === 'codex.getMessages') return transcript(`${params?.sessionId} reply`)
@@ -171,7 +171,7 @@ describe('chat navigation during requests', () => {
 
   it('finishes a submitted task without selecting its old workspace after delayed session creation', async () => {
     const created = deferred<{ id: string; sessionId: string }>()
-    rpcRequest.mockImplementation(async (method: string, params?: { sessionId: string }) => {
+    rpcRequest.mockImplementation(async (method: string, params?: { sessionId?: string }) => {
       if (method === 'codex.models') return []
       if (method === 'codex.start') return created.promise
       if (method === 'codex.get') return { status: 'idle', model: 'default' }

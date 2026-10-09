@@ -101,7 +101,7 @@ export function Layout({ children }: LayoutProps) {
 
   // Start listening for sidecar RPC requests (for MCP tools)
   useEffect(() => {
-    startSidecarRpcListener()
+    void startSidecarRpcListener()
   }, [])
 
   // Show loading screen for minimum duration, then dissolve elegantly

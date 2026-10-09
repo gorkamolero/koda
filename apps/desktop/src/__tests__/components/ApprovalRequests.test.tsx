@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApprovalRequests } from '@/components/AgentChat/ApprovalRequests'
 import type { ApprovalRequest } from '@/lib/rpc'
 
-const { rpcRequest, onNotification } = vi.hoisted(() => ({ rpcRequest: vi.fn(), onNotification: vi.fn() }))
+const { rpcRequest, onNotification } = vi.hoisted(() => ({ rpcRequest: vi.fn<[method: string, params?: { sessionId?: string; workingDirectory?: string; data?: string; [key: string]: unknown }], Promise<unknown>>(), onNotification: vi.fn<[method: string, callback: (payload: { sessionId: string }) => void], Promise<() => void>>() }))
 vi.mock('@/lib/tauri', () => ({ rpcRequest, onNotification }))
 const request = (sessionId = 'A'): ApprovalRequest => ({ id: `request-${sessionId}`, sessionId, agentType: 'codex', toolName: 'command_execution', input: { command: 'echo marker > /owned/marker', cwd: '/owned' }, reason: 'Write outside the worktree', createdAt: '2026-10-08T00:00:00Z', expiresAt: '2026-10-08T00:10:00Z' })
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
@@ -54,7 +54,7 @@ describe('local approval requests', () => {
 
   it('does not show a delayed list belonging to the previous chat', async () => {
     const old = deferred<ApprovalRequest[]>()
-    rpcRequest.mockImplementation((_method, params) => params.sessionId === 'A' ? old.promise : Promise.resolve([request('B')]))
+    rpcRequest.mockImplementation((_method, params) => params?.sessionId === 'A' ? old.promise : Promise.resolve([request('B')]))
     const { view } = setup()
     const rendered = render(view())
     expect(screen.getByText('Checking for approval requests…')).toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('local approval requests', () => {
 
   it('does not apply an old response failure or loading state to the next chat', async () => {
     const old = deferred<object>()
-    rpcRequest.mockImplementation((method, params) => method === 'approval.list' ? Promise.resolve([request(params.sessionId)]) : old.promise)
+    rpcRequest.mockImplementation((method, params) => method === 'approval.list' ? Promise.resolve([request(params?.sessionId)]) : old.promise)
     const { view } = setup()
     const rendered = render(view())
     await screen.findByTestId('approval-card')

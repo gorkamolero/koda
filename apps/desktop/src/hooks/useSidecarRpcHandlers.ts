@@ -61,7 +61,7 @@ export function useSidecarRpcHandlers(worktreeId: string) {
     })
 
     // DiffComment handler - Claude posts review comments
-    onDiffComment(async ({ comments }) => {
+    onDiffComment(({ comments }) => {
       const commentIds: string[] = []
 
       for (const comment of comments) {
