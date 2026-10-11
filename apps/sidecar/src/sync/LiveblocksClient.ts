@@ -74,17 +74,17 @@ export function getMachineId(): string { return getState().machineId }
 export function getMachineName(): string { return process.env.KODA_USER_NAME || getState().settings?.displayName || os.hostname() || getMachineId().slice(0, 6) }
 function secret(): string {
   const key = process.env.LIVEBLOCKS_SECRET_KEY
-  if (!key) throw new Error('Collaboration requires LIVEBLOCKS_SECRET_KEY in the local env file')
+  if (!key) throw new Error('Development collaboration requires LIVEBLOCKS_SECRET_KEY with KODA_COLLAB_MODE=development')
   return key
 }
 let api: Liveblocks | undefined
 function getApi() { return api ??= new Liveblocks({ secret: secret() }) }
-// Replaced by release tooling once a service has been deployed.
-const DEFAULT_COLLAB_URL = ''
+const DEFAULT_COLLAB_URL = 'https://koda-collaboration.gorka-molero.workers.dev'
 export function getServiceUrl() { const value = process.env.KODA_COLLAB_URL || getState().settings?.serviceUrl || DEFAULT_COLLAB_URL; return value ? serviceOrigin(value) : '' }
-export function isCollaborationEnabled() { return Boolean(process.env.LIVEBLOCKS_SECRET_KEY || getServiceUrl()) }
+function developmentMode() { return process.env.KODA_COLLAB_MODE === 'development' }
+export function isCollaborationEnabled() { return developmentMode() ? Boolean(process.env.LIVEBLOCKS_SECRET_KEY) : Boolean(getServiceUrl()) }
 function signingKey() {
-  if (process.env.LIVEBLOCKS_SECRET_KEY) return secret()
+  if (developmentMode()) return secret()
   const value = getState()
   if (!value.signingKey) { value.signingKey = randomBytes(32).toString('base64url'); saveState() }
   return value.signingKey
@@ -101,8 +101,9 @@ function getService() {
 function guestCapability(invitation: string) {
   const capability = parseCapability(invitation)
   if (capability.serviceUrl) {
-    if (process.env.LIVEBLOCKS_SECRET_KEY || serviceOrigin(capability.serviceUrl) !== getServiceUrl()) throw new Error('This invitation uses a different collaboration service. Set its URL in Settings first.')
-  } else if (!process.env.LIVEBLOCKS_SECRET_KEY) throw new Error('This invitation requires development-key mode; ask the host for a service invitation')
+    if (developmentMode()) throw new Error('This invitation requires service mode; unset KODA_COLLAB_MODE=development and use its service URL')
+    if (serviceOrigin(capability.serviceUrl) !== getServiceUrl()) throw new Error('This invitation uses a different collaboration service. Set its URL in Settings first.')
+  } else if (!developmentMode()) throw new Error('This invitation requires development-key mode; ask the host for a service invitation')
   return capability
 }
 export function collaborationSettings() { return { displayName: getState().settings?.displayName || '', serviceUrl: getState().settings?.serviceUrl || '' } }
@@ -111,18 +112,18 @@ export function setCollaborationSettings(settings: { displayName: string; servic
   getState().settings = settings; saveState(); return collaborationSettings()
 }
 export async function collaborationStatus() {
-  const mode = process.env.LIVEBLOCKS_SECRET_KEY ? 'development-key' : getServiceUrl() ? 'service' : 'not-configured'
+  const mode = developmentMode() ? (isCollaborationEnabled() ? 'development-key' : 'not-configured') : getServiceUrl() ? 'service' : 'not-configured'
   const reachable = mode === 'service' ? await getService().reachable() : mode === 'development-key'
   return { enabled: isCollaborationEnabled(), mode, reachable, machineId: getMachineId(), name: getMachineName(), serviceUrl: getServiceUrl(), settings: collaborationSettings() }
 }
 export async function deleteCollaborationRoom(roomId: string) {
-  if (process.env.LIVEBLOCKS_SECRET_KEY) await getApi().deleteRoom(roomId)
+  if (developmentMode()) await getApi().deleteRoom(roomId)
   else await getService().delete(roomId)
 }
 
 /** The host service writes storage; the UI and a guest's service only read it and broadcast. */
 export async function token(roomId: string, role: 'host' | 'ui' | 'guest' = 'ui', name = getMachineName()) {
-  if (!process.env.LIVEBLOCKS_SECRET_KEY) return getService().token(roomId, role)
+  if (!developmentMode()) return getService().token(roomId, role)
   const session = getApi().prepareSession(`${getMachineId()}:${role}`, {
     userInfo: { name, machineId: getMachineId(), color: '#22c55e' },
   })
@@ -157,7 +158,7 @@ export async function shareWorkspace(worktreeId: string, permission: 'view' | 'c
   const repo = worktree.repoId ? db.select().from(repos).where(eq(repos.id, worktree.repoId)).get() : undefined
   const workspaceName = [repo?.name, worktree.branch].filter(Boolean).join(' / ') || 'Shared workspace'
   const capability: Capability = { version: 1, roomId: `workspace:${worktreeId}`, worktreeId, hostMachineId: getMachineId(), permission, nonce: randomUUID(), workspaceName: workspaceName.slice(0, 200), hostName: getMachineName().slice(0, 100) }
-  if (!process.env.LIVEBLOCKS_SECRET_KEY) {
+  if (!developmentMode()) {
     capability.serviceUrl = getServiceUrl()
     capability.joinCode = (await getService().code(capability.roomId)).code
   }
@@ -233,7 +234,7 @@ export class SyncManager {
   private async open() {
     const worktree = getDb().select().from(worktrees).where(eq(worktrees.id, this.workspaceId)).get()
     if (!worktree?.collaborative) throw new Error('Workspace sharing is disabled')
-    if (process.env.LIVEBLOCKS_SECRET_KEY) await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
+    if (developmentMode()) await getApi().getOrCreateRoom(this.roomId, { defaultAccesses: [] })
     else await getService().claim(this.roomId)
     const client = createClient({
       authEndpoint: () => token(this.roomId, 'host'),

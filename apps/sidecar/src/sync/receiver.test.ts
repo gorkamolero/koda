@@ -23,6 +23,7 @@ beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-receiver-'))
   vi.stubEnv('KODA_DATA_DIR', directory)
   vi.stubEnv('LIVEBLOCKS_SECRET_KEY', 'unit-test-only')
+  vi.stubEnv('KODA_COLLAB_MODE', 'development')
   sync = await import('./LiveblocksClient.js')
   router.register('codex.send', dispatch)
   router.register('claude.send', claudeDispatch)

@@ -29,6 +29,7 @@ beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), 'koda-collab-storage-'))
   vi.stubEnv('KODA_DATA_DIR', directory)
   vi.stubEnv('LIVEBLOCKS_SECRET_KEY', 'unit-test-only')
+  vi.stubEnv('KODA_COLLAB_MODE', 'development')
   ;({ SyncManager } = await import('./LiveblocksClient.js'))
   router.register('codex.getMessages', async ({ sessionId }: { sessionId: string }) => mock.transcripts.get(sessionId) ?? [])
   router.register('claude.getMessages', claudeMessages)
