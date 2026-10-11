@@ -11,6 +11,8 @@ const port = parseInt(process.env.VITE_PORT || '1420', 10)
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Concurrent proof instances must not invalidate each other's optimized dependencies.
+  cacheDir: process.env.KODA_VITE_CACHE_DIR || 'node_modules/.vite',
   plugins: [react(), TanStackRouterVite()],
   resolve: {
     alias: {

@@ -11,11 +11,14 @@ export interface ToastProps extends Omit<React.HTMLAttributes<HTMLDivElement>, '
   description?: React.ReactNode
   action?: { label: string; onClick: () => void }
   onDismiss?: () => void
+  dismissProps?: Partial<React.ComponentProps<typeof IconButton>> & { [key: `data-${string}`]: string }
+  icon?: React.ReactNode
+  descriptionClassName?: string
 }
 /** A notification view. Hosts own its lifetime and queue. */
-export function Toast({ tone = 'info', title, description, action, onDismiss, className, ...props }: ToastProps) {
+export function Toast({ tone = 'info', title, description, action, onDismiss, dismissProps, icon, descriptionClassName, className, ...props }: ToastProps) {
   const Icon = icons[tone]
-  return <div role={tone === 'error' ? 'alert' : 'status'} className={cn('flex w-full max-w-md items-start gap-3 rounded-md border bg-surface-popover p-4 font-code text-sm text-text-primary shadow-popover', borders[tone], className)} {...props}><Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><div className="min-w-0 flex-1"><p className="font-semibold">{title}</p>{description && <p className="mt-1 text-xs text-text-secondary">{description}</p>}{action && <Button variant="bracket" size="sm" className="mt-2" onClick={action.onClick}>{action.label}</Button>}</div>{onDismiss && <IconButton aria-label="Dismiss notification" onClick={onDismiss}><X /></IconButton>}</div>
+  return <div role={tone === 'error' ? 'alert' : 'status'} className={cn('flex w-full max-w-md items-start gap-3 rounded-md border bg-surface-popover p-4 font-code text-sm text-text-primary shadow-popover', borders[tone], className)} {...props}>{icon ?? <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />}<div className="min-w-0 flex-1"><p className="font-semibold">{title}</p>{description && <p className={cn("mt-1 text-xs text-text-secondary", descriptionClassName)}>{description}</p>}{action && <Button variant="bracket" size="sm" className="mt-2" onClick={action.onClick}>{action.label}</Button>}</div>{onDismiss && <IconButton aria-label="Dismiss notification" onClick={onDismiss} {...dismissProps}><X /></IconButton>}</div>
 }
 export interface CalloutProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> { tone?: 'info' | 'warning' | 'error' | 'view-only'; title?: React.ReactNode }
 export function Callout({ tone = 'info', title, children, className, ...props }: CalloutProps) {

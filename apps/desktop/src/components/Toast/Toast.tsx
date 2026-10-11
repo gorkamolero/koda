@@ -1,7 +1,8 @@
+import { Toast as ToastView } from '@koda/ui'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { Toast as ToastType, ToastType as ToastVariant } from '@/store/notifications'
-import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react'
 
 interface ToastProps {
   toast: ToastType
@@ -67,41 +68,25 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   }, [toast.duration, handleDismiss])
 
   return (
-    <div
+    <ToastView
+      title={toast.title}
+      description={toast.message}
+      tone={toast.type}
+      onDismiss={handleDismiss}
+      dismissProps={{ 'data-testid': 'toast-dismiss', className: 'size-6 p-1 opacity-70 hover:opacity-100' }}
+      icon={<div className={cn('flex-shrink-0', ICON_STYLES[toast.type])}>{ICONS[toast.type]}</div>}
+      descriptionClassName="text-sm text-text-muted line-clamp-2"
       data-testid="toast"
       data-type={toast.type}
       role="alert"
       aria-live="assertive"
       className={cn(
-        'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl',
+        'font-ui pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl',
         'border p-4 shadow-xl glass',
         'transition-all duration-200 ease-out',
         STYLES[toast.type],
         isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'
       )}
-    >
-      {/* Icon */}
-      <div className={cn('flex-shrink-0', ICON_STYLES[toast.type])}>
-        {ICONS[toast.type]}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-text-strong">{toast.title}</p>
-        {toast.message && (
-          <p className="mt-1 text-sm text-text-muted line-clamp-2">{toast.message}</p>
-        )}
-      </div>
-
-      {/* Dismiss button */}
-      <button
-        data-testid="toast-dismiss"
-        onClick={handleDismiss}
-        className="btn-icon flex-shrink-0 opacity-70 hover:opacity-100"
-        aria-label="Dismiss notification"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
+    />
   )
 }

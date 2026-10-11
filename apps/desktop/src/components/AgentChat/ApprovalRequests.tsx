@@ -1,3 +1,4 @@
+import { ApprovalCard, Button } from '@koda/ui'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { onNotification, rpcRequest } from '@/lib/tauri'
@@ -60,7 +61,7 @@ export function ApprovalRequests({ sessionId, readOnly = false, hostName }: { se
 
   return <div data-testid="approval-requests" aria-live="polite" className="border-b border-border-subtle px-4 py-2 text-xs space-y-2">
     {isPending && <p className="text-text-muted">Checking for approval requests…</p>}
-    {error && <div role="alert" className="text-status-error">Unable to load approval requests: {error.message} <button onClick={() => void refetch()} className="underline">Retry</button></div>}
+    {error && <div role="alert" className="text-status-error">Unable to load approval requests: {error.message} <Button variant="link" className="h-auto p-0 text-xs" onClick={() => void refetch()}>Retry</Button></div>}
     {responseError && <p role="alert" className="text-status-error">{responseError}</p>}
     {pending.map(request => {
       const item = request.input.item as { command?: string; changes?: Array<{ path?: string; kind?: string | { type?: string } }> } | undefined
@@ -68,20 +69,26 @@ export function ApprovalRequests({ sessionId, readOnly = false, hostName }: { se
       const command = request.input.command ?? item?.command
       const filePath = request.input.file_path ?? request.input.path ?? request.input.cwd
       const busy = responding.has(request.id)
-      return <section key={request.id} data-testid="approval-card" data-approval-id={request.id} aria-label={`Permission request: ${request.toolName}`} className="border border-text-accent/40 bg-surface-card p-3 space-y-2">
-        <div className="font-medium text-text-primary">Permission needed · {request.toolName}</div>
-        <p className="text-text-muted">{request.reason || 'The agent needs your approval to continue.'}</p>
-        {typeof command === 'string' && <div><span className="text-text-muted">Command</span><pre data-testid="approval-command" className="mt-1 whitespace-pre-wrap break-all max-h-24 overflow-y-auto">{command}</pre></div>}
-        {typeof filePath === 'string' && <p className="break-all"><span className="text-text-muted">Path: </span><span data-testid="approval-path">{filePath}</span></p>}
-        {network?.host && <p data-testid="approval-network" className="break-all">Network: {network.protocol ? `${network.protocol}://` : ''}{network.host}</p>}
-        {Array.isArray(item?.changes) && <ul data-testid="approval-files" className="space-y-1 break-all">{item.changes.map((change, index) => <li key={index}>{typeof change.kind === 'string' ? change.kind : change.kind?.type || 'Change'}: {change.path || 'Path not supplied'}</li>)}</ul>}
-        <details><summary className="cursor-pointer text-text-muted">Request details</summary><pre data-testid="approval-input" className="mt-1 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{JSON.stringify(request.input, null, 2)}</pre></details>
-        {readOnly && <p data-testid="approval-view-only" className="text-text-muted">View only: {hostName || 'the host'} or a collaborator with control can answer.</p>}
-        <div className="flex flex-wrap gap-2">
-          <button data-testid="approval-allow" disabled={busy || readOnly} onClick={() => void respond(request, 'allow')} className="border border-border-subtle px-3 py-1 hover:text-text-accent disabled:opacity-50">{busy ? 'Sending…' : 'Approve once'}</button>
-          <button data-testid="approval-deny" disabled={busy || readOnly} onClick={() => void respond(request, 'deny')} className="border border-border-subtle px-3 py-1 hover:text-status-error disabled:opacity-50">Deny</button>
-        </div>
-      </section>
+      return <ApprovalCard
+        key={request.id}
+        appearance="terminal"
+        className="[&_p]:text-text-muted"
+        data-testid="approval-card"
+        data-approval-id={request.id}
+        aria-label={`Permission request: ${request.toolName}`}
+        title={`Permission needed · ${request.toolName}`}
+        reason={request.reason || 'The agent needs your approval to continue.'}
+        state={readOnly ? 'read-only' : 'actionable'}
+        hostName={hostName || undefined}
+        busy={busy}
+        command={typeof command === 'string' ? command : undefined}
+        path={typeof filePath === 'string' ? filePath : undefined}
+        network={network?.host ? `${network.protocol ? `${network.protocol}://` : ''}${network.host}` : undefined}
+        files={Array.isArray(item?.changes) ? item.changes.map(change => ({ kind: typeof change.kind === 'string' ? change.kind : change.kind?.type || 'Change', path: change.path || 'Path not supplied' })) : undefined}
+        details={JSON.stringify(request.input, null, 2)}
+        onApprove={() => void respond(request, 'allow')}
+        onDeny={() => void respond(request, 'deny')}
+      />
     })}
   </div>
 }

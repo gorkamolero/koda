@@ -29,4 +29,4 @@ import '@koda/ui/styles.css'
 <SharedBadge hostName="Gorka" permission="view" />
 ```
 
-The desktop currently consumes the shared tokens and Tailwind preset. Its component migration is a separate run; existing desktop copies remain in place.
+Desktop composes these components throughout navigation, chat, workspace panels, settings and sharing. Data fetching, stores and permission checks remain in desktop. The duplicated primitives have been removed and token lint is enforced as an error.

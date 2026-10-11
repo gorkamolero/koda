@@ -9,3 +9,5 @@ export const Default: Story = {}
 export const WithHeaderAction: Story = { args: { action: <Button variant="bracket" size="sm">Edit</Button> } }
 export const WithoutDescription: Story = { args: { description: undefined } }
 
+
+export const CompactSettings: Story = { args: { compact: true, title: 'AGENT' } }

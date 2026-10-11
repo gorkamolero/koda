@@ -1,3 +1,4 @@
+import { Button, Input } from '@koda/ui'
 import { useParams, useSearch, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
@@ -340,14 +341,14 @@ export function WorkspaceView() {
                     <p className="text-text-muted mb-4">
                       Connect a repository to start chatting with Codex about your code.
                     </p>
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       data-testid="connect-repo-button"
                       className="px-4 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
                       onClick={handleStartConnect}
                     >
                       [CONNECT REPOSITORY]
-                    </button>
+                    </Button>
                   </div>
                 )}
 
@@ -374,14 +375,14 @@ export function WorkspaceView() {
                         <div className="text-text-faint mb-2 pl-2">│ Recent:</div>
                         <div className="space-y-1 max-h-48 overflow-y-auto pl-2">
                           {repos.map((repo) => (
-                            <button
+                            <Button variant="unstyled"
                               key={repo.id}
                               onClick={() => { handleSelectRepo(repo.id) }}
                               className="w-full text-left px-3 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
                             >
                               <div className="text-text-primary">{repo.name}</div>
                               <div className="text-text-faint truncate">{repo.rootPath}</div>
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>
@@ -390,24 +391,24 @@ export function WorkspaceView() {
                     {/* Add new repo */}
                     <div className="pl-2">
                       {!isTauriContext() && (
-                        <input aria-label="Repository path" data-testid="repository-path" value={repoPath} onChange={event => setRepoPath(event.target.value)} placeholder="/absolute/path/to/repository" className="w-full mb-2 p-2 bg-transparent border border-dashed border-border-subtle" />
+                        <Input aria-label="Repository path" data-testid="repository-path" value={repoPath} onChange={event => setRepoPath(event.target.value)} placeholder="/absolute/path/to/repository" className="w-full mb-2 p-2 bg-transparent border border-dashed border-border-subtle" />
                       )}
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => void handleAddRepo()}
                         disabled={createRepo.isPending}
                         className="w-full px-3 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors text-center"
                       >
                         {createRepo.isPending ? '[REGISTERING...]' : '[+ ADD GIT REPOSITORY]'}
-                      </button>
+                      </Button>
                     </div>
 
                     <div className="flex justify-end mt-4 pt-3 border-t border-dashed border-border-subtle">
-                      <button
+                      <Button variant="unstyled"
                         onClick={handleCancelConnect}
                         className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                       >
                         [CANCEL]
-                      </button>
+                      </Button>
                     </div>
                     
                     <div className="text-text-faint mt-2">
@@ -439,46 +440,46 @@ export function WorkspaceView() {
 
                     <div className="pl-2 space-y-2">
                       <div className="text-text-faint">│ [BRANCH_NAME]</div>
-                      <input
+                      <Input
                         type="text"
                         value={branchName}
                         onChange={(e) => { setBranchName(e.target.value) }}
                         placeholder="feature/my-feature"
                         data-testid="branch-name-input"
-                        className="w-full px-3 py-2 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-primary placeholder:text-text-faint focus:outline-none focus:border-text-accent"
+                        className="w-full px-3 py-2 bg-[var(--black-soft)] border border-dashed border-border-subtle text-text-primary placeholder:text-text-faint focus:outline-none focus:border-text-accent"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') void handleCreateWorktree()
                           if (e.key === 'Escape') handleCancelConnect()
                         }}
                       />
-                      <p className="text-text-faint text-[10px]">
+                      <p className="text-text-faint text-2xs">
                         A git worktree will be created for isolated work
                       </p>
                     </div>
 
                     <div className="flex justify-between mt-4 pt-3 border-t border-dashed border-border-subtle">
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => { setConnectStep('repo') }}
                         className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                       >
                         [← BACK]
-                      </button>
+                      </Button>
                       <div className="flex gap-2">
-                        <button
+                        <Button variant="unstyled"
                           onClick={handleCancelConnect}
                           className="px-3 py-1 text-text-muted hover:text-text-primary transition-colors"
                         >
                           [CANCEL]
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="unstyled"
                           onClick={() => void handleCreateWorktree()}
                           disabled={!branchName.trim() || createWorktree.isPending}
                           data-testid="create-branch-button"
                           className="px-3 py-1 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent disabled:opacity-50 transition-colors"
                         >
                           {createWorktree.isPending ? '[CREATING...]' : '[CREATE & CONNECT]'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                     
@@ -516,13 +517,13 @@ export function WorkspaceView() {
                 <div>│                            │</div>
                 <div>└────────────────────────────┘</div>
               </div>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 className="mt-4 px-4 py-2 border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
                 onClick={() => { void navigate({ to: '/' }) }}
               >
                 [← BACK TO WORKSPACES]
-              </button>
+              </Button>
             </div>
           )}
 

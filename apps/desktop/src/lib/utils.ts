@@ -1,6 +1,2 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+// Desktop and shared components use the same semantic utility merge rules.
+export { cn } from '@koda/ui'

@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useParams, Link } from '@tanstack/react-router'
 import { useWorktree, useRepo } from '@/hooks/useRpc'
 import { useClickOutside } from '@/hooks/useClickOutside'
@@ -44,7 +45,7 @@ function BranchSelector({ branch }: { branch: string }): React.ReactElement {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button variant="unstyled"
         onClick={() => { setIsOpen(!isOpen) }}
         className={cn(
           'flex items-center gap-1.5 px-2 py-1 rounded-md text-sm',
@@ -53,8 +54,8 @@ function BranchSelector({ branch }: { branch: string }): React.ReactElement {
         )}
       >
         <GitBranch className="w-3.5 h-3.5" />
-        <span className="max-w-[150px] truncate">{branch}</span>
-      </button>
+        <span className="max-w-[calc(var(--space-36)+var(--space-1_5))] truncate">{branch}</span>
+      </Button>
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 w-64 glass-popover rounded-lg border border-border-strong shadow-xl py-1 z-50 animate-fade-in">
@@ -87,18 +88,18 @@ function MoreActionsMenu(): React.ReactElement {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <Button variant="unstyled"
         onClick={() => { setIsOpen(!isOpen) }}
-        className="btn-icon"
+        className="inline-flex items-center justify-center size-8 rounded-md p-0 text-text-muted hover:bg-surface-hover hover:text-text-primary"
         data-tooltip="More actions"
       >
         <MoreHorizontal className="w-4 h-4" />
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-1 w-48 glass-popover rounded-lg border border-border-strong shadow-xl py-1 z-50 animate-fade-in">
           {MORE_ACTIONS_MENU_ITEMS.map((item) => (
-            <button
+            <Button variant="unstyled"
               key={item.label}
               onClick={() => {
                 item.action()
@@ -112,7 +113,7 @@ function MoreActionsMenu(): React.ReactElement {
             >
               <item.icon className="w-4 h-4" />
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -137,7 +138,7 @@ function Breadcrumb({ worktree, title }: { worktree?: Worktree; title?: string }
       {(worktree || title) && (
         <>
           <ChevronRight className="w-4 h-4 text-text-dim" />
-          <span className="text-text-primary font-medium truncate max-w-[200px]">
+          <span className="text-text-primary font-medium truncate max-w-50">
             {displayName || title}
           </span>
         </>

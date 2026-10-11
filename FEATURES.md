@@ -6,16 +6,17 @@ Living document for planned features.
 
 ## Shared design system and Storybook
 
-**Status:** Package implementation; desktop component migration deferred. See [DESIGN.md](DESIGN.md).
+**Status:** Shared package and desktop component migration implemented. See [DESIGN.md](DESIGN.md).
 
 - [x] `@koda/ui` workspace package with shared tokens, typed foundations and a Tailwind preset.
-- [x] Four complete themes: Obsidian, Light, Dim and Graphite; desktop token-only integration preserves existing resolved values.
+- [x] Four complete themes: Obsidian, Light, Dim and Graphite; desktop uses shared components and tokens with four-theme screenshot comparisons.
 - [x] All 40 component groups from the design-system brief, with presentational props and accessible keyboard behavior.
 - [x] Storybook with variant/state stories, generated props docs, theme toolbar, accessibility and browser interaction tests.
 - [x] Introduction, Foundations, Brand, Patterns, and host/collaborator App screens.
-- [x] Token lint errors in `packages/ui`, migration warnings in desktop.
+- [x] Token lint errors in `packages/ui` and desktop components, pages and CSS; documented external renderer adapters only.
 - [x] Static Storybook and official GitHub Pages workflow prepared for pushes to `main`.
-- [ ] Migrate desktop feature components and remove unused vendored primitives after checking callers.
+- [x] Migrate desktop feature components, unify dialogs/file trees/question cards, and remove unused vendored primitives and their dependencies.
+- [x] Preserve proof test IDs, accessible names, native selects and view/control permission behavior.
 - [ ] Enable/publish the public Storybook after owner review; no deployment or repository settings changed in this run.
 
 ## Codex and Claude desktop flow

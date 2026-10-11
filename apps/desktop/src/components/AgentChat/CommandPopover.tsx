@@ -1,3 +1,4 @@
+import { Command, CommandList, CommandItem as UICommandItem } from '@koda/ui'
 import { useEffect, useRef, memo, forwardRef } from 'react'
 import { cn } from '@/lib/utils'
 import {
@@ -26,7 +27,7 @@ export const CommandPopover = memo(function CommandPopover({
   onClose,
 }: CommandPopoverProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const selectedRef = useRef<HTMLButtonElement>(null)
+  const selectedRef = useRef<HTMLDivElement>(null)
 
   // Scroll selected item into view
   useEffect(() => {
@@ -55,16 +56,17 @@ export const CommandPopover = memo(function CommandPopover({
   let flatIndex = 0
 
   return (
-    <div
+    <Command
+      shouldFilter={false}
+      value={commands[selectedIndex]?.trigger}
       ref={containerRef}
       className={cn(
-        'absolute bottom-full left-0 mb-2 z-50',
-        'w-80 max-h-64 overflow-y-auto',
-        'bg-[#0a0a0a] font-mono',
+        'absolute bottom-full left-0 mb-2 z-popover',
+        'h-auto rounded-none w-80 max-h-64 overflow-y-auto',
+        'bg-[var(--black-soft)] font-mono',
         'border border-dashed border-border-strong'
       )}
-      role="listbox"
-      aria-label="Slash commands"
+      label="Slash commands"
     >
       {/* Header */}
       <div className="px-3 py-1.5 border-b border-dashed border-border-subtle text-xs">
@@ -73,6 +75,7 @@ export const CommandPopover = memo(function CommandPopover({
         <span className="text-text-faint"> {'─'.repeat(20)}┐</span>
       </div>
 
+      <CommandList aria-label="Slash commands">
       {Object.entries(grouped).map(([category, cmds]) => (
         <div key={category} className="py-1">
           {/* Category header */}
@@ -100,11 +103,12 @@ export const CommandPopover = memo(function CommandPopover({
         </div>
       ))}
 
+      </CommandList>
       {/* Footer */}
       <div className="px-3 py-1 text-xs text-text-faint">
         └{'─'.repeat(36)}┘
       </div>
-    </div>
+    </Command>
   )
 })
 
@@ -114,16 +118,17 @@ interface CommandItemProps {
   onClick: () => void
 }
 
-const CommandItem = memo(forwardRef<HTMLButtonElement, CommandItemProps>(
+const CommandItem = memo(forwardRef<HTMLDivElement, CommandItemProps>(
   function CommandItem({ command, isSelected, onClick }, ref) {
     return (
-      <button
+      <UICommandItem
+        value={command.trigger}
         ref={ref}
         role="option"
         aria-selected={isSelected}
-        onClick={onClick}
+        onSelect={onClick}
         className={cn(
-          'w-full text-left px-3 py-1.5 flex items-start gap-2',
+          'rounded-none w-full text-left px-3 py-1.5 flex items-start gap-2',
           'transition-colors cursor-pointer text-xs',
           isSelected
             ? 'bg-surface-active text-text-primary'
@@ -147,7 +152,7 @@ const CommandItem = memo(forwardRef<HTMLButtonElement, CommandItemProps>(
             {command.description}
           </p>
         </div>
-      </button>
+      </UICommandItem>
     )
   }
 ))

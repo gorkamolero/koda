@@ -8,7 +8,7 @@
 import { useMemo } from 'react'
 import { usePresence } from '@/hooks/useCollaboration'
 import { useIsCollaborationAvailable } from '@/components/CollaborativeWorkspaceProvider'
-import { cn } from '@/lib/utils'
+import { AvatarStack, type PresenceTone } from '@koda/ui'
 
 interface PresenceAvatarsProps {
   /** Maximum number of avatars to show before +N */
@@ -33,10 +33,11 @@ export function PresenceAvatars({
   return <PresenceAvatarsInner maxVisible={maxVisible} size={size} className={className} />
 }
 
-const SIZE_CLASSES = {
-  sm: 'w-6 h-6 text-[10px]',
-  md: 'w-8 h-8 text-xs',
-} as const
+// Wire identity colors are matched to presentation tokens; custom remote values remain data.
+const PRESENCE_COLORS: Record<string, PresenceTone> = {
+  // koda-token-exception: These are protocol identity values from machineId, mapped to named tokens.
+  '#ef4444': 'red', '#f97316': 'orange', '#eab308': 'yellow', '#22c55e': 'presence-green', '#14b8a6': 'teal', '#3b82f6': 'presence-blue', '#8b5cf6': 'violet', '#ec4899': 'pink', '#6366f1': 'indigo', '#06b6d4': 'presence-cyan',
+}
 
 function PresenceAvatarsInner({
   maxVisible,
@@ -45,61 +46,12 @@ function PresenceAvatarsInner({
 }: Required<Pick<PresenceAvatarsProps, 'maxVisible' | 'size'>> & { className?: string }): React.ReactElement | null {
   const { peers, self } = usePresence()
 
-  const { visibleUsers, overflowCount } = useMemo(() => {
-    const allUsers = [
-      ...(self ? [{ name: self.name, color: self.color }] : []),
-      ...peers.map((p) => ({ name: p.name, color: p.color })),
-    ]
+  const people = useMemo(() => [
+    ...(self ? [{ id: self.machineId, name: self.name, color: self.color }] : []),
+    ...peers.map(peer => ({ id: `${peer.machineId}:${peer.connectionId}`, name: peer.name, color: peer.color })),
+  ].map(person => ({ ...person, tone: PRESENCE_COLORS[person.color.toLowerCase()], color: PRESENCE_COLORS[person.color.toLowerCase()] ? undefined : person.color })), [self, peers])
 
-    return {
-      allUsers,
-      visibleUsers: allUsers.slice(0, maxVisible),
-      overflowCount: Math.max(0, allUsers.length - maxVisible),
-    }
-  }, [self, peers, maxVisible])
+  if (people.length <= 1) return null
 
-  if (visibleUsers.length <= 1) {
-    return null
-  }
-
-  const sizeClass = SIZE_CLASSES[size]
-
-  return (
-    <div data-testid="presence-avatars" className={cn('flex -space-x-2', className)}>
-      {visibleUsers.map((user, i) => (
-        <div
-          key={i}
-          className={cn(
-            'rounded-full flex items-center justify-center font-medium text-white border-2 border-background',
-            sizeClass
-          )}
-          style={{ backgroundColor: user.color }}
-          title={user.name}
-        >
-          {getInitials(user.name)}
-        </div>
-      ))}
-
-      {overflowCount > 0 && (
-        <div
-          className={cn(
-            'rounded-full flex items-center justify-center font-medium bg-muted text-muted-foreground border-2 border-background',
-            sizeClass
-          )}
-          title={`${String(overflowCount)} more`}
-        >
-          +{overflowCount}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  return <AvatarStack data-testid="presence-avatars" people={people} maxVisible={maxVisible} size={size} compact className={className} />
 }

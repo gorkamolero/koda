@@ -1,3 +1,4 @@
+import { Button, IconButton, TerminalFrame } from '@koda/ui'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
@@ -291,7 +292,7 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
       data-testid="terminal-container"
       tabIndex={-1}
     >
-      {/* Tab bar */}
+      <TerminalFrame title="Terminal" status={activeTerminal?.connecting ? 'running' : activeTerminal?.ptySessionId ? 'ready' : 'disconnected'} className="h-full border-0 font-ui text-base" bodyClassName="flex min-h-0 flex-1 flex-col p-0" header={
       <div className="flex items-center border-b border-border-subtle bg-surface-card" data-testid="terminal-tab-bar">
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
@@ -315,50 +316,52 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
               )}
               <span>{tab.title}</span>
               {tab.pid && (
-                <span className="text-muted-foreground/60 text-[10px]" data-testid="terminal-pid">
+                <span className="text-muted-foreground/60 text-2xs" data-testid="terminal-pid">
                   ({tab.pid})
                 </span>
               )}
-              <button
+              <IconButton variant="unstyled" aria-label={`Close ${tab.title}`}
                 onClick={(e) => {
                   e.stopPropagation()
                   void closeTerminal(tab.id)
                 }}
                 data-testid={`terminal-close-${tab.id}`}
-                className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                className="size-auto rounded-none border-0 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
               >
                 <X className="h-3 w-3" />
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
 
         {/* New terminal button */}
-        <button
+        <IconButton variant="unstyled" aria-label="New terminal"
           onClick={() => void createNewTerminal()}
           data-testid="terminal-new-tab"
-          className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+          className="size-auto rounded-none border-0 p-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <Plus className="h-4 w-4" />
-        </button>
+        </IconButton>
       </div>
 
+      }>
       {/* Terminal container */}
       <div ref={containerRef} className="flex-1" data-testid="terminal-viewport" />
 
       {/* Empty state */}
       {tabs.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
-          <button
+          <Button variant="unstyled"
             onClick={() => void createNewTerminal()}
             data-testid="terminal-new-empty"
             className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
           >
             <Plus className="h-4 w-4" />
             New Terminal
-          </button>
+          </Button>
         </div>
       )}
+      </TerminalFrame>
     </div>
   )
 }

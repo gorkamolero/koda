@@ -1,6 +1,6 @@
 # Koda design system
 
-`packages/ui` (`@koda/ui`) codifies Koda's current terminal interface. It contains the shared foundations, all 40 component groups in [the brief](briefs/design-system.md), and the Storybook. Desktop consumes the tokens and Tailwind preset now; its component migration is a separate step.
+`packages/ui` (`@koda/ui`) codifies Koda's current terminal interface. It contains the shared foundations, all 40 component groups in [the brief](briefs/design-system.md), and the Storybook. Desktop composes these shared components while retaining its queries, stores, agent runtimes, and permission checks.
 
 ## Principles
 
@@ -13,7 +13,7 @@
 
 ## Foundations
 
-Import `@koda/ui/styles.css` for the compiled component CSS (including tokens and brand styles); run `pnpm --filter @koda/ui build` first. This works without configuring Tailwind in the consuming app. Import `@koda/ui/tokens.css` alone for a token-only consumer such as desktop.
+Import `@koda/ui/styles.css` for the compiled component CSS (including tokens and brand styles); run `pnpm --filter @koda/ui build` first. This works without configuring Tailwind in the consuming app. Import `@koda/ui/tokens.css` alone for a token-only consumer.
 
 Tailwind consumers can use `@koda/ui/tailwind-preset`, import `@koda/ui/source-styles.css`, and include `../../packages/ui/src/**/*.{ts,tsx}` in their `content` paths (adjust relative to their config). Typed exports live at `@koda/ui/tokens`. Foundations stories read these exports directly, including color swatches and scales.
 
@@ -82,13 +82,13 @@ The brief numbers 40 groups; groups containing several controls expose those con
 | 39 | CommandPalette | Embedded/modal shell, search, groups, disabled results and callbacks |
 | 40 | AppShell | Sidebar/topbar/main/right/bottom slots, host and collaborator layouts |
 
-Feature data logic, editors, xterm instances, agent runtimes, and application pages stay in desktop. Desktop copies and unused vendored primitives are removed only during the later component migration, after checking their callers.
+Feature data logic, editors, xterm instances, agent runtimes, and application pages stay in desktop. Desktop no longer has a `components/ui` or `ai-elements` directory. Streaming Markdown and reasoning adapters stay beside the transcript; they compose the shared controls. The duplicated logo, spinner, file icon and CSS primitives have been removed.
 
 ## Token lint
 
 `koda/no-raw-tokens` is an ESLint rule exported from `@koda/ui/eslint`. It rejects hex colors, raw Tailwind palette colors (including directional borders and hover/opacity forms), arbitrary pixel values and inline color styles. Numeric React dimensions and locally referenced style objects are checked too; unitless values and the three icon sizes remain allowed. The `koda/css` ESLint processor applies the same rule to CSS declarations, `@apply` utilities and media query parameters, with diagnostics at the original CSS locations. Semantic custom-property references, `currentColor`, inheritance and transparency are allowed. Koda's gray 0–14 names are tokens; Tailwind's gray 50–950 palette is not.
 
-The rule is an **error** for `packages/ui` and a **warning** for desktop components, pages and CSS during this run. Desktop warnings document migration work; they become errors after migration. Other lint errors still fail the build.
+The rule is an **error** in both `packages/ui` and desktop components, pages and CSS. Component styling must use the shared tokens; there is no migration warning exemption.
 
 An unavoidable adapter exception must explain its purpose immediately beside the relevant expression:
 
@@ -120,14 +120,35 @@ Storybook uses stable **10.6.1**, React and Vite, with themes, generated docs, a
 
 The five documentation areas are Introduction, Foundations, Brand, Patterns, and App screens. Host and collaborator examples use the same mock `sharing-permissions` worktree. They never connect to real services.
 
+## Desktop migration
+
+The migration preserves feature-owned data and callbacks. The four batches replace:
+
+1. Sidebar, workspace/repository/session rows: `NavItem`, `StatusBadge` and `StatusDot`. Both workspace-creation modals share one feature controller, and creation/add-repository shells use `Dialog`.
+2. Agent chat: `MessageBubble`, `ToolBlock`, `ApprovalCard`, `QuestionCard`, `Composer`, native `Select`, `Command`, and the shared working indicator. Native selects preserve platform selection and proof automation. Request lifecycle, permission validation and secret-answer restrictions remain feature logic.
+3. Workspace, right panel, terminal, files, diffs, checks and review: shared controls and tabs, `TerminalFrame`, one `Tree`, continuous `Meter`, and compact `AvatarStack`. Controlled expansion, lazy folder loading and virtualization callbacks stay in desktop. Keyboard navigation scrolls measured offsets without leaving a pending virtualizer callback after unmount. Diff arrows retain file selection, and Tree updates preserve composer focus.
+4. Settings, sharing, Interview and remaining surfaces: `TerminalSection`, `Dialog`, `SegmentedControl`, `SharedBadge`, `Callout`, `Command`, `Toast`, `AppShell`, and shared inputs/actions. Interview composes the same `QuestionCard` as agent requests.
+
+Desktop imports `source-styles.css` and scans the UI sources with the shared Tailwind preset. Named small text, geometry, presence and file-extension tokens preserve the original dimensions and colors. The shared `cn` understands semantic font sizes and shadows, so overrides do not accidentally remove text colors or retain an unwanted popover shadow. `Button`'s `unstyled` variant retains common focus/disabled handling for custom terminal action layouts. Presentation options (native select, compact terminal sections, filled file icons, continuous meter, composed dialog content) are documented by stories.
+
+All existing proof test IDs are forwarded to their corresponding controls, including the share permission choices, shared workspace link/badge and its `data-permission`, join action, approval/question actions, composer, terminals and file rows. The file-row tests now assert the padding on the shared Tree row; their behavior assertions remain intact.
+
+Documented adapter exceptions are limited to:
+
+- `Terminal/terminalOptions.ts`: xterm requires a literal ANSI color palette.
+- `Scratchpad/Scratchpad.tsx`: Monaco's theme API requires literal hex colors.
+- `PresenceAvatars.tsx` and shared `AvatarStack`: known wire identity colors map to named tokens; an unknown externally supplied identity color remains a documented adapter value.
+
 ## Verified implementation
 
-The verification record is [docs/design-system-verification.json](docs/design-system-verification.json). This implementation contains 303 stories and 61 component Docs pages covering the brief's 40 groups. All stories pass in four themes (1,212 browser story runs), including accessibility checks. The workspace has 770 passing unit tests, including 237 desktop tests. Desktop lint reports 311 migration warnings and no errors; the UI package has no lint warnings.
+The original package verification is recorded in [docs/design-system-verification.json](docs/design-system-verification.json). The desktop migration results, batch commits, screenshot comparisons, tests, and real-agent proof outcomes are recorded separately in [docs/desktop-migration-verification.json](docs/desktop-migration-verification.json).
 
-Sixteen Playwright captures cover host and collaborator workspaces, button sizes and open dialogs in every theme. They were visually inspected; the static `/koda/` base, theme attribute, runtime errors and horizontal overflow are also checked by the screenshot script. A host screenshot is committed in the README; local captures and their manifest remain in `packages/ui/visual-review`.
+Playwright captures the actual desktop with deterministic browser RPC fixtures in all four themes. Core screens, expanded file/diff trees, sharing/join dialogs, settings and toast states are compared before and after the batches. The Add Repo and Join Workspace dialogs now portal to the center of the window: their previous overlays were accidentally confined to the sidebar. A narrow pnpm patch fixes an existing xterm 5.3 viewport disposal race reproduced in the baseline. Its browser regression exercises the public terminal lifecycle and verifies pending animation frames are cancelled; the shared TerminalFrame also has a fill-height regression story. Reduced-motion CSS disables transitions completely so synchronous renderer font measurements remain accurate. See [the visual capture scripts](scripts/desktop-migration-visuals/README.md) to reproduce the comparisons.
+
+`pnpm build`, `pnpm lint`, `pnpm test`, the Storybook build and browser story tests are required. Real Codex, Claude, approval and question proofs run separately from the mock screenshot fixtures. Collaboration and `verify:clean` remain owner-run because they require the owner's environment file. A restricted proof run can set `KODA_PROOF_KEEP_NATIVE_SESSIONS=1` to retain provider history outside its fixture directory; this changes cleanup only, not runtime assertions.
 
 ## Publication
 
 The future public URL is <https://gorkamolero.github.io/koda/>. `.github/workflows/storybook.yml` builds and tests on pushes to `main`, then uses the official configure/upload/deploy Pages actions. The Vite production base is `/koda/`.
 
-This branch does not deploy or change repository settings. The owner can enable Pages for GitHub Actions when ready to merge. The workflow has no manual dispatch trigger and does not run on `codex/design-system`.
+This branch does not deploy or change repository settings. The owner can enable Pages for GitHub Actions when ready to merge. The workflow has no manual dispatch trigger and does not run on `codex/design-system-migration`.

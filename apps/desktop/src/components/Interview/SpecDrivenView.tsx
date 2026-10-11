@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useState } from 'react'
 import { useWorkspace } from '@/hooks/useRpc'
 import { InterviewMode } from './InterviewMode'
@@ -33,13 +34,13 @@ export function SpecDrivenView({ workspaceId }: SpecDrivenViewProps) {
         {/* Spec content header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h3 className="font-semibold text-primary">Feature Specification</h3>
-          <button
+          <Button variant="unstyled"
             data-testid="start-interview-button"
             onClick={() => { setIsInterviewing(true) }}
             className="text-sm text-primary hover:underline"
           >
             Start New Interview
-          </button>
+          </Button>
         </div>
 
         {/* Spec content */}
@@ -78,13 +79,13 @@ export function SpecDrivenView({ workspaceId }: SpecDrivenViewProps) {
           Start an interview to define your feature specification. The agent
           will ask you questions to understand what you want to build.
         </p>
-        <button
+        <Button variant="unstyled"
           data-testid="start-interview-button"
           onClick={() => { setIsInterviewing(true) }}
           className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2 transition-colors"
         >
           Start Interview
-        </button>
+        </Button>
       </div>
     </div>
   )

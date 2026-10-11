@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { cn } from '@/lib/utils'
 import { X, Sparkles, Zap, Brain, Bot } from 'lucide-react'
 
@@ -27,7 +28,7 @@ const AVAILABLE_MODELS: ModelOption[] = [
     description: 'Most capable',
     icon: <Sparkles className="w-4 h-4" />,
     badge: 'Pro',
-    badgeColor: 'bg-purple-500/20 text-purple-400',
+    badgeColor: 'bg-status-reviewing/20 text-status-reviewing',
   },
   {
     id: 'codex',
@@ -62,18 +63,18 @@ export function NewSessionPicker({ onSelect, onCancel }: NewSessionPickerProps) 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-text-primary">New Session</span>
-        <button
+        <Button variant="unstyled"
           onClick={onCancel}
           className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
         >
           <X className="w-3.5 h-3.5" />
-        </button>
+        </Button>
       </div>
 
       {/* Model options */}
       <div className="space-y-1">
         {AVAILABLE_MODELS.map((model) => (
-          <button
+          <Button variant="unstyled"
             key={model.id}
             onClick={() => { onSelect(model.id) }}
             className={cn(
@@ -102,7 +103,7 @@ export function NewSessionPicker({ onSelect, onCancel }: NewSessionPickerProps) 
                 {model.description}
               </span>
             </div>
-          </button>
+          </Button>
         ))}
       </div>
 

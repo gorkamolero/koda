@@ -44,7 +44,7 @@ export function ActivityFeedPanel({ workspaceId, worktreeId }: ActivityFeedPanel
   return (
     <div
       data-testid="activity-feed-panel"
-      className="h-full flex flex-col bg-[#0a0a0a] font-mono text-xs"
+      className="h-full flex flex-col bg-[var(--black-soft)] font-mono text-xs"
     >
       {/* Header */}
       <div className="px-3 py-2 border-b border-dashed border-border-subtle">

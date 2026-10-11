@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@koda/ui'
 import { useState, useCallback } from 'react'
 import { useSetAtom } from 'jotai'
 import { generatedSpecAtom, generatedFixPlanAtom } from '@/store/interview'
@@ -78,11 +79,11 @@ export function SpecBuilder({
         {/* Success message */}
         <div
           data-testid="spec-saved-message"
-          className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4"
+          className="bg-[var(--spec-success-surface)] dark:bg-[var(--spec-success-surface-dark)]/20 border border-[var(--spec-success-border)] dark:border-[var(--spec-success-border-dark)] rounded-lg p-4"
         >
           <div className="flex items-center gap-2">
             <svg
-              className="w-5 h-5 text-green-600 dark:text-green-400"
+              className="w-5 h-5 text-[var(--spec-success-icon)] dark:text-[var(--spec-success-icon-dark)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -94,11 +95,11 @@ export function SpecBuilder({
                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span className="font-medium text-green-800 dark:text-green-200">
+            <span className="font-medium text-[var(--spec-success-heading)] dark:text-[var(--spec-success-heading-dark)]">
               Specification saved successfully!
             </span>
           </div>
-          <p className="mt-2 text-sm text-green-700 dark:text-green-300">
+          <p className="mt-2 text-sm text-[var(--spec-success-text)] dark:text-[var(--spec-success-text-dark)]">
             Your feature spec has been saved to the workspace and a fix plan has
             been generated.
           </p>
@@ -111,7 +112,7 @@ export function SpecBuilder({
           </div>
           <div
             data-testid="fix-plan-preview"
-            className="p-4 font-mono text-sm whitespace-pre-wrap bg-background max-h-[300px] overflow-y-auto"
+            className="p-4 font-mono text-sm whitespace-pre-wrap bg-background max-h-75 overflow-y-auto"
           >
             {fixPlan}
           </div>
@@ -119,12 +120,12 @@ export function SpecBuilder({
 
         {/* Done button */}
         <div className="flex justify-end">
-          <button
+          <Button variant="unstyled"
             onClick={onDone}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 py-2 transition-colors"
           >
             Done
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -144,44 +145,44 @@ export function SpecBuilder({
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
           <h3 className="font-medium text-primary">Feature Specification</h3>
           {!isEditing && (
-            <button
+            <Button variant="unstyled"
               data-testid="spec-edit-button"
               onClick={handleEdit}
               className="text-sm text-primary hover:underline"
             >
               Edit
-            </button>
+            </Button>
           )}
         </div>
 
         {isEditing ? (
           <div className="p-4">
-            <textarea
+            <Textarea
               data-testid="spec-editor"
               value={spec}
               onChange={(e) => { setSpec(e.target.value) }}
-              className="w-full min-h-[300px] rounded-md border border-border bg-background px-4 py-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
+              className="w-full min-h-75 rounded-md border border-border bg-background px-4 py-3 text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y"
             />
             <div className="flex justify-end gap-2 mt-4">
-              <button
+              <Button variant="unstyled"
                 onClick={handleCancelEdit}
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 data-testid="spec-save-button"
                 onClick={handleSaveEdit}
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-3 transition-colors"
               >
                 Save Changes
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <div
             data-testid="spec-preview"
-            className="p-4 font-mono text-sm whitespace-pre-wrap bg-background max-h-[400px] overflow-y-auto"
+            className="p-4 font-mono text-sm whitespace-pre-wrap bg-background max-h-100 overflow-y-auto"
           >
             {spec}
           </div>
@@ -190,15 +191,15 @@ export function SpecBuilder({
 
       {/* Action buttons */}
       <div className="flex items-center justify-between pt-4 border-t border-border">
-        <button
+        <Button variant="unstyled"
           data-testid="interview-back-button"
           onClick={onBack}
           disabled={isSaving}
           className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors disabled:opacity-50 disabled:pointer-events-none"
         >
           Back to Questions
-        </button>
-        <button
+        </Button>
+        <Button variant="unstyled"
           data-testid="spec-confirm-button"
           onClick={() => { void handleConfirm() }}
           disabled={isSaving || isEditing}
@@ -231,7 +232,7 @@ export function SpecBuilder({
           ) : (
             'Save & Generate Fix Plan'
           )}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+import { Button, Dialog, DialogContent, DialogTitle, SharedBadge } from '@koda/ui'
 import { useState, useCallback, useRef } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import {
@@ -129,7 +130,7 @@ export function TopBar({
           <span className="text-text-faint">┌─</span>
           
           {/* Branch indicator */}
-          <button
+          <Button variant="unstyled"
             onClick={() => void handleCopyBranch()}
             className="flex items-center gap-1.5 px-1.5 py-0.5 hover:bg-surface-hover transition-colors group"
             title={branchCopied ? 'Copied!' : 'Copy branch name'}
@@ -141,7 +142,7 @@ export function TopBar({
             ) : (
               <Copy className="size-3 text-text-faint opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
-          </button>
+          </Button>
 
           <span className="text-text-faint">→</span>
           
@@ -164,29 +165,28 @@ export function TopBar({
           </Link>
           
           {remote ? (
-            <span
+            <SharedBadge
+              hostName={remote.hostName || 'HOST'}
+              permission={remote.permission}
+              icon={<Users aria-hidden="true" className="size-3" />}
               data-testid="shared-workspace-badge"
-              data-permission={remote.permission}
-              className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-[--git-green] text-[--git-green]"
+              className="flex flex-nowrap items-center gap-1 px-2 py-1 text-xs border border-dashed border-[--git-green] text-[--git-green]"
               title={remote.permission === 'control' ? 'You can message this agent' : 'You can watch this workspace'}
-            >
-              <Users className="size-3" />
-              <span>[SHARED BY {(remote.hostName || 'HOST').toUpperCase()} · {remote.permission === 'control' ? 'CONTROL' : 'VIEW'}]</span>
-            </span>
+            />
           ) : (<>
-          <button
+          <Button variant="unstyled"
             onClick={() => { setOpenDropdownVisible(!openDropdownVisible) }}
             className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
           >
             <span>[OPEN</span>
             <ChevronDown className="size-3" />
             <span>]</span>
-          </button>
+          </Button>
 
           {worktreeId && <ShareWorkspaceButton worktreeId={worktreeId} />}
 
           {/* Collaboration toggle */}
-          <button
+          <Button variant="unstyled"
             onClick={() => {
               if (isCollaborative) {
                 onDisableCollaboration?.()
@@ -215,7 +215,7 @@ export function TopBar({
                 <span>[SOLO]</span>
               </>
             )}
-          </button>
+          </Button>
           </>)}
 
           {/* Collaboration status and presence avatars - only show when collaborative */}
@@ -227,40 +227,40 @@ export function TopBar({
           )}
 
           {openDropdownVisible && (
-            <div className="absolute top-full right-0 mt-1 z-50 min-w-48 bg-[#0a0a0a] border border-dashed border-border-subtle">
+            <div className="absolute top-full right-0 mt-1 z-50 min-w-48 bg-[var(--black-soft)] border border-dashed border-border-subtle">
               <div className="py-1 text-xs">
                 <div className="px-3 py-1 text-text-faint border-b border-dashed border-border-subtle">
                   ┌─ OPEN IN ─────────┐
                 </div>
-                <button
+                <Button variant="unstyled"
                   onClick={handleOpenInTerminal}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover hover:text-text-accent transition-colors"
                 >
                   <Terminal className="size-3" />
                   <span>Terminal</span>
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   onClick={handleOpenInFinder}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover hover:text-text-accent transition-colors"
                 >
                   <Folder className="size-3" />
                   <span>Finder</span>
-                </button>
+                </Button>
                 <div className="h-px bg-border-subtle mx-2 my-1" />
-                <button
+                <Button variant="unstyled"
                   onClick={() => { handleOpenInIDE('vscode') }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover hover:text-text-accent transition-colors"
                 >
                   <Code2 className="size-3" />
                   <span>VS Code</span>
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   onClick={() => { handleOpenInIDE('cursor') }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover hover:text-text-accent transition-colors"
                 >
                   <Code2 className="size-3" />
                   <span>Cursor</span>
-                </button>
+                </Button>
                 <div className="px-3 py-1 text-text-faint border-t border-dashed border-border-subtle">
                   └───────────────────┘
                 </div>
@@ -337,14 +337,14 @@ export function TopBar({
 
           {/* New chat button */}
           {onNewSession && (
-            <button
+            <Button variant="unstyled"
               onClick={onNewSession}
               className="px-2 py-1 text-text-muted hover:text-text-accent transition-colors"
               title="New chat"
               data-testid="new-chat-button"
             >
               [+]
-            </button>
+            </Button>
           )}
         </div>
 
@@ -358,14 +358,14 @@ export function TopBar({
               onClick={onToggleActivityFeed}
             />
           )}
-          <button
+          <Button variant="unstyled"
             onClick={() => { setHistoryDialogOpen(true) }}
             title="Conversation history"
             className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-accent transition-colors"
           >
             <History className="size-3" />
             <span>[HIST]</span>
-          </button>
+          </Button>
           <span className="text-text-faint">│</span>
         </div>
       </div>
@@ -378,8 +378,9 @@ export function TopBar({
 
       {/* Enable collaboration confirmation modal */}
       {collabModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-[#0a0a0a] border border-dashed border-border-subtle p-4 max-w-md text-xs font-mono">
+        <Dialog open onOpenChange={open => { if (!open) setCollabModalOpen(false) }}>
+          <DialogContent aria-describedby={undefined} className="bg-[var(--black-soft)] border-dashed border-border-subtle p-4 max-w-md text-xs font-mono">
+            <DialogTitle className="sr-only">Enable Collaboration?</DialogTitle>
             <div className="text-text-faint mb-3">
               ┌─ <span className="text-text-accent">Enable Collaboration?</span> {'─'.repeat(8)}┐
             </div>
@@ -390,13 +391,13 @@ export function TopBar({
             </p>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-dashed border-border-subtle">
-              <button
+              <Button variant="unstyled"
                 onClick={() => { setCollabModalOpen(false) }}
                 className="px-3 py-1.5 text-text-muted hover:text-text-primary transition-colors"
               >
                 [CANCEL]
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 onClick={() => {
                   setCollabModalOpen(false)
                   onEnableCollaboration?.()
@@ -404,14 +405,14 @@ export function TopBar({
                 className="px-3 py-1.5 border border-dashed border-[--git-green] text-[--git-green] hover:bg-[--git-green]/10 transition-colors"
               >
                 [ENABLE]
-              </button>
+              </Button>
             </div>
 
             <div className="text-text-faint mt-2">
               └{'─'.repeat(38)}┘
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
@@ -435,30 +436,34 @@ function TerminalTab({
   onClose,
 }: TerminalTabProps): React.ReactElement {
   return (
-    <button
+    <div className={cn("group relative flex items-center", active ? "text-text-accent" : "text-text-muted hover:text-text-primary")}>
+    <Button variant="unstyled"
       onClick={onClick}
       data-testid={testId}
       data-active={active}
       className={cn(
-        'group flex items-center gap-1 px-2 py-1 text-xs transition-colors',
+        'flex items-center pl-2 py-1 text-xs transition-colors',
+        closable ? 'pr-6' : 'pr-2',
         active
           ? 'text-text-accent bg-surface-active'
-          : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
+          : 'text-text-muted group-hover:text-text-primary group-hover:bg-surface-hover'
       )}
     >
       <span>[{label}]</span>
       
+    </Button>
       {closable && (
-        <button
+        <Button variant="unstyled"
+          aria-label={`Close ${label}`}
           onClick={(e) => {
             e.stopPropagation()
             onClose?.()
           }}
-          className="opacity-0 group-hover:opacity-100 hover:text-status-error transition-opacity"
+          className="absolute right-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-status-error transition-opacity"
         >
           <X className="size-3" />
-        </button>
+        </Button>
       )}
-    </button>
+    </div>
   )
 }

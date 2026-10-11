@@ -1,3 +1,4 @@
+import { Button, Input } from '@koda/ui'
 import { useState, useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAllWorktrees, useRepos } from '@/hooks/useRpc'
@@ -13,7 +14,7 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react'
-import { KodaSpinner } from '@/components/KodaSpinner'
+import { Spinner } from '@koda/ui'
 
 // ============================================================================
 // Status Filter Options
@@ -42,10 +43,10 @@ interface StatusConfig {
 
 function getStatusConfig(status?: WorktreeStatus | null): StatusConfig {
   if (status === 'done') {
-    return { icon: <Check className="w-3.5 h-3.5" />, colorClass: 'text-green-500' }
+    return { icon: <Check className="w-3.5 h-3.5" />, colorClass: 'text-status-success' }
   }
   if (status === 'blocked' || status === 'needs-review') {
-    return { icon: <AlertCircle className="w-3.5 h-3.5" />, colorClass: 'text-orange-500' }
+    return { icon: <AlertCircle className="w-3.5 h-3.5" />, colorClass: 'text-status-warning' }
   }
   return {
     icon: <span className="w-1.5 h-1.5 rounded-full bg-current" />,
@@ -132,7 +133,7 @@ function WorkspaceCard({ workspace }: { workspace: Worktree }) {
       </div>
 
       {/* Archive action - floating icon button on hover */}
-      <button
+      <Button variant="unstyled"
         className={cn(
           'absolute right-2 top-1/2 -translate-y-1/2',
           'opacity-0 group-hover:opacity-100 transition-opacity',
@@ -151,7 +152,7 @@ function WorkspaceCard({ workspace }: { workspace: Worktree }) {
         ) : (
           <Archive className="w-4 h-4" />
         )}
-      </button>
+      </Button>
     </Link>
   )
 }
@@ -251,12 +252,12 @@ export function AllWorkspacesPage() {
           {/* Search */}
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
-            <input
+            <Input
               type="text"
               placeholder="Search workspaces..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value) }}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-border-subtle bg-surface-inset text-text-primary placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-border-subtle bg-surface-inset text-text-primary placeholder:text-text-dim focus:outline-none focus:ring-2 focus:ring-status-unread/50"
             />
           </div>
 
@@ -264,7 +265,7 @@ export function AllWorkspacesPage() {
           <div className="flex items-center gap-1">
             <Filter className="w-4 h-4 text-text-dim mr-1" />
             {STATUS_FILTERS.map((filter) => (
-              <button
+              <Button variant="unstyled"
                 key={filter.id}
                 onClick={() => { setStatusFilter(filter.id) }}
                 className={cn(
@@ -275,7 +276,7 @@ export function AllWorkspacesPage() {
                 )}
               >
                 {filter.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -285,7 +286,7 @@ export function AllWorkspacesPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {loadingWorkspaces ? (
           <div className="flex items-center justify-center py-12">
-            <KodaSpinner style="wave" />
+            <Spinner variant="wave" showLabel={false} />
           </div>
         ) : filteredWorkspaces.length === 0 ? (
           <div className="text-center py-12">

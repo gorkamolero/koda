@@ -51,8 +51,9 @@ AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
 export { Avatar, AvatarImage, AvatarFallback }
 
 /** Participant identity colors are independent of availability status. */
-export type PresenceTone = 'blue' | 'green' | 'amber' | 'rose' | 'cyan' | 'terracotta'
+export type PresenceTone = 'blue' | 'green' | 'amber' | 'rose' | 'cyan' | 'terracotta' | 'red' | 'orange' | 'yellow' | 'teal' | 'violet' | 'pink' | 'indigo' | 'presence-blue' | 'presence-green' | 'presence-cyan'
 const presenceClasses: Record<PresenceTone, string> = {
+  red: 'bg-presence-red text-inverse', orange: 'bg-presence-orange text-inverse', yellow: 'bg-presence-yellow text-inverse', teal: 'bg-presence-teal text-inverse', violet: 'bg-presence-violet text-inverse', pink: 'bg-presence-pink text-inverse', indigo: 'bg-presence-indigo text-inverse', 'presence-blue': 'bg-presence-blue text-inverse', 'presence-green': 'bg-presence-green text-inverse', 'presence-cyan': 'bg-presence-cyan text-inverse',
   blue: 'bg-status-unread text-gray-0',
   green: 'bg-status-ready text-gray-0',
   amber: 'bg-status-warning text-gray-0',
@@ -60,7 +61,7 @@ const presenceClasses: Record<PresenceTone, string> = {
   cyan: 'bg-status-reviewing text-gray-0',
   terracotta: 'bg-status-processing text-gray-0',
 }
-const presenceTones = Object.keys(presenceClasses) as PresenceTone[]
+const presenceTones: PresenceTone[] = ['blue', 'green', 'amber', 'rose', 'cyan', 'terracotta']
 function defaultPresenceTone(id: string): PresenceTone {
   const hash = Array.from(id).reduce((value, character) => (Math.imul(value, 31) + character.codePointAt(0)!) >>> 0, 0)
   return presenceTones[hash % presenceTones.length]!
@@ -72,28 +73,32 @@ export interface AvatarStackPerson {
   status?: Status
   /** Token palette key for identity; omitted values are stable hashes of id. */
   tone?: PresenceTone
+  /** An external peer's custom identity color, when it is not in the token palette. */
+  color?: string
 }
 export interface AvatarStackProps extends React.HTMLAttributes<HTMLDivElement> {
   people: AvatarStackPerson[]
   maxVisible?: number
   size?: 'sm' | 'md'
+  compact?: boolean
 }
-export function AvatarStack({ people, maxVisible = 3, size = 'sm', className, ...props }: AvatarStackProps) {
+export function AvatarStack({ people, maxVisible = 3, size = 'sm', compact = false, className, ...props }: AvatarStackProps) {
   const visible = people.slice(0, Math.max(1, maxVisible))
   const overflow = people.length - visible.length
   return <div role="group" aria-label="Workspace collaborators" className={cn('flex -space-x-2 font-code text-xs text-text-primary', className)} {...props}>
     {visible.map(person => {
       const tone = person.tone ?? defaultPresenceTone(person.id)
       return <div key={person.id} className="relative" title={person.name}>
-        <Avatar className={cn('border-2 border-surface-card', size === 'sm' ? 'size-7' : 'size-9')}>
+        <Avatar className={cn(compact ? 'border-2 border-background' : 'border-2 border-surface-card', compact ? size === 'sm' ? 'size-6 text-2xs' : 'size-8 text-xs' : size === 'sm' ? 'size-7' : 'size-9')}>
           <AvatarImage src={person.src} alt={person.name} />
-          <AvatarFallback role="img" aria-label={person.name} data-presence-tone={tone} className={presenceClasses[tone]}>
+          {/* koda-token-exception: Remote presence colors are caller-owned identity data; known colors use the token palette. */}
+          <AvatarFallback style={person.color ? { backgroundColor: person.color } : undefined} role="img" aria-label={person.name} data-presence-tone={tone} className={presenceClasses[tone]}>
             {person.name.trim().split(/\s+/).map(part => part[0]).join('').toUpperCase().slice(0, 2)}
           </AvatarFallback>
         </Avatar>
         {person.status && <StatusDot status={person.status} label={`${person.name}: ${person.status}`} className="absolute bottom-0 right-0 ring-2 ring-surface-card" />}
       </div>
     })}
-    {overflow > 0 && <span role="img" title={people.slice(visible.length).map(person => person.name).join(', ')} aria-label={`${overflow} more collaborators`} className={cn('flex items-center justify-center rounded-full border-2 border-surface-card bg-surface-control', size === 'sm' ? 'size-7' : 'size-9')}>+{overflow}</span>}
+    {overflow > 0 && <span role="img" title={people.slice(visible.length).map(person => person.name).join(', ')} aria-label={`${overflow} more collaborators`} className={cn('flex items-center justify-center rounded-full border-2 border-surface-card bg-surface-control', compact ? size === 'sm' ? 'size-6 text-2xs' : 'size-8 text-xs' : size === 'sm' ? 'size-7' : 'size-9')}>+{overflow}</span>}
   </div>
 }

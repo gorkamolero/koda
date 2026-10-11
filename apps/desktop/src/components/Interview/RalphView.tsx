@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useState } from 'react'
 import { useWorkspace } from '@/hooks/useRpc'
 import { InterviewMode } from './InterviewMode'
@@ -37,13 +38,13 @@ export function RalphView({ workspaceId }: RalphViewProps) {
             Autonomous agent with spec-driven workflow
           </p>
         </div>
-        <button
+        <Button variant="unstyled"
           data-testid="start-interview-button"
           onClick={() => { setIsInterviewing(true) }}
           className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 transition-colors"
         >
           New Interview
-        </button>
+        </Button>
       </div>
 
       {/* Content split view */}

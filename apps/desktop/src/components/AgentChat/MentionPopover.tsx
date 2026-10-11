@@ -1,3 +1,4 @@
+import { Command, CommandList, CommandItem } from '@koda/ui'
 import { memo, forwardRef, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -78,14 +79,15 @@ function getFileIconColor(suggestion: FileSuggestion): string {
 // MentionItem Component
 // ============================================================================
 
-const MentionItem = forwardRef<HTMLButtonElement, MentionItemProps>(
+const MentionItem = forwardRef<HTMLDivElement, MentionItemProps>(
   function MentionItem({ suggestion, isSelected, onClick }, ref) {
     return (
-      <button
+      <CommandItem
+        value={suggestion.path}
         ref={ref}
-        onClick={onClick}
+        onSelect={onClick}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs',
+          'rounded-none w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs',
           isSelected
             ? 'bg-surface-active text-text-primary'
             : 'text-text-muted hover:bg-surface-hover hover:text-text-primary'
@@ -99,7 +101,7 @@ const MentionItem = forwardRef<HTMLButtonElement, MentionItemProps>(
           <span className="truncate">{suggestion.name}</span>
           <span className="text-text-dim ml-2 truncate">{suggestion.path}</span>
         </div>
-      </button>
+      </CommandItem>
     )
   }
 )
@@ -116,7 +118,7 @@ export const MentionPopover = memo(function MentionPopover({
   onSelect,
   onClose: _onClose,
 }: MentionPopoverProps) {
-  const selectedRef = useRef<HTMLButtonElement>(null)
+  const selectedRef = useRef<HTMLDivElement>(null)
 
   // Scroll selected item into view
   useEffect(() => {
@@ -128,11 +130,14 @@ export const MentionPopover = memo(function MentionPopover({
   if (!isOpen || suggestions.length === 0) return null
 
   return (
-    <div
+    <Command
+      shouldFilter={false}
+      value={suggestions[selectedIndex]?.path}
+      label="Mention files"
       className={cn(
-        'absolute bottom-full left-0 mb-2 z-50',
-        'w-96 max-h-64 overflow-y-auto',
-        'bg-[#0a0a0a] font-mono',
+        'absolute bottom-full left-0 mb-2 z-popover',
+        'h-auto rounded-none w-96 max-h-64 overflow-y-auto',
+        'bg-[var(--black-soft)] font-mono',
         'border border-dashed border-border-strong'
       )}
     >
@@ -145,7 +150,7 @@ export const MentionPopover = memo(function MentionPopover({
       </div>
 
       {/* Suggestions */}
-      <div className="py-1">
+      <CommandList aria-label="Mention files" className="py-1">
         {suggestions.map((suggestion, index) => (
           <MentionItem
             key={suggestion.path}
@@ -155,7 +160,7 @@ export const MentionPopover = memo(function MentionPopover({
             onClick={() => { onSelect(suggestion) }}
           />
         ))}
-      </div>
+      </CommandList>
 
       {/* Footer hint */}
       <div className="px-3 py-1.5 border-t border-dashed border-border-subtle text-xs text-text-faint flex items-center gap-3">
@@ -169,6 +174,6 @@ export const MentionPopover = memo(function MentionPopover({
       <div className="px-3 text-xs text-text-faint">
         └{'─'.repeat(44)}┘
       </div>
-    </div>
+    </Command>
   )
 })

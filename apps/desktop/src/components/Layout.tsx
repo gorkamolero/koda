@@ -6,7 +6,7 @@ import { useSidecar } from '@/hooks/useRpc'
 import { useSidebarResize } from '@/hooks/useResizable'
 import { initializeThemeAtom } from '@/store/theme'
 import { cn } from '@/lib/utils'
-import { KodaLoadingScreen, KodaWaveSpinner } from '@/components/KodaSpinner'
+import { AppShell, Callout, LoadingScreen, Spinner } from '@koda/ui'
 import { startSidecarRpcListener } from '@/lib/sidecarRpc'
 
 interface LayoutProps {
@@ -27,16 +27,14 @@ function SidecarStatus() {
 
   if (error) {
     return (
-      <div className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full badge-error animate-in fade-in slide-in-from-bottom-2">
-        Sidecar error
-      </div>
+      <Callout tone="error" className="fixed bottom-4 right-4 px-3 py-1.5 text-xs rounded-full animate-in fade-in slide-in-from-bottom-2">Sidecar error</Callout>
     )
   }
 
   if (!status?.running) {
     return (
       <div className="fixed bottom-4 right-4 px-4 py-2 rounded-lg bg-surface-card border border-border-subtle animate-in fade-in slide-in-from-bottom-2">
-        <KodaWaveSpinner label="Connecting" speed={120} />
+        <Spinner label="Connecting" speed={120} />
       </div>
     )
   }
@@ -65,8 +63,8 @@ function SidebarResizer({
       style={{
         ...handleProps.style,
         // Extend hit area for easier grabbing
-        marginRight: '-2px',
-        width: '5px',
+        marginRight: 'calc(-1 * var(--space-0_5))',
+        width: 'calc(var(--space-1) + var(--space-px))',
       }}
     />
   )
@@ -134,31 +132,16 @@ export function Layout({ children }: LayoutProps) {
           loadingState === 'dissolving' && 'opacity-0'
         )}
       >
-        <KodaLoadingScreen message="Initializing" />
+        <LoadingScreen message="Initializing" />
       </div>
     )
   }
 
   return (
     <NotificationProvider>
-      <div className="h-screen w-screen overflow-hidden bg-surface-messages grid grid-cols-[var(--sidebar-width)_1fr]">
-        {/* Sidebar */}
-        <aside className="relative glass-sidebar border-r border-border-subtle overflow-hidden">
-          <Sidebar />
-          <SidebarResizer
-            handleProps={sidebar.handleProps}
-            isDragging={sidebar.isDragging}
-          />
-        </aside>
-
-        {/* Main content area */}
-        <main className="overflow-hidden bg-surface-messages">
-          {children}
-        </main>
-
-        {/* Status indicator */}
+      <AppShell variant="navigation" sidebar={<><Sidebar /><SidebarResizer handleProps={sidebar.handleProps} isDragging={sidebar.isDragging} /></>} main={children}>
         <SidecarStatus />
-      </div>
+      </AppShell>
     </NotificationProvider>
   )
 }

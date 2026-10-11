@@ -1,3 +1,4 @@
+import { Badge } from '@koda/ui'
 import { cn } from '@/lib/utils'
 
 interface ProgressIndicatorProps {
@@ -27,16 +28,16 @@ export function ProgressIndicator({
       </div>
 
       {/* Percent badge */}
-      <span
+      <Badge
         className={cn(
-          'px-2 py-0.5 rounded-full text-xs font-medium',
+          'border-0 px-2 py-0.5 rounded-full text-xs font-medium',
           percent === 100
             ? 'bg-status-success/20 text-status-success'
             : 'bg-surface-control text-text-faint'
         )}
       >
         {percent}%
-      </span>
+      </Badge>
     </div>
   )
 }

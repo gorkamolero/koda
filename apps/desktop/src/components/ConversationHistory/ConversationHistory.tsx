@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useState, useMemo } from 'react'
 import { useAtomValue } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -160,7 +161,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
               )}
             >
               {/* Turn header */}
-              <button
+              <Button variant="unstyled"
                 onClick={() => { toggleTurn(turn.id); }}
                 className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-surface-hover/50 transition-colors"
               >
@@ -185,7 +186,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
 
                   {/* Meta row */}
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] text-text-faint">
+                    <span className="text-2xs text-text-faint">
                       {formatRelativeTime(turn.timestamp)}
                     </span>
                     {status && (
@@ -204,7 +205,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
                     )}
                   </div>
                 </div>
-              </button>
+              </Button>
 
               {/* Expanded content */}
               {isExpanded && (
@@ -214,7 +215,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
                     <div className="flex gap-2">
                       <User className="w-4 h-4 text-text-muted flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] text-text-faint mb-0.5">You</div>
+                        <div className="text-2xs text-text-faint mb-0.5">You</div>
                         <div className="text-xs text-text-primary whitespace-pre-wrap break-words bg-surface-control/50 rounded px-2 py-1.5">
                           {turn.userMessage.content}
                         </div>
@@ -227,7 +228,7 @@ export function ConversationHistory({ className }: ConversationHistoryProps) {
                     <div className="flex gap-2">
                       <Bot className="w-4 h-4 text-text-accent flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[10px] text-text-faint mb-0.5">Assistant</div>
+                        <div className="text-2xs text-text-faint mb-0.5">Assistant</div>
                         <div className="text-xs text-text-muted whitespace-pre-wrap break-words bg-surface-control/30 rounded px-2 py-1.5 max-h-32 overflow-y-auto">
                           {turn.assistantMessage.content.slice(0, 500)}
                           {turn.assistantMessage.content.length > 500 && '...'}

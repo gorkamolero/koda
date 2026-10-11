@@ -1,3 +1,4 @@
+import { Button, Composer } from '@koda/ui'
 import { useRef, useCallback, useState, useMemo, type KeyboardEvent, type ChangeEvent, type DragEvent, type ClipboardEvent } from 'react'
 import { useAtom, useSetAtom, useAtomValue } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -225,7 +226,9 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
       const textarea = textareaRef.current
       if (textarea) {
         textarea.style.height = 'auto'
-        textarea.style.height = `${String(Math.min(textarea.scrollHeight, 200))}px`
+        // Fit measured content within the Composer's token-sized viewport.
+        const limit = Number.parseFloat(getComputedStyle(textarea.parentElement ?? textarea).maxHeight)
+        textarea.style.height = `${Math.min(textarea.scrollHeight, Number.isFinite(limit) ? limit : textarea.scrollHeight)}px`
       }
     },
     [setInputValue]
@@ -291,34 +294,26 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
           }}
         />
 
-        {/* Main input container */}
-        <div className="group border border-dashed border-border-subtle focus-within:border-text-accent transition-colors">
-          {/* Textarea with prompt indicator */}
-          <div className="flex min-h-[80px] max-h-[200px] overflow-y-auto px-3 py-3">
-            <span className="text-text-accent text-sm mr-2 mt-0.5 select-none">&gt;</span>
-            <textarea
-              ref={textareaRef}
-              data-testid="chat-input"
-              value={inputValue}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onSelect={(e) => { setCursorPosition(e.currentTarget.selectionStart) }}
-              placeholder={placeholder}
-              disabled={isStreaming || disabled}
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              className={cn(
-                "flex-1 min-h-[60px] resize-none bg-transparent",
-                "text-sm text-text-primary placeholder:text-text-faint",
-                "focus:outline-none",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-            />
-          </div>
-
+        <Composer
+          appearance="terminal"
+          value={inputValue}
+          running={isStreaming}
+          disabled={disabled}
+          placeholder={placeholder}
+          onSend={handleSend}
+          textareaRef={textareaRef}
+          textareaProps={{
+            'data-testid': 'chat-input',
+            onChange: handleChange,
+            onKeyDown: handleKeyDown,
+            onPaste: handlePaste,
+            onSelect: event => setCursorPosition(event.currentTarget.selectionStart),
+            spellCheck: false,
+            autoComplete: 'off',
+            autoCorrect: 'off',
+            autoCapitalize: 'off',
+          }}
+          footer={<>
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -329,25 +324,25 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
           />
 
           {/* Footer controls - integrated into the box */}
-          <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-border-subtle group-focus-within:border-text-accent/50 bg-[#050505] transition-colors">
+          <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-border-subtle group-focus-within:border-text-accent/50 bg-[var(--black-rich)] transition-colors">
             {/* Left controls: Model, Thinking, Plan */}
             <div className="flex items-center gap-1 text-xs">
               {/* Model selector */}
-              <button
+              <Button variant="unstyled"
                 type="button"
-                className="px-1.5 py-0.5 text-text-muted hover:text-text-accent transition-colors"
+                className="h-auto rounded-none border-0 px-1.5 py-0.5 text-text-muted hover:text-text-accent transition-colors"
               >
                 [{modelDisplayName}]
-              </button>
+              </Button>
 
               <span className="text-text-faint">·</span>
 
               {/* Thinking toggle */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => { setThinkingEnabled(!thinkingEnabled) }}
                 className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 transition-colors",
+                  "h-auto rounded-none border-0 flex items-center gap-1 px-1.5 py-0.5 transition-colors",
                   thinkingEnabled
                     ? "text-text-accent"
                     : "text-text-faint hover:text-text-muted"
@@ -356,16 +351,16 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
               >
                 <Brain className="size-3" />
                 <span>{thinkingEnabled ? 'ON' : 'OFF'}</span>
-              </button>
+              </Button>
 
               <span className="text-text-faint">·</span>
 
               {/* Plan mode toggle */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => { setPlanModeEnabled(!planModeEnabled) }}
                 className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 transition-colors",
+                  "h-auto rounded-none border-0 flex items-center gap-1 px-1.5 py-0.5 transition-colors",
                   planModeEnabled
                     ? "text-status-warning"
                     : "text-text-faint hover:text-text-muted"
@@ -374,29 +369,29 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
               >
                 <Map className="size-3" />
                 <span>{planModeEnabled ? 'PLAN' : 'OFF'}</span>
-              </button>
+              </Button>
             </div>
 
             {/* Right controls: Add, Send */}
             <div className="flex items-center gap-2 text-xs">
               {/* Add/attach button */}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-1.5 py-0.5 text-text-faint hover:text-text-accent transition-colors"
+                className="h-auto rounded-none border-0 px-1.5 py-0.5 text-text-faint hover:text-text-accent transition-colors"
                 title="Attach files"
               >
                 [+]
-              </button>
+              </Button>
 
               {/* Send button */}
-              <button
+              <Button variant="unstyled"
                 data-testid="send-button"
                 type="button"
                 onClick={handleSend}
                 disabled={!canSend}
                 className={cn(
-                  "flex items-center gap-1 px-2 py-1 transition-colors",
+                  "h-auto rounded-none border-0 flex items-center gap-1 px-2 py-1 transition-colors disabled:opacity-100",
                   canSend
                     ? "text-text-accent hover:bg-text-accent/10"
                     : "text-text-faint cursor-not-allowed"
@@ -414,10 +409,11 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
                     <span>[SEND]</span>
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+          </>}
+        />
       </div>
     </div>
   )

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSetAtom, useAtomValue } from 'jotai'
-import { useWorkspaces, useWorkspaceRepos, useWorktreesByWorkspace, useCreateStandaloneWorkspace, useDeleteWorkspace } from '@/hooks/useRpc'
+import { useWorkspaces, useWorkspaceRepos, useWorktreesByWorkspace, useDeleteWorkspace } from '@/hooks/useRpc'
 import { selectedWorkspaceIdAtom } from '@/store/workspace'
 import type { Workspace, WorkspaceRepo, Worktree, WorktreeStatus } from '@/lib/rpc'
 import { cn } from '@/lib/utils'
-import { KodaSpinner } from '@/components/KodaSpinner'
+import { Button, NavItem, Spinner, StatusBadge } from '@koda/ui'
+import { CreateWorkspaceModal } from '@/components/WorkspaceDialogs'
 
 // ============================================================================
 // Terminal-style Status Labels
@@ -54,9 +55,9 @@ function WorktreeRow({ worktree, onClick }: WorktreeRowProps) {
   const timeAgo = formatTimeAgo(worktree.updatedAt)
 
   return (
-    <button
+    <NavItem label={displayName}
       onClick={onClick}
-      className={cn(
+      buttonClassName={cn('block rounded-none text-base leading-6',
         'group w-full text-left font-mono pl-12 pr-4 py-2',
         'hover:bg-surface-hover hover:text-border-accent',
         'transition-colors duration-100'
@@ -64,24 +65,24 @@ function WorktreeRow({ worktree, onClick }: WorktreeRowProps) {
     >
       <div className="flex items-center gap-3">
         <span className="text-text-dim">·</span>
-        <span className={cn(
-          'text-[10px] font-bold tracking-wide',
+        <StatusBadge showDot={false} status={status === 'done' ? 'success' : status === 'blocked' ? 'error' : status === 'needs-review' ? 'warning' : 'processing'} className={cn(
+          'border-0 rounded-none bg-transparent p-0 text-2xs font-bold tracking-wide',
           status === 'done' ? 'text-status-success' :
           status === 'blocked' ? 'text-status-error' :
           status === 'needs-review' ? 'text-status-warning' :
           'text-border-accent'
         )}>
           [{statusLabel}]
-        </span>
+        </StatusBadge>
         <span className="flex-1 truncate text-xs text-text-primary group-hover:text-border-accent">
           {displayName}
         </span>
-        <span className="text-[10px] text-text-dim tabular-nums">
+        <span className="text-2xs text-text-dim tabular-nums">
           {timeAgo}
         </span>
         <span className="text-text-dim group-hover:text-border-accent">→</span>
       </div>
-    </button>
+    </NavItem>
   )
 }
 
@@ -101,14 +102,14 @@ function RepoSection({ repo, worktrees, onWorktreeClick }: RepoSectionProps) {
 
   return (
     <div className="border-l border-dashed border-text-dim/20 ml-4">
-      <button
+      <NavItem label={repo.repoName ?? 'unnamed'}
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full text-left font-mono px-4 py-2 flex items-center gap-2 hover:bg-surface-hover transition-colors"
+        buttonClassName="rounded-none w-full text-left font-mono px-4 py-2 flex items-center gap-2 hover:bg-surface-hover transition-colors"
       >
         <span className="text-text-dim text-xs">{isExpanded ? '▼' : '▶'}</span>
         <span className="text-xs text-text-primary">{repo.repoName ?? 'unnamed'}</span>
-        <span className="text-[10px] text-text-dim">({repoWorktrees.length})</span>
-      </button>
+        <span className="text-2xs text-text-dim">({repoWorktrees.length})</span>
+      </NavItem>
 
       {isExpanded && repoWorktrees.length > 0 && (
         <div className="border-l border-dashed border-text-dim/20 ml-4">
@@ -123,7 +124,7 @@ function RepoSection({ repo, worktrees, onWorktreeClick }: RepoSectionProps) {
       )}
 
       {isExpanded && repoWorktrees.length === 0 && (
-        <div className="pl-8 py-2 text-[10px] text-text-dim italic">
+        <div className="pl-8 py-2 text-2xs text-text-dim italic">
           No worktrees
         </div>
       )}
@@ -165,16 +166,16 @@ function WorkspaceCard({ workspace, isSelected, onSelect, onDelete }: WorkspaceC
     )}>
       {/* Workspace Header */}
       <div className="flex items-center gap-2 px-4 py-3 bg-surface-card">
-        <button
+        <Button variant="unstyled"
           onClick={() => setIsExpanded(!isExpanded)}
           className="text-text-dim hover:text-text-primary"
         >
           <span className="text-xs">{isExpanded ? '▼' : '▶'}</span>
-        </button>
+        </Button>
 
-        <button
+        <NavItem label={workspace.name} className="flex-1 hover:bg-transparent"
           onClick={onSelect}
-          className="flex-1 text-left font-mono"
+          buttonClassName="p-0 rounded-none block flex-1 text-left font-mono"
         >
           <span className={cn(
             'text-sm font-bold',
@@ -182,36 +183,36 @@ function WorkspaceCard({ workspace, isSelected, onSelect, onDelete }: WorkspaceC
           )}>
             {workspace.name}
           </span>
-          <span className="ml-2 text-[10px] text-text-dim">
+          <span className="ml-2 text-2xs text-text-dim">
             {repoCount} repo{repoCount !== 1 ? 's' : ''} · {worktreeCount} worktree{worktreeCount !== 1 ? 's' : ''}
           </span>
-        </button>
+        </NavItem>
 
         {/* Actions */}
         <div className="flex items-center gap-1">
           {showDeleteConfirm ? (
             <>
-              <button
+              <Button variant="unstyled"
                 onClick={() => { onDelete(); setShowDeleteConfirm(false) }}
-                className="px-2 py-1 text-[10px] text-status-error hover:bg-status-error hover:text-white transition-colors"
+                className="px-2 py-1 text-2xs text-status-error hover:bg-status-error hover:text-text-inverse transition-colors"
               >
                 CONFIRM
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-2 py-1 text-[10px] text-text-dim hover:text-text-primary transition-colors"
+                className="px-2 py-1 text-2xs text-text-dim hover:text-text-primary transition-colors"
               >
                 CANCEL
-              </button>
+              </Button>
             </>
           ) : (
-            <button
+            <Button variant="unstyled"
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-2 py-1 text-[10px] text-text-dim hover:text-status-error transition-colors"
+              className="px-2 py-1 text-2xs text-text-dim hover:text-status-error transition-colors"
               title="Delete workspace"
             >
               [×]
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -231,7 +232,7 @@ function WorkspaceCard({ workspace, isSelected, onSelect, onDelete }: WorkspaceC
           ) : (
             <div className="px-4 py-6 text-center">
               <p className="text-xs text-text-dim">No repos attached</p>
-              <p className="text-[10px] text-text-dim mt-1">
+              <p className="text-2xs text-text-dim mt-1">
                 Use the sidebar to add repos to this workspace
               </p>
             </div>
@@ -262,109 +263,18 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
 └─────────────────────────────────┘`}
           </pre>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={onCreateClick}
           data-testid="new-workspace-button-empty"
           className={cn(
             'px-6 py-3 font-mono text-xs uppercase tracking-wider',
             'border border-dashed border-border-accent',
-            'text-border-accent hover:bg-border-accent hover:text-white',
+            'text-border-accent hover:bg-border-accent hover:text-text-inverse',
             'transition-colors duration-100'
           )}
         >
           [+] CREATE WORKSPACE
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// Create Workspace Modal
-// ============================================================================
-
-function CreateWorkspaceModal({
-  isOpen,
-  onClose,
-  onCreated,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  onCreated: (workspace: Workspace) => void
-}) {
-  const createWorkspace = useCreateStandaloneWorkspace()
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  if (!isOpen) return null
-
-  const handleCreate = async () => {
-    if (!name.trim()) return
-
-    try {
-      const workspace = await createWorkspace.mutateAsync({ name: name.trim() })
-      setName('')
-      setError(null)
-      onCreated(workspace)
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace')
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md mx-4 bg-surface-card border border-dashed border-text-dim/30 font-mono"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="px-4 py-3 border-b border-dashed border-text-dim/20">
-          <div className="text-xs text-border-accent">┌─ NEW WORKSPACE ─────────────</div>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {error && (
-            <div className="text-status-error text-xs border border-dashed border-status-error p-2">
-              ERROR: {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-[10px] text-text-dim mb-1">NAME</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="my-workspace"
-              className="w-full px-3 py-2 bg-transparent border border-dashed border-text-dim/30 text-text-primary text-sm font-mono focus:border-border-accent focus:outline-none"
-              onKeyDown={e => {
-                if (e.key === 'Enter') void handleCreate()
-                if (e.key === 'Escape') onClose()
-              }}
-              autoFocus
-            />
-          </div>
-
-          <button
-            onClick={() => void handleCreate()}
-            disabled={!name.trim() || createWorkspace.isPending}
-            className="w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50"
-          >
-            {createWorkspace.isPending ? 'CREATING...' : '[+] CREATE'}
-          </button>
-        </div>
-
-        <div className="px-4 py-3 border-t border-dashed border-text-dim/20 flex justify-end">
-          <button
-            onClick={onClose}
-            className="text-xs text-text-dim hover:text-text-primary"
-          >
-            [ESC] CANCEL
-          </button>
-        </div>
+        </Button>
       </div>
     </div>
   )
@@ -408,7 +318,7 @@ export function WorkspaceList() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-surface-messages">
-        <KodaSpinner />
+        <Spinner showLabel={false} />
       </div>
     )
   }
@@ -444,18 +354,18 @@ export function WorkspaceList() {
               </p>
             )}
           </div>
-          <button
+          <Button variant="unstyled"
             onClick={() => setIsCreateOpen(true)}
             data-testid="new-workspace-button"
             className={cn(
               'px-4 py-2 font-mono text-xs uppercase tracking-wider',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-white',
+              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
               'transition-colors duration-100'
             )}
           >
             [+] NEW
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -477,7 +387,7 @@ export function WorkspaceList() {
       )}
 
       {/* Footer */}
-      <footer className="px-6 py-3 border-t border-dashed border-text-dim/20 font-mono text-[10px] text-text-dim">
+      <footer className="px-6 py-3 border-t border-dashed border-text-dim/20 font-mono text-2xs text-text-dim">
         <div className="flex items-center justify-between">
           <span>KODA v0.1.0</span>
           <span>CLICK TO SELECT · EXPAND TO VIEW</span>

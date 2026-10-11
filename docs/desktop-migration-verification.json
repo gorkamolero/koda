@@ -1,0 +1,141 @@
+{
+  "scope": "apps/desktop migration to @koda/ui",
+  "branch": "codex/design-system-migration",
+  "baseline_commit": "1993d88",
+  "implementation_commit": "pending-final-keyboard-and-visual-fixes",
+  "batches": [
+    {
+      "batch": 1,
+      "commits": [
+        "d76c61e",
+        "8c938bf"
+      ],
+      "replaces": "Sidebar, workspace/repository/session rows and duplicate creation/add-repository modal shells with NavItem, StatusBadge, StatusDot and Dialog.",
+      "screenshots": [
+        ".migration-visual/before",
+        ".migration-visual/after-batch1",
+        ".migration-visual/after-batch1-corrected"
+      ]
+    },
+    {
+      "batch": 2,
+      "commits": [
+        "1b9bb55"
+      ],
+      "replaces": "Agent transcript, tool blocks, approval/question requests, InputArea shell and model/permission selects with shared chat patterns, Composer and native Select.",
+      "screenshots": [
+        ".migration-visual/after-batch1-corrected",
+        ".migration-visual/after-batch2"
+      ]
+    },
+    {
+      "batch": 3,
+      "commits": [
+        "eb2ff86"
+      ],
+      "replaces": "Workspace/right panels, terminal shells, diff/file rows, checks/review, context and presence with shared panels/tabs, TerminalFrame, Tree, Meter and AvatarStack.",
+      "screenshots": [
+        ".migration-visual/after-batch2",
+        ".migration-visual/after-batch3"
+      ]
+    },
+    {
+      "batch": 4,
+      "commits": [
+        "9f3cbf2"
+      ],
+      "replaces": "Settings, sharing, command palette, toasts, top bar, Interview and remaining pages with TerminalSection, Dialog, SegmentedControl, SharedBadge, Callout, Command, Toast, AppShell and shared controls.",
+      "screenshots": [
+        ".migration-visual/after-batch3",
+        ".migration-visual/final"
+      ]
+    }
+  ],
+  "cleanup": {
+    "deleted": [
+      "apps/desktop/src/components/ui",
+      "apps/desktop/src/components/ai-elements",
+      "duplicated logo/spinner/file-icon implementations and desktop CSS primitives"
+    ],
+    "unused_direct_dependencies_removed": 30,
+    "data_boundary": "Feature queries, stores, RPC, runtimes, permissions and callbacks stay in desktop. Shared UI has no store or data-fetching dependencies.",
+    "compatibility_audit": "All 80 literal test-hook references and baseline static test IDs and literal selector-name strings retained, including protected sharing hooks and data-permission."
+  },
+  "lint": {
+    "status": "passed",
+    "command": "pnpm lint",
+    "errors": 0,
+    "warnings": 0,
+    "enforcement": "koda/no-raw-tokens is an error for desktop components, pages and CSS, and for packages/ui.",
+    "documented_exceptions": [
+      {
+        "file": "apps/desktop/src/components/Terminal/terminalOptions.ts",
+        "reason": "xterm requires literal ANSI palette values at its API boundary."
+      },
+      {
+        "file": "apps/desktop/src/components/Scratchpad/Scratchpad.tsx",
+        "reason": "Monaco themes require literal hex values."
+      },
+      {
+        "files": [
+          "apps/desktop/src/components/PresenceAvatars.tsx",
+          "packages/ui/src/brand/index.tsx"
+        ],
+        "reason": "Known protocol identity colors map to tokens; unknown external identity colors are a documented AvatarStack adapter value."
+      }
+    ]
+  },
+  "tests": {
+    "status": "awaiting-final-run"
+  },
+  "visual_review": {
+    "themes": [
+      "obsidian",
+      "light",
+      "dim",
+      "graphite"
+    ],
+    "scenarios_per_theme": 18,
+    "captures_per_full_run": 72,
+    "baseline": ".migration-visual/baseline",
+    "final": "pending-final-capture",
+    "reproduction": "scripts/desktop-migration-visuals/README.md",
+    "method": "Exact-ref desktop source snapshots, Playwright synthetic RPC/terminal fixtures, full-resolution screenshots and manual before/after review by root and visual reviewer. Pixel maps supplement human review.",
+    "intentional_changes": [
+      "Add Repo and Join Workspace now portal to the viewport center instead of being trapped inside the sidebar containing block."
+    ],
+    "fixes_from_review": [
+      "Restored navigation density, dialog shadows, shared class-merging semantics, fonts, tool badge sizing, file icons and row geometry, command palette, Settings import control, TopBar tab sizing and terminal fill height.",
+      "Patched baseline xterm viewport disposal race; restored diff arrow navigation and stopped Tree from taking composer focus."
+    ],
+    "artifacts": "PNGs, contact/comparison sheets, manifests and logs remain in ignored .migration-visual. Reproduction scripts are tracked; no env files or real project data enter screenshot fixtures."
+  },
+  "proofs": {
+    "status": "awaiting-final-run",
+    "commands": [
+      "pnpm --filter e2e test:proof:codex",
+      "pnpm --filter e2e test:proof:claude",
+      "pnpm --filter e2e test:proof:approvals",
+      "pnpm --filter e2e test:proof:questions"
+    ],
+    "environment": {
+      "TMPDIR": "<worktree>/.migration-tmp",
+      "KODA_PROOF_KEEP_NATIVE_SESSIONS": "1"
+    },
+    "cleanup": "Proof fixture roots are scoped to this worktree; native provider history outside the permitted root is retained. All runtime assertions remain enabled.",
+    "initial_attempts": "Earlier main Codex and Claude question attempts were disrupted by live edits/shared Vite optimizer cache. Proof instances now use isolated caches; frozen reruns supersede those attempts."
+  },
+  "owner_run_checks": [
+    {
+      "command": "pnpm --filter e2e test:proof:collaboration",
+      "status": "not run",
+      "reason": "Explicitly reserved for the owner of the collaboration env file."
+    },
+    {
+      "command": "pnpm verify:clean",
+      "status": "not run",
+      "reason": "Explicitly reserved for the owner of the env file."
+    }
+  ],
+  "deployment": "None. No merge, history rewrite, force push or repository settings change."
+}

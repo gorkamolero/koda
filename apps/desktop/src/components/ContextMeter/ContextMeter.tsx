@@ -1,3 +1,4 @@
+import { Meter } from '@koda/ui'
 import { useAtomValue } from 'jotai'
 import { cn } from '@/lib/utils'
 import {
@@ -27,28 +28,7 @@ export function ContextMeter() {
   const isCritical = displayPercent >= 90
 
   return (
-    <div
-      data-testid="context-meter"
-      className="flex items-center gap-3"
-    >
-      {/* Progress bar */}
-      <div className="w-32 h-1.5 bg-surface-control rounded-full overflow-hidden">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-300',
-            isCritical
-              ? 'bg-gradient-to-r from-status-warning to-status-error'
-              : isWarning
-                ? 'bg-gradient-to-r from-[#62b7ff] to-status-warning'
-                : 'bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3]'
-          )}
-          style={{
-            width: `${String(displayPercent)}%`,
-          }}
-        />
-      </div>
-
-      {/* Token count */}
+    <Meter data-testid="context-meter" label="Context usage" value={displayTokens} max={contextLimit} variant="continuous" valueText={`${formatTokenCount(displayTokens)} / ${formatTokenCount(contextLimit)}`} valueDisplay={
       <div className="flex items-center gap-1.5 text-xs">
         {isCritical && (
           <AlertTriangle className="w-3.5 h-3.5 text-status-error" />
@@ -68,7 +48,7 @@ export function ContextMeter() {
         <span className="text-text-dim">/</span>
         <span className="text-text-dim">{formatTokenCount(contextLimit)}</span>
       </div>
-    </div>
+    } />
   )
 }
 

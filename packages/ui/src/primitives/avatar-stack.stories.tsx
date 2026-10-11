@@ -29,3 +29,5 @@ export const IdentityColors: Story = {
     await expect(canvas.getAllByRole('img', { name: /: ready$/ })).toHaveLength(args.people.length)
   },
 }
+
+export const CompactPresence: Story = { args: { compact: true, people: [{ id: 'host', name: 'Host', tone: 'presence-blue' }, { id: 'peer', name: 'Peer', tone: 'presence-green' }] } }

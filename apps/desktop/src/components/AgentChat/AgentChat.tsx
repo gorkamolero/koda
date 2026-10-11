@@ -1,3 +1,4 @@
+import { Button, Input, Select } from '@koda/ui'
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -312,13 +313,13 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
       <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 border-b border-dashed border-border-subtle text-xs text-text-muted">
         <span data-testid="active-agent">{agentName}</span>
         <label className="flex items-center gap-1">Agent
-          <select aria-label="Agent" data-testid="agent-select" value={agent} disabled={Boolean(sessionId) || isStreaming || settingsSaving || Boolean(remote)} className="bg-surface-card border border-border-subtle p-1" onChange={event => setDraftAgent(event.target.value as CodingAgent)}>
+          <Select native aria-label="Agent" data-testid="agent-select" value={agent} disabled={Boolean(sessionId) || isStreaming || settingsSaving || Boolean(remote)} className="bg-surface-card border border-border-subtle p-1" onChange={event => setDraftAgent(event.target.value as CodingAgent)}>
             <option value="codex">Codex</option>
             <option value="claude">Claude</option>
-          </select>
+          </Select>
         </label>
         <label className="flex items-center gap-1">Model
-          <select aria-label={`${agentName} model`} data-testid={`${agent}-model-select`} value={isCustomModel ? 'custom' : model} disabled={isStreaming || stopping || settingsSaving || modelsPending || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
+          <Select native aria-label={`${agentName} model`} data-testid={`${agent}-model-select`} value={isCustomModel ? 'custom' : model} disabled={isStreaming || stopping || settingsSaving || modelsPending || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} className="bg-surface-card border border-border-subtle p-1" onChange={event => {
             const custom = event.target.value === 'custom'
             setCustomModel(custom)
             if (!custom) void updateSettings({ model: event.target.value })
@@ -326,25 +327,25 @@ export function AgentChat({ worktreeId, sessionId, agentType = 'codex', workingD
             <option value="default">{agentName} default</option>
             {models.filter(option => option.model !== 'default').map(option => <option key={option.id} value={option.model}>{option.displayName}{option.isDefault ? ' (default)' : ''}</option>)}
             <option value="custom">Custom model…</option>
-          </select>
+          </Select>
         </label>
-        {isCustomModel && <input aria-label={`${agentName} model ID`} data-testid={`${agent}-model-input`} value={model === 'default' ? '' : model} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} placeholder="Model ID" className="w-40 bg-transparent border border-border-subtle p-1" onChange={event => setModel(event.target.value)} onBlur={() => {
+        {isCustomModel && <Input aria-label={`${agentName} model ID`} data-testid={`${agent}-model-input`} value={model === 'default' ? '' : model} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} placeholder="Model ID" className="h-auto w-40 rounded-none bg-transparent border border-border-subtle p-1 text-xs" onChange={event => setModel(event.target.value)} onBlur={() => {
           const next = model.trim() || 'default'
           if (next !== savedSettingsRef.current.model) void updateSettings({ model: next })
         }} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} />}
         {/* A collaborator sees the host's permission mode; changing it is the host's security decision. */}
         <label className="flex items-center gap-1">Permissions
-          <select aria-label="Permissions" data-testid="permission-mode-select" value={permissionMode} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} onChange={event => void updateSettings({ permissionMode: event.target.value as PermissionMode })} className="bg-surface-card border border-border-subtle p-1">
+          <Select native aria-label="Permissions" data-testid="permission-mode-select" value={permissionMode} disabled={isStreaming || stopping || settingsSaving || Boolean(sessionId && loadedSession !== sessionId) || Boolean(remote)} onChange={event => void updateSettings({ permissionMode: event.target.value as PermissionMode })} className="bg-surface-card border border-border-subtle p-1">
             <option value="default">Ask when needed</option>
             <option value="bypassPermissions">Bypass permissions</option>
-          </select>
+          </Select>
         </label>
         {settingsSaving && <span role="status">Saving settings…</span>}
-        {!sessionId && !remote && <button data-testid="start-chat-button" disabled={isStreaming} onClick={() => void handleSendMessage()} className="hover:text-text-primary disabled:opacity-40">Start chat</button>}
-        {sessionId && canSend && (isStreaming || stopping) && <button data-testid="stop-agent-button" disabled={stopping} onClick={() => void stopTurn()} className="border border-border-subtle px-2 py-1 text-status-error disabled:opacity-40">{stopping ? 'Stopping…' : 'Stop'}</button>}
-        {!remote && <button data-testid="save-checkpoint" disabled={saving || isStreaming || !workingDirectory} onClick={() => void saveCheckpoint()} className="hover:text-text-primary disabled:opacity-40">
+        {!sessionId && !remote && <Button variant="unstyled" data-testid="start-chat-button" disabled={isStreaming} onClick={() => void handleSendMessage()} className="h-auto rounded-none p-0 hover:bg-transparent hover:text-text-primary disabled:opacity-40">Start chat</Button>}
+        {sessionId && canSend && (isStreaming || stopping) && <Button variant="unstyled" data-testid="stop-agent-button" disabled={stopping} onClick={() => void stopTurn()} className="h-auto rounded-none border border-border-subtle px-2 py-1 text-status-error disabled:opacity-40">{stopping ? 'Stopping…' : 'Stop'}</Button>}
+        {!remote && <Button variant="unstyled" data-testid="save-checkpoint" disabled={saving || isStreaming || !workingDirectory} onClick={() => void saveCheckpoint()} className="h-auto rounded-none p-0 hover:bg-transparent hover:text-text-primary disabled:opacity-40">
           {saving ? 'Saving…' : 'Save checkpoint'}
-        </button>}
+        </Button>}
         {remote && <span data-testid="shared-session-host" className="ml-auto text-text-faint">running on {hostName}</span>}
         {checkpointId && <span data-testid="checkpoint-saved" data-checkpoint-id={checkpointId}>Checkpoint saved</span>}
       </div>

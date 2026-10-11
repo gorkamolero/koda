@@ -100,62 +100,93 @@ export function Scratchpad({ workspaceId, className }: ScratchpadProps) {
       ],
       colors: {
         // Editor background - pure black
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.background': '#000000',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.foreground': '#a3a3a3',
         
         // Selection - terracotta tinted
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.selectionBackground': '#e07a5f33',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.selectionHighlightBackground': '#e07a5f1a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.inactiveSelectionBackground': '#e07a5f1a',
         
         // Line highlighting
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.lineHighlightBackground': '#0a0a0a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.lineHighlightBorder': '#00000000',
         
         // Cursor
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorCursor.foreground': '#e07a5f',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorCursor.background': '#000000',
         
         // Whitespace
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorWhitespace.foreground': '#262626',
         
         // Indent guides
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorIndentGuide.background': '#1a1a1a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorIndentGuide.activeBackground': '#333333',
         
         // Line numbers
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorLineNumber.foreground': '#333333',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorLineNumber.activeForeground': '#525252',
         
         // Gutter
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorGutter.background': '#000000',
         
         // Scrollbar - subtle
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'scrollbar.shadow': '#00000000',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'scrollbarSlider.background': '#ffffff0d',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'scrollbarSlider.hoverBackground': '#ffffff1a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'scrollbarSlider.activeBackground': '#e07a5f33',
         
         // Widget (autocomplete, etc)
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorWidget.background': '#0a0a0a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorWidget.border': '#262626',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorWidget.foreground': '#a3a3a3',
         
         // Hover widget
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorHoverWidget.background': '#0a0a0a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorHoverWidget.border': '#262626',
         
         // Find/replace
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.findMatchBackground': '#e07a5f4d',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editor.findMatchHighlightBackground': '#e07a5f26',
         
         // Bracket matching
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorBracketMatch.background': '#e07a5f1a',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorBracketMatch.border': '#e07a5f4d',
         
         // Overview ruler (right edge)
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorOverviewRuler.border': '#00000000',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorOverviewRuler.findMatchForeground': '#e07a5f4d',
+        // koda-token-exception: Monaco accepts literal hex colors, not CSS variables, in its theme API.
         'editorOverviewRuler.selectionHighlightForeground': '#e07a5f33',
       },
     })

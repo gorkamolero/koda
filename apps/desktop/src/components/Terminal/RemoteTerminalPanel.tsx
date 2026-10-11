@@ -1,3 +1,4 @@
+import { Button, TerminalFrame } from '@koda/ui'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Terminal } from 'xterm'
@@ -72,33 +73,34 @@ export function RemoteTerminalPanel({ worktreeId, hostName }: { worktreeId: stri
   }, [activeId, terminals])
 
   return (
-    <div className="h-full flex flex-col bg-surface-terminal" data-testid="terminal-container" data-remote="true">
+    <TerminalFrame title="Terminal" readOnly status={terminals.length ? 'ready' : 'disconnected'} className="h-full border-0 font-ui text-base" bodyClassName="flex min-h-0 flex-1 flex-col p-0" data-testid="terminal-container" data-remote="true" header={
       <div className="flex items-center border-b border-border-subtle bg-surface-card" data-testid="terminal-tab-bar">
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {terminals.map((item, index) => (
-            <button
+            <Button variant="unstyled"
               key={item.sessionId}
               data-testid={`remote-terminal-tab-${item.sessionId}`}
               onClick={() => setActiveId(item.sessionId)}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border-subtle whitespace-nowrap flex-shrink-0',
+                'h-auto rounded-none border-0 flex items-center gap-2 px-3 py-1.5 text-xs border-r border-border-subtle whitespace-nowrap flex-shrink-0',
                 activeId === item.sessionId ? 'bg-surface-terminal text-text-primary' : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
               )}
             >
               <TerminalIcon className="h-3 w-3" />
               <span>Terminal {index + 1}</span>
-              <span className="text-muted-foreground/60 text-[10px]">({item.pid})</span>
-            </button>
+              <span className="text-muted-foreground/60 text-2xs">({item.pid})</span>
+            </Button>
           ))}
         </div>
-        <span className="flex items-center gap-1 px-3 text-[10px] text-text-faint" title="The host's terminal, read-only">
+        <span className="flex items-center gap-1 px-3 text-2xs text-text-faint" title="The host's terminal, read-only">
           <Lock className="h-3 w-3" />{hostName ? `${hostName.toUpperCase()}'S SHELL` : 'HOST SHELL'}
         </span>
       </div>
+      }>
       <div ref={containerRef} className="flex-1" data-testid="terminal-viewport" />
       {terminals.length === 0 && (
         <div className="flex-1 flex items-center justify-center text-xs text-text-faint">No terminal open on the host</div>
       )}
-    </div>
+    </TerminalFrame>
   )
 }

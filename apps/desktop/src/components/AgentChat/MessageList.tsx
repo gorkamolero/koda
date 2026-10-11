@@ -1,3 +1,4 @@
+import { KODA_ASCII } from '@koda/ui'
 import { useRef, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue } from 'jotai'
@@ -57,12 +58,7 @@ export function MessageList() {
 │                                    │
 │      `}<span className="text-text-accent">KODA TERMINAL</span>{` v0.1.0          │
 │                                    │
-│  ██╗  ██╗ ██████╗ ██████╗  █████╗  │
-│  ██║ ██╔╝██╔═══██╗██╔══██╗██╔══██╗ │
-│  █████╔╝ ██║   ██║██║  ██║███████║ │
-│  ██╔═██╗ ██║   ██║██║  ██║██╔══██║ │
-│  ██║  ██╗╚██████╔╝██████╔╝██║  ██║ │
-│  ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝ │
+${KODA_ASCII.split('\n').map(line => `│  ${line} │`).join('\n')}
 │                                    │
 │  Ready for input...                │
 │                                    │

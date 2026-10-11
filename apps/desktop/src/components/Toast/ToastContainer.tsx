@@ -11,7 +11,7 @@ export function ToastContainer() {
   return (
     <div
       data-testid="toast-container"
-      className="pointer-events-none fixed bottom-0 right-0 z-50 flex flex-col items-end gap-2 p-4"
+      className="pointer-events-none fixed bottom-0 right-0 z-toast flex flex-col items-end gap-2 p-4"
     >
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} onDismiss={dismissToast} />

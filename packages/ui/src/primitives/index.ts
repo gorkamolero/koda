@@ -20,3 +20,5 @@ export * from './progress'
 export * from './avatar'
 export * from './feedback'
 export * from './card'
+
+export { cn } from './utils'

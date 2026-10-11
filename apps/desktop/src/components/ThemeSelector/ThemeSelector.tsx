@@ -1,3 +1,4 @@
+import { Button, Input } from '@koda/ui'
 import { useRef, useCallback, type ChangeEvent } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -38,10 +39,11 @@ function ThemeCard({
   onDelete?: () => void
 }) {
   return (
-    <button
+    <div className="relative">
+    <Button variant="unstyled"
       onClick={onSelect}
       className={cn(
-        'relative p-4 rounded-xl border transition-all text-left',
+        'relative w-full h-full p-4 rounded-xl border transition-all text-left',
         'hover:border-border-accent hover:bg-surface-hover',
         isActive
           ? 'border-border-accent bg-surface-active ring-1 ring-border-accent-soft'
@@ -64,9 +66,9 @@ function ThemeCard({
           )}
         >
           {theme.type === 'dark' ? (
-            <Moon className="w-4 h-4 text-blue-400" />
+            <Moon className="w-4 h-4 text-status-unread" />
           ) : (
-            <Sun className="w-4 h-4 text-amber-500" />
+            <Sun className="w-4 h-4 text-status-warning" />
           )}
         </div>
         <div>
@@ -75,26 +77,27 @@ function ThemeCard({
         </div>
       </div>
 
+    </Button>
       {/* Delete button for custom themes */}
       {theme.isCustom && onDelete && (
-        <button
+        <Button variant="unstyled"
           onClick={(e) => {
             e.stopPropagation()
             onDelete()
           }}
-          className="absolute bottom-2 right-2 btn-icon text-text-dim hover:text-status-error"
+          className="absolute bottom-2 right-2 inline-flex items-center justify-center size-8 rounded-md p-0 text-text-muted hover:bg-surface-hover hover:text-text-primary text-text-dim hover:text-status-error"
         >
           <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        </Button>
       )}
 
       {/* Custom badge */}
       {theme.isCustom && (
-        <span className="absolute bottom-2 left-2 text-[10px] text-text-dim px-1.5 py-0.5 bg-surface-control rounded">
+        <span className="absolute bottom-2 left-2 text-2xs text-text-dim px-1.5 py-0.5 bg-surface-control rounded">
           Custom
         </span>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -165,7 +168,7 @@ export function ThemeSelector() {
         </div>
 
         {/* Import button */}
-        <button onClick={handleImportClick} className="btn-secondary" disabled={isLoading}>
+        <Button variant="unstyled" onClick={handleImportClick} className="px-4 py-2 rounded-lg font-semibold text-sm text-text-primary bg-surface-card-strong disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 enabled:hover:bg-surface-control-hover" disabled={isLoading}>
           {isLoading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -177,8 +180,8 @@ export function ThemeSelector() {
               Import VS Code Theme
             </>
           )}
-        </button>
-        <input
+        </Button>
+        <Input
           ref={fileInputRef}
           type="file"
           accept=".json"
@@ -195,9 +198,9 @@ export function ThemeSelector() {
             <p className="text-sm font-medium text-status-error">Import failed</p>
             <p className="text-xs text-text-muted mt-0.5">{error}</p>
           </div>
-          <button onClick={clearError} className="ml-auto btn-icon text-status-error">
+          <Button variant="unstyled" onClick={clearError} className="ml-auto inline-flex items-center justify-center size-8 rounded-md p-0 text-text-muted hover:bg-surface-hover hover:text-text-primary text-status-error">
             ×
-          </button>
+          </Button>
         </div>
       )}
 

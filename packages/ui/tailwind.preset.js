@@ -7,6 +7,7 @@ export default {
   	extend: {
   		colors: {
             'surface-base': 'var(--surface-base)',
+            ...Object.fromEntries(['folder', 'ts', 'tsx', 'js', 'jsx', 'css', 'json', 'md', 'html', 'rust', 'default'].map(type => [`file-icon-${type}`, `var(--file-icon-${type})`])),
             ...Object.fromEntries(['terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval', 'control-hover', 'control-disabled'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
             'text-action': 'var(--text-action)',
             focus: 'var(--focus-ring-color)',
@@ -84,6 +85,8 @@ export default {
   			'text-review-active': 'var(--text-review-active)',
   			'surface-review-done': 'var(--surface-review-done)',
   			'text-review-done': 'var(--text-review-done)',
+            'text-inverse': 'var(--text-inverse)',
+            ...Object.fromEntries(['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'violet', 'pink', 'indigo', 'cyan'].map(tone => [`presence-${tone}`, `var(--presence-${tone})`])),
 			sidebar: {
 				DEFAULT: 'var(--sidebar-background)',
 				background: 'var(--sidebar-background)',
@@ -137,6 +140,9 @@ export default {
   			}
   		},
   		spacing: {
+            'window-controls': 'var(--space-window-controls)',
+            30: 'var(--space-30)', 35: 'var(--space-35)', 75: 'var(--space-75)', 100: 'var(--space-100)',
+            15: 'var(--space-15)', 45: 'var(--space-45)', 50: 'var(--space-50)',
             ...Object.fromEntries(['0', 'px', '0.5', '1', '1.5', '2', '2.5', '3', '3.5', '4', '5', '6', '7', '8', '9', '10', '11', '12', '14', '16', '20', '24', '28', '32', '36', '40', '44', '48', '52', '56', '60', '64', '72', '80', '96'].map(value => [value, `var(--space-${value.replace('.', '_')})`])),
   			sidebar: 'var(--sidebar-width)',
   			topbar: 'var(--topbar-height)',
@@ -169,6 +175,9 @@ export default {
   			]
   		},
   		fontSize: {
+            '2xs': 'var(--type-2xs-size)',
+            micro: 'var(--type-micro-size)',
+            tiny: 'var(--type-tiny-size)',
             ...Object.fromEntries(['display', 'heading', 'label', 'body', 'caption', 'code'].map(role => [role, [`var(--type-${role}-size)`, { lineHeight: `var(--type-${role}-line-height)`, letterSpacing: `var(--type-${role}-tracking)` }]])),
             'display-sm': ['var(--type-display-sm-size)', { lineHeight: 'var(--type-display-line-height)' }],
             'display-md': ['var(--type-display-md-size)', { lineHeight: 'var(--type-display-line-height)' }],

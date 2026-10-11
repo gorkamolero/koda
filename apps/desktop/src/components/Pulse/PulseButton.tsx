@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { Activity, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePulse } from '@/hooks/usePulse'
@@ -46,7 +47,7 @@ export function PulseButton({
   }
 
   return (
-    <button
+    <Button variant="unstyled"
       onClick={handleClick}
       disabled={isLoading}
       className={cn(
@@ -65,6 +66,6 @@ export function PulseButton({
         <Activity className={cn('w-4 h-4', isActive && 'animate-pulse')} />
       )}
       <span>{label}</span>
-    </button>
+    </Button>
   )
 }

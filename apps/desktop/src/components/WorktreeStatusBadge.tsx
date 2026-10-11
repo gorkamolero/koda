@@ -1,5 +1,5 @@
 import { Check, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { StatusBadge } from '@koda/ui'
 import type { WorktreeStatus } from '@/lib/rpc'
 
 interface WorktreeStatusBadgeProps {
@@ -24,9 +24,9 @@ export function WorktreeStatusBadge({ status }: WorktreeStatusBadgeProps): React
   if (!config) return null
 
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium', config.color)}>
+    <StatusBadge status={status === 'done' ? 'success' : status === 'blocked' || status === 'needs-review' ? 'warning' : 'unread'} showDot={false} className={`border-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${config.color}`}>
       {config.icon}
       {status}
-    </span>
+    </StatusBadge>
   )
 }

@@ -1,3 +1,4 @@
+import { Button, Textarea, QuestionCard as UIQuestionCard } from '@koda/ui'
 import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion, InterviewAnswer } from '@/store/interview'
@@ -50,7 +51,7 @@ export function QuestionCard({
   )
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <UIQuestionCard appearance="interview" aria-label={question.question} hideActions heading={<>
       <div className="mb-6">
         <h3
           data-testid="interview-question"
@@ -65,16 +66,17 @@ export function QuestionCard({
           <p className="text-text-muted">{question.description}</p>
         )}
       </div>
+      </>}>
 
       {question.type === 'text' && (
         <div>
-          <textarea
+          <Textarea
             data-testid="interview-text-input"
             value={textValue}
             onChange={handleTextChange}
             placeholder={question.placeholder}
             className={cn(
-              'w-full min-h-[120px] rounded-xl',
+              'w-full min-h-30 rounded-xl',
               'bg-surface-control border border-border-subtle',
               'px-4 py-3 text-sm text-text-primary',
               'placeholder:text-text-dim',
@@ -90,7 +92,7 @@ export function QuestionCard({
           {question.choices.map((choice) => {
             const isSelected = selectedChoices.includes(choice)
             return (
-              <button
+              <Button variant="unstyled"
                 key={choice}
                 data-testid="interview-choice-option"
                 data-selected={isSelected}
@@ -107,21 +109,21 @@ export function QuestionCard({
                     className={cn(
                       'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
                       isSelected
-                        ? 'border-border-accent bg-gradient-to-br from-[#62b7ff] to-[#4fe3a3]'
+                        ? 'border-border-accent bg-gradient-to-br from-[var(--meter-start)] to-[var(--meter-end)]'
                         : 'border-text-dim'
                     )}
                   >
                     {isSelected && (
-                      <Check className="w-3 h-3 text-[#0b0f1a]" strokeWidth={3} />
+                      <Check className="w-3 h-3 text-[var(--choice-check)]" strokeWidth={3} />
                     )}
                   </div>
                   <span className="text-sm font-medium">{choice}</span>
                 </div>
-              </button>
+              </Button>
             )
           })}
         </div>
       )}
-    </div>
+    </UIQuestionCard>
   )
 }

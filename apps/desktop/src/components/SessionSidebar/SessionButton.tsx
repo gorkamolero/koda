@@ -1,3 +1,4 @@
+import { NavItem, StatusDot, type Status } from '@koda/ui'
 import { cn } from '@/lib/utils'
 import type { Session, SessionStatus } from '@/lib/rpc'
 import {
@@ -24,25 +25,25 @@ function getStatusConfig(status?: SessionStatus): {
     case 'running':
       return {
         icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
-        colorClass: 'text-blue-400',
+        colorClass: 'text-status-unread',
         label: 'Running',
       }
     case 'paused':
       return {
         icon: <Pause className="w-3.5 h-3.5" />,
-        colorClass: 'text-yellow-500',
+        colorClass: 'text-status-warning',
         label: 'Paused',
       }
     case 'completed':
       return {
         icon: <Check className="w-3.5 h-3.5" />,
-        colorClass: 'text-green-500',
+        colorClass: 'text-status-success',
         label: 'Completed',
       }
     case 'error':
       return {
         icon: <AlertCircle className="w-3.5 h-3.5" />,
-        colorClass: 'text-red-400',
+        colorClass: 'text-status-error',
         label: 'Error',
       }
     case 'cancelled':
@@ -54,7 +55,7 @@ function getStatusConfig(status?: SessionStatus): {
     case 'compacting':
       return {
         icon: <Sparkles className="w-3.5 h-3.5 animate-pulse" />,
-        colorClass: 'text-purple-400',
+        colorClass: 'text-status-reviewing',
         label: 'Compacting',
       }
     case 'idle':
@@ -135,7 +136,8 @@ export function SessionButton({
   isRemote = false,
   remoteMachineId,
 }: SessionButtonProps) {
-  const { icon, colorClass } = getStatusConfig(session.status)
+  const { icon, colorClass, label } = getStatusConfig(session.status)
+  const statusTone: Status = session.status === 'running' ? 'processing' : session.status === 'error' ? 'error' : session.status === 'completed' ? 'success' : session.status === 'compacting' ? 'reviewing' : session.status === 'paused' ? 'warning' : 'unknown'
   const timeAgo = formatTimeAgo(session.updatedAt ?? session.createdAt)
   const contextPercent = session.contextUsedPercent
     ? parseFloat(session.contextUsedPercent)
@@ -151,9 +153,9 @@ export function SessionButton({
     : session.agentType ?? 'claude'
 
   return (
-    <button
+    <NavItem label={displayTitle}
       onClick={onClick}
-      className={cn(
+      buttonClassName={cn(
         'group flex items-start gap-2.5 w-full px-3 py-2.5 rounded-md transition-colors text-left',
         'hover:bg-surface-hover',
         isActive && 'bg-surface-active',
@@ -162,7 +164,7 @@ export function SessionButton({
     >
       {/* Status icon */}
       <div className={cn('mt-0.5 flex-shrink-0', colorClass)}>
-        {icon}
+        {icon}<StatusDot status={statusTone} label={label} className="sr-only" />
       </div>
 
       {/* Content */}
@@ -175,7 +177,7 @@ export function SessionButton({
             </span>
             {isRemote && (
               <span
-                className="flex items-center gap-0.5 text-[10px] font-medium px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 flex-shrink-0"
+                className="flex items-center gap-0.5 text-2xs font-medium px-1 py-0.5 rounded bg-status-reviewing/20 text-status-reviewing flex-shrink-0"
                 title={`Remote session on ${remoteMachineId ?? 'another machine'}`}
               >
                 <Globe className="w-2.5 h-2.5" />
@@ -211,12 +213,12 @@ export function SessionButton({
 
         {/* Compacting indicator */}
         {session.isCompacting && (
-          <div className="flex items-center gap-1 mt-1 text-xs text-purple-400">
+          <div className="flex items-center gap-1 mt-1 text-xs text-status-reviewing">
             <Sparkles className="w-3 h-3" />
             <span>Compacting context...</span>
           </div>
         )}
       </div>
-    </button>
+    </NavItem>
   )
 }

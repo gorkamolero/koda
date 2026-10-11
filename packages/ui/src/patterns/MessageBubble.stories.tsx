@@ -12,3 +12,7 @@ export const System: Story = { args: { variant: 'system', author: undefined, chi
 export const SharedAuthor: Story = { args: { variant: 'user', author: 'Ana', children: 'I can reproduce this after switching Wi-Fi networks.' } }
 export const HoverActions: Story = { args: { actions: <Button size="sm" variant="bracket">Copy message</Button> }, play: async ({ canvasElement }) => { const canvas = within(canvasElement); await userEvent.hover(canvas.getByRole('article')); const action = canvas.getByRole('button', { name: 'Copy message' }); action.focus(); await expect(action).toHaveFocus() } }
 
+
+export const TerminalAssistant: Story = { args: { appearance: 'terminal', heading: <span>┌─ KODA</span>, footer: <div className="px-3 py-1 text-text-muted">└─────────────────────┘</div> } }
+export const TerminalUser: Story = { args: { appearance: 'terminal', variant: 'user', author: 'Ana' } }
+export const TerminalSystem: Story = { args: { appearance: 'terminal', variant: 'system', author: undefined } }

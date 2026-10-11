@@ -9,3 +9,5 @@ export const Critical: Story = { args: { value: 94 } }
 export const Empty: Story = { args: { value: 0 } }
 export const Full: Story = { args: { value: 100 } }
 export const TokenCount: Story = { args: { value: 64000, max: 200000, valueText: '64K / 200K' } }
+
+export const Continuous: Story = { args: { variant: 'continuous', value: 32, max: 100, label: 'Context usage', valueText: '32.0K / 100.0K' } }

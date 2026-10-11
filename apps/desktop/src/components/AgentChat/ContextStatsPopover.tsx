@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useAtomValue } from 'jotai'
 import {
   totalTokensAtom,
@@ -9,7 +10,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover'
+} from '@koda/ui'
 import { cn } from '@/lib/utils'
 
 interface ContextCategory {
@@ -82,10 +83,10 @@ export function ContextStatsPopover({ className }: ContextStatsPopoverProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
+        <Button variant="unstyled"
           type="button"
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-xs font-mono',
+            'h-auto rounded-none border-0 flex items-center gap-1 px-2 py-1 text-xs font-mono',
             'text-text-muted hover:text-text-accent transition-colors',
             className
           )}
@@ -101,11 +102,11 @@ export function ContextStatsPopover({ className }: ContextStatsPopoverProps) {
             {Math.round(usedPercent * 100)}%
           </span>
           <span className="text-text-faint">]</span>
-        </button>
+        </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="w-72 p-0 bg-[#0a0a0a] border border-dashed border-border-strong font-mono" 
-        align="start" 
+      <PopoverContent
+        className="w-72 p-0 bg-[var(--black-soft)] border border-dashed border-border-strong font-mono"
+        align="start"
         sideOffset={8}
       >
         {/* Header */}

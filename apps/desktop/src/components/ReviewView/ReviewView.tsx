@@ -1,3 +1,4 @@
+import { Button, Card, ButtonGroup } from '@koda/ui'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
@@ -115,54 +116,51 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
           <h2 className="text-sm font-medium text-text-primary">Code Review</h2>
 
           {/* Filter tabs */}
-          <div className="flex items-center gap-1 bg-surface-control rounded-md p-0.5" data-testid="review-filter-tabs">
-            <button
-              onClick={() => { setFilter('all'); }}
+          <ButtonGroup aria-label="Review filter" className="gap-1 rounded-md bg-surface-control p-0.5" data-testid="review-filter-tabs">
+            <Button variant="unstyled" onClick={() => setFilter('all')} aria-pressed={filter === 'all'}
               data-testid="review-filter-all"
               data-active={filter === 'all'}
               className={cn(
-                'px-2 py-1 text-xs rounded transition-colors',
+                'px-2 py-1 text-xs font-normal rounded transition-colors',
                 filter === 'all'
                   ? 'bg-surface-active text-text-strong'
                   : 'text-text-muted hover:text-text-primary'
               )}
             >
               All ({comments.length})
-            </button>
-            <button
-              onClick={() => { setFilter('open'); }}
+            </Button>
+            <Button variant="unstyled" onClick={() => setFilter('open')} aria-pressed={filter === 'open'}
               data-testid="review-filter-open"
               data-active={filter === 'open'}
               className={cn(
-                'px-2 py-1 text-xs rounded transition-colors',
+                'px-2 py-1 text-xs font-normal rounded transition-colors',
                 filter === 'open'
                   ? 'bg-surface-active text-text-strong'
                   : 'text-text-muted hover:text-text-primary'
               )}
             >
               Open ({openCount})
-            </button>
-            <button
-              onClick={() => { setFilter('resolved'); }}
+            </Button>
+            <Button variant="unstyled" onClick={() => setFilter('resolved')} aria-pressed={filter === 'resolved'}
               data-testid="review-filter-resolved"
               data-active={filter === 'resolved'}
               className={cn(
-                'px-2 py-1 text-xs rounded transition-colors',
+                'px-2 py-1 text-xs font-normal rounded transition-colors',
                 filter === 'resolved'
                   ? 'bg-surface-active text-text-strong'
                   : 'text-text-muted hover:text-text-primary'
               )}
             >
               Resolved ({resolvedCount})
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         </div>
 
         {/* Actions */}
-        <button className="flex items-center gap-1.5 px-2 py-1 text-xs bg-surface-control text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors">
+        <Button variant="unstyled" className="flex items-center gap-1.5 px-2 py-1 text-xs bg-surface-control text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors">
           <Plus className="w-3 h-3" />
           Add comment
-        </button>
+        </Button>
       </div>
 
       {/* Comments list */}
@@ -172,7 +170,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
             const isExpanded = expandedComments.has(comment.id)
 
             return (
-              <div
+              <Card
                 key={comment.id}
                 data-testid={`review-comment-${comment.id}`}
                 data-resolved={comment.resolved}
@@ -184,7 +182,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                 )}
               >
                 {/* Comment header */}
-                <button
+                <Button variant="unstyled"
                   onClick={() => { toggleComment(comment.id); }}
                   data-testid={`review-comment-toggle-${comment.id}`}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
@@ -223,7 +221,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                     <span>•</span>
                     <span>{formatRelativeTime(comment.timestamp)}</span>
                   </div>
-                </button>
+                </Button>
 
                 {/* Expanded content */}
                 {isExpanded && (
@@ -233,7 +231,7 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button variant="unstyled"
                         onClick={() => { toggleResolved(comment.id); }}
                         data-testid={`review-comment-${comment.resolved ? 'reopen' : 'resolve'}-${comment.id}`}
                         className={cn(
@@ -245,15 +243,15 @@ export function ReviewView({ workspaceId }: ReviewViewProps) {
                       >
                         <CheckCircle2 className="w-3 h-3" />
                         {comment.resolved ? 'Reopen' : 'Resolve'}
-                      </button>
-                      <button className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors">
+                      </Button>
+                      <Button variant="unstyled" className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors">
                         <Eye className="w-3 h-3" />
                         View in diff
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             )
           })}
 

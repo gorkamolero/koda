@@ -4,7 +4,17 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "./utils"
 
-const Select = SelectPrimitive.Root
+/** Native mode preserves platform selection and automation through <select>. */
+type NativeSelectProps = React.SelectHTMLAttributes<HTMLSelectElement> & { native: true }
+type PopoverSelectProps = React.ComponentProps<typeof SelectPrimitive.Root> & { native?: false }
+function Select(props: NativeSelectProps | PopoverSelectProps) {
+  if (props.native) {
+    const { native: _native, className, ...rest } = props
+    return <select className={cn('bg-surface-card border border-border-subtle p-1 font-code text-xs disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus', className)} {...rest} />
+  }
+  const { native: _native, ...rest } = props
+  return <SelectPrimitive.Root {...rest} />
+}
 
 const SelectGroup = SelectPrimitive.Group
 

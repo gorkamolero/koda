@@ -1,5 +1,7 @@
-import { memo, useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { memo } from 'react'
+import { MessageBubble, ToolBlock as UIToolBlock, CodeBlock, Badge } from '@koda/ui'
+import { CheckCircle, ChevronDown, Circle, Clock, Wrench, XCircle } from 'lucide-react'
+import { useClipboard } from '@/hooks/useClipboard'
 import type {
   ChatMessage,
   ContentBlock,
@@ -9,12 +11,8 @@ import type {
 import { ToolCallSummary } from './ToolCallSummary'
 import { WorkingIndicator } from './WorkingIndicator'
 
-// AI Elements imports
-import { MessageResponse } from '@/components/ai-elements/message'
-import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
-import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
-import { CodeBlock } from '@/components/ai-elements/code-block'
-import type { BundledLanguage } from 'shiki'
+import { MessageResponse } from './MessageResponse'
+import { Reasoning, ReasoningTrigger, ReasoningContent } from './Reasoning'
 
 // ============================================================================
 // Types
@@ -26,62 +24,23 @@ interface MessageItemProps {
   onAnswerQuestion?: (toolUseId: string, answers: (string | string[])[]) => void
 }
 
-// Map our status to AI Elements tool state
-type AIElementsToolState = 'input-streaming' | 'input-available' | 'output-available' | 'output-error' | 'output-denied'
-
-function mapStatusToToolState(status?: string, hasResult?: boolean): AIElementsToolState {
-  if (status === 'pending') return 'input-streaming'
-  if (status === 'running') return 'input-available'
-  if (status === 'error') return 'output-error'
-  if (status === 'cancelled') return 'output-denied'
-  if (hasResult) return 'output-available'
-  return 'input-available'
-}
-
-// ============================================================================
-// Tool Block Renderer
-// ============================================================================
-
-/** Open while the tool runs, collapsed once it finishes, unless the reader toggled it. */
+/** The transcript owns tool payloads; the UI component owns disclosure chrome. */
 function ToolBlock({ block, result }: { block: ToolUseContentBlock; result?: ToolResultContentBlock }): React.ReactElement {
-  const toolState = mapStatusToToolState(block.status, !!result)
-  const toolName = block.name
-  const isCodeOutput = ['Read', 'Grep', 'Glob'].includes(toolName) && result?.output
-  const finished = toolState === 'output-available'
-  const [open, setOpen] = useState(!finished)
-  const [toggled, setToggled] = useState(false)
-  useEffect(() => { if (finished && !toggled) setOpen(false) }, [finished, toggled])
-
-  return (
-    <Tool open={open} onOpenChange={(next) => { setToggled(true); setOpen(next) }}>
-      <ToolHeader
-        type="dynamic-tool"
-        toolName={toolName}
-        state={toolState}
-        statusLabel={block.status === 'cancelled' ? 'Stopped' : undefined}
-        title={getToolTitle(toolName, block.input)}
-      />
-      <ToolContent>
-        <ToolInput input={block.input} />
-        {isCodeOutput ? (
-          <div className="p-4 space-y-2">
-            <h4 className="font-mono text-text-faint text-xs uppercase tracking-wide">
-              [RESULT]
-            </h4>
-            <CodeBlock
-              code={result?.output ?? ''}
-              language={getLanguageFromTool(toolName, block.input) as BundledLanguage}
-            />
-          </div>
-        ) : (
-          <ToolOutput
-            output={result?.output}
-            errorText={result?.error}
-          />
-        )}
-      </ToolContent>
-    </Tool>
-  )
+  const { copy, isCopied } = useClipboard()
+  const status = block.status === 'error' || block.status === 'cancelled' || result?.error || result?.isError ? 'failed' : result ? 'done' : 'running'
+  const label = block.status === 'cancelled' ? 'Stopped' : status === 'failed' ? 'Error' : status === 'done' ? 'Completed' : block.status === 'pending' ? 'Pending' : 'Running'
+  const Icon = block.status === 'pending' ? Circle : status === 'running' ? Clock : status === 'done' ? CheckCircle : XCircle
+  const isCodeOutput = ['Read', 'Grep', 'Glob'].includes(block.name) && result?.output
+  return <UIToolBlock
+    tool={block.name}
+    status={status}
+    className="group not-prose mb-4 w-full rounded-md border-solid bg-transparent [&>button]:justify-between [&>button]:gap-4 [&>button]:p-3"
+    bodyClassName="border-0 p-0"
+    header={<><span className="flex items-center gap-2"><Wrench className="size-4 text-muted-foreground" /><span className="font-medium text-sm">{getToolTitle(block.name, block.input)}</span><Badge className="gap-1.5 rounded-full border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 px-2.5 py-0.5 text-xs font-semibold"><Icon className={`size-4 ${status === 'running' ? 'animate-pulse' : status === 'done' ? 'text-status-success' : 'text-status-error'}`} />{label}</Badge></span><ChevronDown className="size-4 text-muted-foreground transition-transform group-has-[button[aria-expanded=true]]:rotate-180" /></>}
+  >
+    <div className="space-y-2 overflow-hidden p-4"><h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Parameters</h4><CodeBlock code={JSON.stringify(block.input, null, 2)} language="json" onCopy={text => void copy(text)} copied={isCopied} /></div>
+    {(result?.output || result?.error) && <div className="p-4 space-y-2"><h4 className="font-code text-text-faint text-xs uppercase tracking-wide">{result.error ? 'Error' : isCodeOutput ? '[RESULT]' : 'Result'}</h4>{result.error && <div className="bg-destructive/10 text-destructive">{result.error}</div>}<CodeBlock code={result.output ?? ''} language={isCodeOutput ? getLanguageFromTool(block.name, block.input) : 'json'} onCopy={text => void copy(text)} copied={isCopied} /></div>}
+  </UIToolBlock>
 }
 
 function safeStr(value: unknown, fallback = ''): string {
@@ -191,133 +150,32 @@ export const MessageItem = memo(function MessageItem({
   const isError = message.status === 'error'
   const hasContentBlocks = message.contentBlocks && message.contentBlocks.length > 0
 
-  // System messages - terminal style centered notice
-  if (isSystem) {
-    return (
-      <div
-        data-testid={`message-${message.id}`}
-        data-turn-index={turnIndex}
-        data-message-role="system"
-        className="py-2 px-6 text-xs font-mono"
-      >
-        <div className="flex justify-center">
-          <span className="text-text-faint">─── </span>
-          <span className="text-text-muted">{message.content}</span>
-          <span className="text-text-faint"> ───</span>
-        </div>
-      </div>
-    )
-  }
+  if (isSystem || isUser) return <MessageBubble
+    appearance="terminal"
+    variant={isSystem ? 'system' : 'user'}
+    author={message.authorName}
+    data-testid={`message-${message.id}`}
+    data-turn-index={turnIndex}
+    data-message-role={message.role}
+  >{message.content}</MessageBubble>
 
-  // User messages - terminal prompt style with '>' prefix
-  if (isUser) {
-    return (
-      <div
-        data-testid={`message-${message.id}`}
-        data-turn-index={turnIndex}
-        data-message-role="user"
-        className="py-3 px-6 font-mono"
-      >
-        {message.authorName && <div className="text-xs text-text-muted mb-1" data-testid="message-author">{message.authorName}</div>}
-        <div className="flex gap-2 text-sm">
-          <span className="text-text-accent flex-shrink-0">&gt;</span>
-          <div className="text-text-primary whitespace-pre-wrap break-words">
-            {message.content}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Assistant messages - boxed response with KODA header
-  return (
-    <div
-      data-testid={`message-${message.id}`}
-      data-turn-index={turnIndex}
-      data-message-role="assistant"
-      data-message-status={message.status}
-      className="py-3 px-6 font-mono text-xs"
-    >
-      {/* Tool call summary row */}
-      {hasContentBlocks && message.contentBlocks && (
-        <ToolCallSummary
-          contentBlocks={message.contentBlocks}
-          className="mb-2"
-        />
-      )}
-
-      {/* Response box */}
-      <div className={cn(
-        "border border-dashed border-border-subtle",
-        isError && "border-status-error/50"
-      )}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-dashed border-border-subtle">
-          <div className="flex items-center gap-2 text-text-faint">
-            <span>┌─</span>
-            <span className="text-text-accent">KODA</span>
-            {isStreaming && (
-              <span className="text-status-warning">[STREAMING]</span>
-            )}
-            {isError && (
-              <span className="text-status-error">[ERROR]</span>
-            )}
-          </div>
-          {message.model && (
-            <span className="text-text-faint text-[10px]">
-              {message.model.includes('opus') ? 'opus-4.5' : 
-               message.model.includes('sonnet') ? 'sonnet-4' : 
-               message.model.includes('haiku') ? 'haiku' : message.model}
-            </span>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="px-4 py-3">
-          <div className="prose prose-sm prose-invert prose-pre:bg-[#0a0a0a] prose-pre:border prose-pre:border-dashed prose-pre:border-border-subtle max-w-none">
-            {hasContentBlocks && message.contentBlocks ? (
-              <div className="space-y-3">
-                {message.content && !message.contentBlocks.some(block => block.type === 'text') && (
-                  <MessageResponse>{message.content}</MessageResponse>
-                )}
-                {message.contentBlocks.map((block, idx) => (
-                  <div key={`${block.type}-${String(idx)}`}>
-                    {renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                {isStreaming && !message.content ? (
-                  <div className="text-text-muted">
-                    <span className="inline-block animate-pulse">█</span>
-                  </div>
-                ) : (
-                  <MessageResponse>{message.content}</MessageResponse>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Footer with working indicator during streaming */}
-        {isStreaming && (
-          <div className="flex items-center justify-between px-3 py-1.5 border-t border-dashed border-border-subtle">
-            <WorkingIndicator
-              startTime={message.startTime ?? message.timestamp}
-              className="text-xs"
-            />
-            <span className="text-text-faint">─┘</span>
-          </div>
-        )}
-
-        {/* Closed footer when not streaming */}
-        {!isStreaming && (
-          <div className="px-3 py-1 text-text-faint">
-            └{'─'.repeat(40)}┘
-          </div>
-        )}
-      </div>
+  return <MessageBubble
+    appearance="terminal"
+    variant="assistant"
+    data-testid={`message-${message.id}`}
+    data-turn-index={turnIndex}
+    data-message-role="assistant"
+    data-message-status={message.status}
+    error={isError}
+    summary={hasContentBlocks && message.contentBlocks ? <ToolCallSummary contentBlocks={message.contentBlocks} className="mb-2" /> : undefined}
+    heading={<><div className="flex items-center gap-2 text-text-faint"><span>┌─</span><span className="text-text-accent">KODA</span>{isStreaming && <span className="text-status-warning">[STREAMING]</span>}{isError && <span className="text-status-error">[ERROR]</span>}</div>{message.model && <span className="text-text-faint text-2xs">{message.model.includes('opus') ? 'opus-4.5' : message.model.includes('sonnet') ? 'sonnet-4' : message.model.includes('haiku') ? 'haiku' : message.model}</span>}</>}
+    footer={isStreaming ? <div className="flex items-center justify-between px-3 py-1.5 border-t border-dashed border-border-subtle"><WorkingIndicator startTime={message.startTime ?? message.timestamp} className="text-xs" /><span className="text-text-faint">─┘</span></div> : <div className="px-3 py-1 text-text-faint">└{'─'.repeat(40)}┘</div>}
+  >
+    <div className="prose prose-sm prose-invert prose-pre:bg-[var(--black-soft)] prose-pre:border prose-pre:border-dashed prose-pre:border-border-subtle max-w-none">
+      {hasContentBlocks && message.contentBlocks ? <div className="space-y-3">
+        {message.content && !message.contentBlocks.some(block => block.type === 'text') && <MessageResponse>{message.content}</MessageResponse>}
+        {message.contentBlocks.map((block, index) => <div key={`${block.type}-${index}`}>{renderContentBlock(block, message.contentBlocks ?? [], isStreaming)}</div>)}
+      </div> : isStreaming && !message.content ? <div className="text-text-muted"><span className="inline-block animate-pulse">█</span></div> : <MessageResponse>{message.content}</MessageResponse>}
     </div>
-  )
+  </MessageBubble>
 })

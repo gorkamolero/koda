@@ -216,7 +216,7 @@ function CommentMarkers({ comments }: CommentMarkersProps) {
           style={{
             // This is a simplified positioning - in production we'd calculate from line height
             top: `${String((comment.lineNumber - 1) * 20 + 28)}px`,
-            left: comment.side === 'original' ? '4px' : '50%',
+            left: comment.side === 'original' ? 'var(--space-1)' : '50%',
           }}
           data-testid="diff-comment-marker"
           data-line={comment.lineNumber}

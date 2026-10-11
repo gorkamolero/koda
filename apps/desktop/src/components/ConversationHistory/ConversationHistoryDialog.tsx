@@ -1,3 +1,4 @@
+import { Button, Input, Dialog, DialogContent, DialogTitle } from '@koda/ui'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { useAtom } from 'jotai'
 import { messagesAtom, type ChatMessage } from '@/store/chat'
@@ -137,36 +138,29 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="relative w-full max-w-lg max-h-[80vh] bg-surface-base border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent className="max-w-lg max-h-[80vh] bg-surface-base border-border rounded-xl overflow-hidden" aria-describedby={undefined}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-text-muted" />
-            <h2 className="text-sm font-semibold text-text-primary">
+            <DialogTitle decorate={false} className="text-sm font-semibold text-text-primary normal-case tracking-normal">
               Conversation History
-            </h2>
+            </DialogTitle>
           </div>
-          <button
+          <Button variant="unstyled"
             onClick={onClose}
             className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
           >
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Search */}
         <div className="px-4 py-2 border-b border-border-subtle">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value) }}
@@ -196,7 +190,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
 
                 {/* Entries */}
                 {entries.map(entry => (
-                  <button
+                  <Button variant="unstyled"
                     key={entry.id}
                     onClick={() => { handleLoadConversation(entry) }}
                     className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-surface-hover transition-colors border-b border-border-subtle/50"
@@ -219,7 +213,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
                         <span>{formatTimeAgo(entry.timestamp)}</span>
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))
@@ -232,15 +226,15 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
             {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
           </span>
 
-          <button
+          <Button variant="unstyled"
             onClick={handleClearHistory}
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             Clear all
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 })
