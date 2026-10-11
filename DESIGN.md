@@ -149,6 +149,6 @@ Playwright captures the actual desktop with deterministic browser RPC fixtures i
 
 ## Publication
 
-The future public URL is <https://gorkamolero.github.io/koda/>. `.github/workflows/storybook.yml` builds and tests on pushes to `main`, then uses the official configure/upload/deploy Pages actions. The Vite production base is `/koda/`.
+The public Storybook is <https://koda-storybook.pages.dev>, a static build on Cloudflare Pages (project `koda-storybook`). `pnpm storybook:deploy` builds it and publishes it with `wrangler pages deploy`, using the Cloudflare account wrangler is signed in to. There is no CI deploy.
 
-This branch does not deploy or change repository settings. The owner can enable Pages for GitHub Actions when ready to merge. The workflow has no manual dispatch trigger and does not run on `codex/design-system-migration`.
+The build serves from the site root. Set `STORYBOOK_BASE` to serve it from a subpath instead. Storybook's own frame and its docs pages use the Obsidian tokens (`.storybook/kodaTheme.ts`).

@@ -10,6 +10,7 @@
     "verify:clean": "node scripts/run.mjs verify-clean",
     "dev": "turbo run dev",
     "collab:deploy": "pnpm --filter @koda/collab-service deploy",
+    "storybook:deploy": "pnpm --filter @koda/ui deploy-storybook",
     "build": "turbo run build",
     "test": "turbo run test --filter=!e2e",
     "lint": "turbo run lint",
