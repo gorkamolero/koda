@@ -11,3 +11,5 @@ export const WithoutDescription: Story = { args: { description: undefined } }
 
 
 export const CompactSettings: Story = { args: { compact: true, title: 'AGENT' } }
+
+export const CompactWide: Story = { args: { compact: true, title: 'NEW CONVERSATION PERMISSIONS', className: 'w-full', action: <Button variant="bracket" size="sm">Edit</Button> } }

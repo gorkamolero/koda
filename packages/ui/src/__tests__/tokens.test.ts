@@ -8,9 +8,7 @@ import {
   themes,
   spacing,
   typography,
-  type ThemeDefinition,
 } from '../tokens'
-import legacyThemeValues from './legacy-theme-values.json'
 
 function resolveToken(value: string, tokens: Record<string, string>, seen = new Set<string>()): string {
   return value.replace(/var\((--[\w-]+)\)/g, (_match, name: string) => {
@@ -21,13 +19,6 @@ function resolveToken(value: string, tokens: Record<string, string>, seen = new 
   })
 }
 
-const legacyThemes: Record<string, ThemeDefinition> = {
-  codexDarkTheme: themes.obsidian,
-  codexLightTheme: themes.light,
-  codexDimTheme: themes.dim,
-  kodaGraphiteTheme: themes.graphite,
-}
-
 function declarations(css: string, selector: string): Record<string, string> {
   const start = css.indexOf(`${selector} {`)
   const block = css.slice(start, css.indexOf('}', start))
@@ -35,15 +26,22 @@ function declarations(css: string, selector: string): Record<string, string> {
 }
 
 describe('shared Koda tokens', () => {
-  it.each(Object.entries(legacyThemeValues))('preserves every pre-move desktop value in %s', (name, expected) => {
-    const theme = legacyThemes[name]!
-    const tokens = { ...baseTokens, ...theme.variables }
-    // Fixture captured from the original :root + .light + bundled theme cascade.
-    // Resolving aliases catches visually different substitutions, not just names.
-    for (const [key, value] of Object.entries(expected)) {
-      // koda-token-exception: Regression reference for the intentionally opaque Light surface.
-      const current = name === 'codexLightTheme' && key === '--surface-popover' ? '#ffffff' : value
-      expect(resolveToken(tokens[key as keyof typeof tokens], tokens), `${theme.name}: ${key}`).toBe(current)
+  it.each(Object.entries(themes))('keeps %s meaningful text and status foregrounds at AA on desktop surfaces', (_name, theme) => {
+    const tokens: Record<string, string> = { ...baseTokens, ...theme.variables }
+    const rgb = (value: string): number[] => {
+      if (value.startsWith('#')) return value.slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255)
+      return value.match(/[\d.]+/g)!.map((v, i) => i < 3 ? Number(v) / 255 : Number(v))
+    }
+    const blend = (color: number[], base: number[]) => color.slice(0, 3).map((v, i) => v * (color[3] ?? 1) + base[i]! * (1 - (color[3] ?? 1)))
+    const luminance = (color: number[]) => color.map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i]!, 0)
+    const resolve = (key: string) => rgb(resolveToken(tokens[key]!, tokens))
+    const base = resolve('--surface-base')
+    for (const surface of ['base', 'sidebar', 'messages', 'card', 'card-strong', 'control', 'popover', 'composer', 'terminal', 'hover']) {
+      const background = blend(resolve(`--surface-${surface}`), base)
+      for (const text of ['text-primary', 'text-secondary', 'text-quiet', 'text-muted', 'text-subtle', 'text-faint', 'text-fainter', 'text-dim', 'text-action', ...['success', 'warning', 'error', 'processing', 'reviewing', 'ready', 'unread', 'unknown'].map(status => `status-${status}-foreground`)]) {
+        const bg = luminance(background), fg = luminance(blend(resolve(`--${text}`), background))
+        expect((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05), `${text} on ${surface}`).toBeGreaterThanOrEqual(4.5)
+      }
     }
   })
 

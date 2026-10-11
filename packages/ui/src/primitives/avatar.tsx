@@ -54,12 +54,12 @@ export { Avatar, AvatarImage, AvatarFallback }
 export type PresenceTone = 'blue' | 'green' | 'amber' | 'rose' | 'cyan' | 'terracotta' | 'red' | 'orange' | 'yellow' | 'teal' | 'violet' | 'pink' | 'indigo' | 'presence-blue' | 'presence-green' | 'presence-cyan'
 const presenceClasses: Record<PresenceTone, string> = {
   red: 'bg-presence-red text-inverse', orange: 'bg-presence-orange text-inverse', yellow: 'bg-presence-yellow text-inverse', teal: 'bg-presence-teal text-inverse', violet: 'bg-presence-violet text-inverse', pink: 'bg-presence-pink text-inverse', indigo: 'bg-presence-indigo text-inverse', 'presence-blue': 'bg-presence-blue text-inverse', 'presence-green': 'bg-presence-green text-inverse', 'presence-cyan': 'bg-presence-cyan text-inverse',
-  blue: 'bg-status-unread text-gray-0',
-  green: 'bg-status-ready text-gray-0',
-  amber: 'bg-status-warning text-gray-0',
-  rose: 'bg-status-error text-gray-0',
-  cyan: 'bg-status-reviewing text-gray-0',
-  terracotta: 'bg-status-processing text-gray-0',
+  blue: 'bg-status-unread text-text-on-status',
+  green: 'bg-status-ready text-text-on-status',
+  amber: 'bg-status-warning text-text-on-status',
+  rose: 'bg-status-error text-text-on-status',
+  cyan: 'bg-status-reviewing text-text-on-status',
+  terracotta: 'bg-status-processing text-text-on-status',
 }
 const presenceTones: PresenceTone[] = ['blue', 'green', 'amber', 'rose', 'cyan', 'terracotta']
 function defaultPresenceTone(id: string): PresenceTone {

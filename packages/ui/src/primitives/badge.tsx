@@ -13,6 +13,7 @@ export interface StatusDotProps extends React.HTMLAttributes<HTMLSpanElement> { 
 export function StatusDot({ status, label, className, ...props }: StatusDotProps) {
   return <span role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} className={cn('inline-block size-2 shrink-0 rounded-full', statusClasses[status], className)} {...props} />
 }
+export const statusForegroundClasses: Record<Status, string> = { success: 'text-status-success-foreground', warning: 'text-status-warning-foreground', error: 'text-status-error-foreground', processing: 'text-status-processing-foreground', reviewing: 'text-status-reviewing-foreground', ready: 'text-status-ready-foreground', unread: 'text-status-unread-foreground', unknown: 'text-status-unknown-foreground' }
 export interface StatusBadgeProps extends BadgeProps { status: Status; showDot?: boolean }
-export function StatusBadge({ status, children, showDot = true, ...props }: StatusBadgeProps) { return <Badge {...props}>{showDot && <StatusDot status={status} />}{children ?? status}</Badge> }
+export function StatusBadge({ status, children, showDot = true, className, ...props }: StatusBadgeProps) { return <Badge className={cn(statusForegroundClasses[status], className)} {...props}>{showDot && <StatusDot status={status} />}{children ?? status}</Badge> }
 export function Kbd({ className, ...props }: React.HTMLAttributes<HTMLElement>) { return <kbd className={cn('inline-flex items-center rounded-sm border border-border-muted bg-surface-control px-1.5 py-0.5 font-code text-xs text-text-primary', className)} {...props} /> }

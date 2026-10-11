@@ -89,10 +89,9 @@ export function CompactWorkingIndicator(props: Omit<WorkingIndicatorProps, 'comp
 export interface TerminalSectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title: string; description?: string; action?: ReactNode; compact?: boolean }
 export function TerminalSection({ title, description, action, compact = false, children, className, ...props }: TerminalSectionProps) {
   const id = useId()
-  if (compact) return <section aria-labelledby={id} className={cx('font-code text-xs', className)} {...props}>
-    <div className="flex items-center text-text-faint mb-2"><span aria-hidden="true">┌─ </span><h2 id={id} className="text-xs text-text-action">{title}</h2><span aria-hidden="true"> {'─'.repeat(Math.max(0, 30 - title.length))}</span>{action}<span aria-hidden="true">┐</span></div>
-    <div className="px-4 py-3 border-x border-dashed border-border-subtle">{description && <p className="text-text-muted mb-3">{description}</p>}{children}</div>
-    <div aria-hidden="true" className="text-text-faint">└{'─'.repeat(34)}┘</div>
+  if (compact) return <section aria-labelledby={id} className={cx('border border-dashed border-border-subtle font-code text-xs', className)} {...props}>
+    <div className="flex items-center gap-2 border-b border-dashed border-border-subtle px-4 py-2"><h2 id={id} className="flex-1 text-xs text-text-action">[{title}]</h2>{action}</div>
+    <div className="px-4 py-3">{description && <p className="text-text-secondary mb-3">{description}</p>}{children}</div>
   </section>
   return <section aria-labelledby={id} className={cx('font-code text-xs', className)} {...props}>
     <div className="mb-2 flex items-center gap-1 text-text-secondary"><span aria-hidden="true">┌─</span><h2 id={id} className="text-xs uppercase text-text-action">{title}</h2><span aria-hidden="true" className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"> {'─'.repeat(60)}</span>{action}<span aria-hidden="true">┐</span></div>

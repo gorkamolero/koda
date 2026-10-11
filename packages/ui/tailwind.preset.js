@@ -8,7 +8,7 @@ export default {
   		colors: {
             'surface-base': 'var(--surface-base)',
             ...Object.fromEntries(['folder', 'ts', 'tsx', 'js', 'jsx', 'css', 'json', 'md', 'html', 'rust', 'default'].map(type => [`file-icon-${type}`, `var(--file-icon-${type})`])),
-            ...Object.fromEntries(['terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval', 'control-hover', 'control-disabled'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
+            ...Object.fromEntries(['accent', 'status', 'terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval', 'control-hover', 'control-disabled'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
             'text-action': 'var(--text-action)',
             focus: 'var(--focus-ring-color)',
             'text-secondary': 'var(--text-secondary)',
