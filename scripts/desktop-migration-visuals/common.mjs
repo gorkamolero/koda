@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 export const outputRoot = resolve(projectRoot, '.migration-visual')
 const require = createRequire(resolve(projectRoot, 'packages/ui/package.json'))
+export const axePath = require.resolve('axe-core/axe.min.js')
 export const { chromium } = require('playwright')
 export const themes = ['obsidian', 'light', 'dim', 'graphite']
 export const groups = {

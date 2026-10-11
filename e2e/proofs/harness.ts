@@ -335,7 +335,7 @@ export type Agent = 'codex' | 'claude'
 // OS temporary directories are allowed by Codex workspace-write. This exact
 // throwaway directory is deliberately outside them and contains only markers.
 export function outsideFixture() {
-  const parent = join(homedir(), '.koda-approval-proofs')
+  const parent = process.env.KODA_PROOF_OUTSIDE_ROOT || join(homedir(), '.koda-approval-proofs')
   const createdParent = !existsSync(parent)
   mkdirSync(parent, { recursive: true })
   const root = mkdtempSync(join(parent, 'owned-'))

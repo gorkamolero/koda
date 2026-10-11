@@ -21,8 +21,8 @@ Tailwind consumers can use `@koda/ui/tailwind-preset`, import `@koda/ui/source-s
 | --- | --- |
 | Themes | `themes.obsidian`, `themes.light`, `themes.dim`, `themes.graphite`; complete matching color namespaces |
 | Color | Existing `--surface-*`, `--text-*`, `--border-*`, eight `--status-*` tones, gray 0–14, git and review tokens |
-| Compatibility | Shadcn names reference named `--koda-*-hsl` backing tokens; these preserve the original HSL values exactly |
-| Contrast | New `--text-secondary`, `--text-action`, status foreground and `--text-on-*` tokens pair foregrounds with legacy dark surfaces without changing desktop colors |
+| Compatibility | Shadcn names reference named `--koda-*-hsl` backing tokens; these pair surfaces and foregrounds in every theme |
+| Contrast | `--text-secondary`, `--text-action`, status foreground and `--text-on-*` tokens provide AA text on their matching theme surfaces |
 | Type | `--font-ui` (SF Pro) and `--font-code` (SF Mono); display, heading, label, body, caption and code roles define size, line height and tracking |
 | Spacing | One exported `spacing` scale, mirrored by `--space-*` variables and Tailwind |
 | Radius | `--radius`, `--radius-md`, `--radius-sm`, none and full |
@@ -31,9 +31,9 @@ Tailwind consumers can use `@koda/ui/tailwind-preset`, import `@koda/ui/source-s
 | Layers | Base, sticky, popover, modal and toast |
 | Icons | Lucide at 12, 14 and 16, with the desktop's file-extension mapping in `FileIcon` |
 
-The theme toolbar sets `data-koda-theme="obsidian|light|dim|graphite"` and the desktop's `.dark`/`.light` class. Desktop's theme loader retains its existing theme IDs and imported-theme translator. Tests compare original resolved tokens against a captured pre-move fixture in all four themes, with an explicit exception for the now-opaque Light popover; CSS and typed objects are checked for parity.
+The theme toolbar sets `data-koda-theme="obsidian|light|dim|graphite"` and the desktop's `.dark`/`.light` class. Desktop's theme loader retains its existing theme IDs and imported-theme translator. Tests enforce WCAG AA (4.5:1) for meaningful text and status foregrounds on desktop surfaces in all four themes; CSS and typed objects are checked for parity. The pre-move fixture remains historical evidence, not an appearance constraint.
 
-Light intentionally retains some dark terminal and panel surfaces from the existing application. New components use the matching `text-on-*` foreground tokens there. Do not “correct” inherited legacy values during a token-only move.
+Light uses light composer, terminal, control, panel and badge surfaces. Use semantic surface tokens instead of black palette tokens in components. Quiet, faint and dim text carry readable metadata; reserve reduced opacity for decoration or disabled controls. `--text-on-accent` and `--text-on-status` pair with filled accent and status backgrounds, including counters and avatars. Native `Select` owns its control surface, option surface and text color. Compact `TerminalSection` uses a complete dashed border and bracket heading; do not append fixed-width ASCII footer fragments.
 
 ## Component inventory and states
 
@@ -135,7 +135,7 @@ All existing proof test IDs are forwarded to their corresponding controls, inclu
 
 Documented adapter exceptions are limited to:
 
-- `Terminal/terminalOptions.ts`: xterm requires a literal ANSI color palette.
+- `Terminal/terminalOptions.ts`: xterm receives resolved shared CSS colors, with a 4.5 minimum contrast ratio. Theme changes update local and mirrored terminals without recreating their sessions; observers disconnect on disposal. The initial fallback palette remains at this API boundary.
 - `Scratchpad/Scratchpad.tsx`: Monaco's theme API requires literal hex colors.
 - `PresenceAvatars.tsx` and shared `AvatarStack`: known wire identity colors map to named tokens; an unknown externally supplied identity color remains a documented adapter value.
 
@@ -160,3 +160,9 @@ Use `--surface-popover` for dialogs, menus, tooltips, selects, hover cards and t
 `--surface-overlay` includes its alpha: Obsidian, Dim and Graphite use `rgba(0, 0, 0, 0.8)`; Light uses `rgba(0, 0, 0, 0.45)`. Apply it directly without additional opacity. The `.light` fallback also uses 45% black.
 
 Use `--text-secondary` for dialog labels, hints and close labels, and `--text-action` for action text. Secondary text on the popover surface meets WCAG AA (4.5:1) in all four themes; token tests enforce this pairing. Do not use decorative `--text-dim` or `--text-faint` for these labels.
+
+## Desktop theme polish checks
+
+`node scripts/desktop-migration-visuals/snapshot.mjs polished HEAD full` captures and audits all 18 fixture screens in all four themes. Axe `color-contrast` violations fail capture, including measurable failures that axe classifies as short-text review items. The manifest retains selectors, ratios, passing node counts and incomplete results for visual review. Canvas terminal output is covered by the token tests, xterm's minimum contrast setting and capture inspection. Run `node --test scripts/desktop-migration-visuals/contrast.test.mjs` to verify the audit rejects low-contrast labels and counters.
+
+For a proof run restricted to repository cleanup, set `TMPDIR` to a repo-owned temp directory, `KODA_PROOF_OUTSIDE_ROOT` to a separate repo-owned directory outside the agent fixture worktree, and `KODA_PROOF_KEEP_NATIVE_SESSIONS=1`. The approval probe remains outside the agent's allowed worktree while provider history is retained. These settings do not skip proof assertions.
