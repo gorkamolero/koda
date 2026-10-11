@@ -14,6 +14,7 @@
   }
 
   body {
+    font-family: var(--font-ui);
     @apply bg-surface-messages text-text-primary;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;

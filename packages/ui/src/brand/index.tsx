@@ -239,11 +239,19 @@ export function FileIcon({ filename, type = 'file', isExpanded = false, size = 1
   return <Icon aria-hidden="true" data-testid={type === 'directory' ? isExpanded ? 'folder-icon-open' : 'folder-icon' : `file-icon-${fileType}`} className={cx('shrink-0', size === 12 ? 'size-3' : size === 14 ? 'size-3.5' : 'size-4', tone, className)} {...props} />
 }
 
-export interface DiffStatProps extends HTMLAttributes<HTMLSpanElement> { additions: number; deletions: number; showBar?: boolean; hideZero?: boolean; variant?: 'status' | 'git' }
-export function DiffStat({ additions, deletions, showBar = true, hideZero = false, variant = 'status', className, ...props }: DiffStatProps) {
+export interface DiffStatProps extends HTMLAttributes<HTMLSpanElement> {
+  additions: number
+  deletions: number
+  showBar?: boolean
+  hideZero?: boolean
+  additionClassName?: string
+  deletionClassName?: string
+  deletionSign?: '−' | '-'
+}
+export function DiffStat({ additions, deletions, showBar = true, hideZero = false, additionClassName, deletionClassName, deletionSign = '−', className, ...props }: DiffStatProps) {
   const added = Math.max(0, additions), removed = Math.max(0, deletions), total = added + removed
   const green = total ? Math.round(added / total * 5) : 0
-  return <span role="img" aria-label={`${added} additions, ${removed} deletions`} className={cx('inline-flex items-center gap-2 font-code text-xs', className)} {...props}>{(!hideZero || added > 0) && <span aria-hidden="true" className={variant === 'git' ? 'text-[var(--git-green)]' : 'text-status-success-foreground'}>+{added}</span>}{(!hideZero || removed > 0) && <span aria-hidden="true" className={variant === 'git' ? 'text-[var(--git-red)]' : 'text-status-error-foreground'}>{variant === 'git' ? '-' : '−'}{removed}</span>}{showBar && <span aria-hidden="true" className="inline-flex gap-0.5">{Array.from({ length: 5 }, (_, index) => <span key={index} className={cx('h-2 w-1', !total ? 'bg-border-subtle' : index < green ? 'bg-status-success' : 'bg-status-error')} />)}</span>}</span>
+  return <span role="img" aria-label={`${added} additions, ${removed} deletions`} className={cx('inline-flex items-center gap-2 font-code text-xs', className)} {...props}>{(!hideZero || added > 0) && <span aria-hidden="true" className={cn('text-status-success-foreground', additionClassName)}>+{added}</span>}{(!hideZero || removed > 0) && <span aria-hidden="true" className={cn('text-status-error-foreground', deletionClassName)}>{deletionSign}{removed}</span>}{showBar && <span aria-hidden="true" className="inline-flex gap-0.5">{Array.from({ length: 5 }, (_, index) => <span key={index} className={cx('h-2 w-1', !total ? 'bg-border-subtle' : index < green ? 'bg-status-success' : 'bg-status-error')} />)}</span>}</span>
 }
 
 export interface CodeBlockProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onCopy'> { code: string; language?: string; wrap?: boolean; copied?: boolean; onCopy?: (code: string) => void }

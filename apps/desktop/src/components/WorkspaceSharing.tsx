@@ -104,7 +104,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
             value={invitation}
             rows={4}
             onFocus={(e) => e.target.select()}
-            className="min-h-0 rounded-none w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-2xs text-text-muted break-all resize-none outline-none focus:border-border-accent"
+            className="min-h-0 rounded-none w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-2xs text-text-muted break-all resize-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent"
           />
         </div>}
         {error && <Callout tone="error" className={`${errorBox} bg-transparent [&>svg]:hidden`}>ERROR: {error}</Callout>}
@@ -146,7 +146,7 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
               value={invitation}
               onChange={(e) => setInvitation(e.target.value)}
               placeholder="paste the invitation you received"
-              className="min-h-0 p-0 border-0 rounded-none flex-1 bg-transparent text-caption text-text-primary placeholder:text-text-dim/50 outline-none resize-none break-all"
+              className="min-h-0 p-0 border-0 rounded-none flex-1 bg-transparent text-caption text-text-primary placeholder:text-text-dim/50 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none break-all"
             />
           </div>
         </div>

@@ -108,7 +108,7 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
     return nodes.map(node => isDiffFolder(node) ? { id: node.id, label: node.name, children: toItems(node.children) } : {
       id: node.id, label: node.path,
       icon: <span className={cn('flex size-4 shrink-0 items-center justify-center rounded text-2xs font-bold', STATUS_COLORS[node.status].bg, STATUS_COLORS[node.status].text)} data-testid="file-status-badge" data-status={node.status}>{STATUS_LABELS[node.status]}</span>,
-      meta: <DiffStat hideZero variant="git" additions={node.additions} deletions={node.deletions} showBar={false} />,
+      meta: <DiffStat hideZero additionClassName="text-[var(--git-green)]" deletionClassName="text-[var(--git-red)]" deletionSign="-" additions={node.additions} deletions={node.deletions} showBar={false} />,
     })
   }
 

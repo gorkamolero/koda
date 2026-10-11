@@ -71,7 +71,7 @@ function FileRow({
       </>}>
       <span className={cn('w-4 text-center', statusColor)}>[{statusLabel}]</span>
       <span className="flex min-w-0 flex-1 items-baseline overflow-hidden">{directory && <span className="truncate text-text-faint">{directory}</span>}<span className="truncate text-text-primary">{filename}</span></span>
-      <DiffStat hideZero variant="git" additions={file.additions ?? 0} deletions={file.deletions ?? 0} showBar={false} className="group-hover:hidden" />
+      <DiffStat hideZero additionClassName="text-[var(--git-green)]" deletionClassName="text-[var(--git-red)]" deletionSign="-" additions={file.additions ?? 0} deletions={file.deletions ?? 0} showBar={false} className="group-hover:hidden" />
     </NavItem>
   )
 }

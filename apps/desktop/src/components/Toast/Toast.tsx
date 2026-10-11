@@ -81,7 +81,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       role="alert"
       aria-live="assertive"
       className={cn(
-        'pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl',
+        'font-ui pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl',
         'border p-4 shadow-xl glass',
         'transition-all duration-200 ease-out',
         STYLES[toast.type],

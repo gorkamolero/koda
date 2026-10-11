@@ -53,12 +53,17 @@ const CommandDialog = ({ children, commandProps, contentProps, ...props }: Comma
   )
 }
 
+export interface CommandInputProps extends React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> {
+  icon?: React.ReactNode
+  trailing?: React.ReactNode
+  wrapperClassName?: string
+}
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-border-muted px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+  CommandInputProps
+>(({ className, icon = <Search aria-hidden="true" className="mr-2 h-4 w-4 shrink-0 opacity-50" />, trailing, wrapperClassName, ...props }, ref) => (
+  <div className={cn("flex items-center border-b border-border-muted px-3", wrapperClassName)} cmdk-input-wrapper="">
+    {icon}
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
@@ -67,6 +72,7 @@ const CommandInput = React.forwardRef<
       )}
       {...props}
     />
+    {trailing}
   </div>
 ))
 
