@@ -1,0 +1,6 @@
+.foundation-swatch { background: var(--sample-color); }
+.foundation-spacing { width: var(--sample-space); }
+.foundation-radius { border-radius: var(--sample-radius); }
+.foundation-shadow { box-shadow: var(--sample-shadow); }
+.foundation-blur { backdrop-filter: blur(var(--sample-blur)); }
+.foundation-sample { transition-duration: var(--sample-duration); transition-timing-function: var(--sample-easing); }

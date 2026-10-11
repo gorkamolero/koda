@@ -26,7 +26,7 @@ jobs:
       - run: pnpm --filter @koda/ui build
       - run: pnpm --filter @koda/ui lint
       - run: pnpm --filter @koda/ui test
-      - run: pnpm --filter @koda/ui test-storybook
+      - run: pnpm --filter @koda/ui test-storybook:themes
       - run: pnpm --filter @koda/ui build-storybook
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

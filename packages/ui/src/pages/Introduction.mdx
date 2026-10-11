@@ -1,0 +1,32 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Introduction" />
+
+# Koda
+
+The review-first, collaborative agent IDE. Run Codex or Claude in an isolated worktree, review the change, and share the same session with a teammate.
+
+## A terminal, with room to think
+
+Koda's interface uses mono-first type, quiet surfaces, a warm accent, the ASCII KODA mark and `[BRACKET]` actions. The design system codifies that interface in `@koda/ui`.
+
+Start with **Foundations** for the four themes and token scales. **Primitives** are the accessible controls. **Brand** contains Koda's distinctive marks and terminal framing. **Patterns** composes them into agent conversations and permission flows. **App screens** shows the host and collaborator looking at the same workspace.
+
+## Props in, events out
+
+Components render supplied data and report interaction through callbacks. They have no sidecar, network, database or application-store dependency. Stories use realistic, local mock content. Secret answers are never requested on the collaborator's device.
+
+Use the theme toolbar to switch between **Obsidian**, **Light**, **Dim** and **Graphite**. Each component's Docs page describes its props; Canvas shows states and interactions. The accessibility and Vitest panels run the same checks as the command line.
+
+## Package usage
+
+```tsx
+import { Button, SharedBadge } from '@koda/ui'
+import '@koda/ui/tokens.css'
+import '@koda/ui/styles.css'
+
+<Button variant="bracket" onClick={onShare}>Share</Button>
+<SharedBadge hostName="Gorka" permission="view" />
+```
+
+The desktop currently consumes the shared tokens and Tailwind preset. Its component migration is a separate run; existing desktop copies remain in place.

@@ -7,7 +7,7 @@ const config: StorybookConfig = {
   typescript: { reactDocgen: 'react-docgen-typescript' },
   core: { disableTelemetry: true },
   async viteFinal(config, { configType }) {
-    return { ...config, base: configType === 'PRODUCTION' ? '/koda/' : '/' }
+    return { ...config, base: configType === 'PRODUCTION' ? '/koda/' : '/', optimizeDeps: { ...config.optimizeDeps, include: [...(config.optimizeDeps?.include ?? []), 'react/jsx-dev-runtime'] } }
   },
 }
 

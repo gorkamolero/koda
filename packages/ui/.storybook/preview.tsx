@@ -6,14 +6,14 @@ const preview: Preview = {
   decorators: [
     withThemeByDataAttribute({
       themes: { Obsidian: 'obsidian', Light: 'light', Dim: 'dim', Graphite: 'graphite' },
-      defaultTheme: 'Obsidian',
+      defaultTheme: import.meta.env.VITE_KODA_THEME ?? 'Obsidian',
       attributeName: 'data-koda-theme',
     }),
     (Story, context) => {
       const theme = context.globals.theme as string | undefined
       document.documentElement.classList.toggle('light', theme === 'Light')
       document.documentElement.classList.toggle('dark', theme !== 'Light')
-      return <Story />
+      return <div className={context.viewMode === 'docs' ? 'bg-surface-messages p-4 font-code text-text-primary' : 'font-code text-text-primary'}><Story /></div>
     },
   ],
   parameters: {
