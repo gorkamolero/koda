@@ -82,6 +82,10 @@ The brief numbers 40 groups; groups containing several controls expose those con
 | 39 | CommandPalette | Embedded/modal shell, search, groups, disabled results and callbacks |
 | 40 | AppShell | Sidebar/topbar/main/right/bottom slots, host and collaborator layouts |
 
+The auditable coverage table is [brief-coverage.json](packages/ui/src/__tests__/brief-coverage.json): all 40 brief items, 61 components (with Modal/ListRow recorded as aliases), and 229 individual variant, size, state and feature entries. Each entry names one Storybook story ID; interaction entries explain the play function that exposes the state. Several entries can point to the same gallery story. Badge's small and medium galleries each show all three styles. Requirements expressed as optional slots or prose are included, not just labelled variant lists.
+
+[The coverage unit test](packages/ui/src/__tests__/brief-coverage.test.ts) parses the brief's Components section, checks items 1–40 and each group's component names, and resolves mapped IDs directly from fresh CSF source with Storybook's own parser. It checks explicit Variants/Sizes/States lists and keeps each item's brief text alongside the mapping so brief edits require a coverage review. Run it with `pnpm --filter @koda/ui test`; no static build is required. ID validation proves the story exists; the mapping is a reviewed claim about what it shows, backed by the story interaction and accessibility suite in all four themes. When changing a requirement or renaming a story, update this table and run both suites.
+
 Feature data logic, editors, xterm instances, agent runtimes, and application pages stay in desktop. Desktop no longer has a `components/ui` or `ai-elements` directory. Streaming Markdown and reasoning adapters stay beside the transcript; they compose the shared controls. The duplicated logo, spinner, file icon and CSS primitives have been removed.
 
 ## Token lint

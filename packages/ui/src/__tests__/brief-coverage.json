@@ -1,0 +1,1723 @@
+[
+  {
+    "item": 1,
+    "brief": "**Button.** Variants: primary, secondary, ghost, outline, destructive, link and bracket (the `[SHARE]` style). Sizes: sm, md, lg and icon. States: hover, focus, active, disabled and loading. Supports `asChild`. It replaces most of the 175 raw buttons, `MessageActionBar`'s `ActionButton`, and the shells of `PulseButton` and `AgentOverviewButton`.",
+    "components": [
+      {
+        "name": "Button",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "primary",
+            "storyId": "primitives-button--primary"
+          },
+          {
+            "kind": "variant",
+            "name": "secondary",
+            "storyId": "primitives-button--secondary"
+          },
+          {
+            "kind": "variant",
+            "name": "ghost",
+            "storyId": "primitives-button--ghost"
+          },
+          {
+            "kind": "variant",
+            "name": "outline",
+            "storyId": "primitives-button--outline"
+          },
+          {
+            "kind": "variant",
+            "name": "destructive",
+            "storyId": "primitives-button--destructive"
+          },
+          {
+            "kind": "variant",
+            "name": "link",
+            "storyId": "primitives-button--link"
+          },
+          {
+            "kind": "variant",
+            "name": "bracket",
+            "storyId": "primitives-button--bracket"
+          },
+          {
+            "kind": "size",
+            "name": "sm",
+            "storyId": "primitives-button--sizes"
+          },
+          {
+            "kind": "size",
+            "name": "md",
+            "storyId": "primitives-button--sizes"
+          },
+          {
+            "kind": "size",
+            "name": "lg",
+            "storyId": "primitives-button--sizes"
+          },
+          {
+            "kind": "size",
+            "name": "icon",
+            "storyId": "primitives-button--sizes"
+          },
+          {
+            "kind": "state",
+            "name": "hover",
+            "storyId": "primitives-button--hover",
+            "note": "play hovers the button with userEvent.hover."
+          },
+          {
+            "kind": "state",
+            "name": "focus",
+            "storyId": "primitives-button--focus",
+            "note": "play tabs to the button and asserts focus and :focus-visible."
+          },
+          {
+            "kind": "state",
+            "name": "active",
+            "storyId": "primitives-button--active",
+            "note": "play holds MouseLeft down with userEvent.pointer to show :active."
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-button--disabled"
+          },
+          {
+            "kind": "state",
+            "name": "loading",
+            "storyId": "primitives-button--loading"
+          },
+          {
+            "kind": "feature",
+            "name": "asChild",
+            "storyId": "primitives-button--as-child"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 2,
+    "brief": "**IconButton.** An icon-only button with a required `aria-label` and an optional tooltip.",
+    "components": [
+      {
+        "name": "IconButton",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "icon-only accessible label",
+            "storyId": "primitives-iconbutton--default"
+          },
+          {
+            "kind": "feature",
+            "name": "optional tooltip",
+            "storyId": "primitives-iconbutton--tooltip-visible",
+            "note": "play tabs to the icon button and waits for its visible tooltip."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 3,
+    "brief": "**ButtonGroup and SegmentedControl.** Grouped actions, plus a single-choice toggle (the share dialog's view and control choice).",
+    "components": [
+      {
+        "name": "ButtonGroup",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "grouped actions",
+            "storyId": "primitives-buttongroup--horizontal"
+          }
+        ]
+      },
+      {
+        "name": "SegmentedControl",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "view",
+            "storyId": "primitives-segmentedcontrol--view"
+          },
+          {
+            "kind": "variant",
+            "name": "control",
+            "storyId": "primitives-segmentedcontrol--control"
+          },
+          {
+            "kind": "feature",
+            "name": "single-choice toggle",
+            "storyId": "primitives-segmentedcontrol--keyboard",
+            "note": "play selects CONTROL with ArrowRight and asserts the checked radio."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 4,
+    "brief": "**Kbd.** Key hints such as `[ESC]` and `⌘K`.",
+    "components": [
+      {
+        "name": "Kbd",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "[ESC]",
+            "storyId": "primitives-kbd--escape"
+          },
+          {
+            "kind": "variant",
+            "name": "⌘K",
+            "storyId": "primitives-kbd--shortcut"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 5,
+    "brief": "**Badge.** Neutral, accent and outline styles, each in sm and md.",
+    "components": [
+      {
+        "name": "Badge",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "neutral",
+            "storyId": "primitives-badge--neutral"
+          },
+          {
+            "kind": "variant",
+            "name": "accent",
+            "storyId": "primitives-badge--accent"
+          },
+          {
+            "kind": "variant",
+            "name": "outline",
+            "storyId": "primitives-badge--outline"
+          },
+          {
+            "kind": "size",
+            "name": "sm",
+            "storyId": "primitives-badge--small"
+          },
+          {
+            "kind": "size",
+            "name": "md",
+            "storyId": "primitives-badge--medium"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 6,
+    "brief": "**StatusBadge and StatusDot.** One tone for each status token. It replaces `WorktreeStatusBadge` and the status dots in the sidebar and session list.",
+    "components": [
+      {
+        "name": "StatusBadge",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "success",
+            "storyId": "primitives-statusbadge--success"
+          },
+          {
+            "kind": "variant",
+            "name": "warning",
+            "storyId": "primitives-statusbadge--warning"
+          },
+          {
+            "kind": "variant",
+            "name": "error",
+            "storyId": "primitives-statusbadge--error"
+          },
+          {
+            "kind": "variant",
+            "name": "processing",
+            "storyId": "primitives-statusbadge--processing"
+          },
+          {
+            "kind": "variant",
+            "name": "reviewing",
+            "storyId": "primitives-statusbadge--reviewing"
+          },
+          {
+            "kind": "variant",
+            "name": "ready",
+            "storyId": "primitives-statusbadge--ready"
+          },
+          {
+            "kind": "variant",
+            "name": "unread",
+            "storyId": "primitives-statusbadge--unread"
+          },
+          {
+            "kind": "variant",
+            "name": "unknown",
+            "storyId": "primitives-statusbadge--unknown"
+          }
+        ]
+      },
+      {
+        "name": "StatusDot",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "success",
+            "storyId": "primitives-statusdot--success"
+          },
+          {
+            "kind": "variant",
+            "name": "warning",
+            "storyId": "primitives-statusdot--warning"
+          },
+          {
+            "kind": "variant",
+            "name": "error",
+            "storyId": "primitives-statusdot--error"
+          },
+          {
+            "kind": "variant",
+            "name": "processing",
+            "storyId": "primitives-statusdot--processing"
+          },
+          {
+            "kind": "variant",
+            "name": "reviewing",
+            "storyId": "primitives-statusdot--reviewing"
+          },
+          {
+            "kind": "variant",
+            "name": "ready",
+            "storyId": "primitives-statusdot--ready"
+          },
+          {
+            "kind": "variant",
+            "name": "unread",
+            "storyId": "primitives-statusdot--unread"
+          },
+          {
+            "kind": "variant",
+            "name": "unknown",
+            "storyId": "primitives-statusdot--unknown"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 7,
+    "brief": "**Field.** A label, hint and error wrapper around any control.",
+    "components": [
+      {
+        "name": "Field",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "label",
+            "storyId": "primitives-field--default"
+          },
+          {
+            "kind": "feature",
+            "name": "hint",
+            "storyId": "primitives-field--hint"
+          },
+          {
+            "kind": "state",
+            "name": "error",
+            "storyId": "primitives-field--error"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 8,
+    "brief": "**Input, Textarea and InputGroup.** Inputs with leading and trailing addons, in their invalid and disabled states.",
+    "components": [
+      {
+        "name": "Input",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "leading addon",
+            "storyId": "primitives-inputgroup--both"
+          },
+          {
+            "kind": "feature",
+            "name": "trailing addon",
+            "storyId": "primitives-inputgroup--both"
+          },
+          {
+            "kind": "state",
+            "name": "invalid",
+            "storyId": "primitives-input--invalid"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-input--disabled"
+          }
+        ]
+      },
+      {
+        "name": "Textarea",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "leading addon",
+            "storyId": "primitives-textarea--with-addons"
+          },
+          {
+            "kind": "feature",
+            "name": "trailing addon",
+            "storyId": "primitives-textarea--with-addons"
+          },
+          {
+            "kind": "state",
+            "name": "invalid",
+            "storyId": "primitives-textarea--invalid"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-textarea--disabled"
+          }
+        ]
+      },
+      {
+        "name": "InputGroup",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "leading addon",
+            "storyId": "primitives-inputgroup--both"
+          },
+          {
+            "kind": "feature",
+            "name": "trailing addon",
+            "storyId": "primitives-inputgroup--both"
+          },
+          {
+            "kind": "state",
+            "name": "invalid",
+            "storyId": "primitives-inputgroup--invalid"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-inputgroup--disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 9,
+    "brief": "**Select.** It also covers the model and permission selects, including a disabled read-only state for collaborators.",
+    "components": [
+      {
+        "name": "Select",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "model",
+            "storyId": "primitives-select--model"
+          },
+          {
+            "kind": "variant",
+            "name": "permission",
+            "storyId": "primitives-select--permission"
+          },
+          {
+            "kind": "state",
+            "name": "disabled read-only collaborator",
+            "storyId": "primitives-select--read-only-collaborator"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 10,
+    "brief": "**Checkbox, RadioGroup and Switch.**",
+    "components": [
+      {
+        "name": "Checkbox",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "unchecked",
+            "storyId": "primitives-checkbox--unchecked"
+          },
+          {
+            "kind": "state",
+            "name": "checked",
+            "storyId": "primitives-checkbox--checked"
+          },
+          {
+            "kind": "state",
+            "name": "indeterminate",
+            "storyId": "primitives-checkbox--indeterminate"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-checkbox--disabled"
+          }
+        ]
+      },
+      {
+        "name": "RadioGroup",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "selected",
+            "storyId": "primitives-radiogroup--selected"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-radiogroup--disabled"
+          }
+        ]
+      },
+      {
+        "name": "Switch",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "off",
+            "storyId": "primitives-switch--off"
+          },
+          {
+            "kind": "state",
+            "name": "on",
+            "storyId": "primitives-switch--on"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "primitives-switch--disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 11,
+    "brief": "**Dialog (Modal).** The brand modal from `WorkspaceSharing`: a title bar, the `[ESC] CLOSE` affordance, a body and footer actions, in sm, md and lg widths. It replaces both `CreateWorkspaceModal`s (in `Sidebar.tsx` and `WorkspaceList.tsx`), `AddRepoModal`, `JoinSharedWorkspaceModal` and the shell of `ConversationHistoryDialog`.",
+    "components": [
+      {
+        "name": "Dialog",
+        "entries": [
+          {
+            "kind": "size",
+            "name": "sm",
+            "storyId": "primitives-dialog--open-small",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "size",
+            "name": "md",
+            "storyId": "primitives-dialog--open",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "size",
+            "name": "lg",
+            "storyId": "primitives-dialog--open-large",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "feature",
+            "name": "title bar",
+            "storyId": "primitives-dialog--open",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "feature",
+            "name": "[ESC] CLOSE",
+            "storyId": "primitives-dialog--open",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "feature",
+            "name": "body",
+            "storyId": "primitives-dialog--open",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          },
+          {
+            "kind": "feature",
+            "name": "footer actions",
+            "storyId": "primitives-dialog--open",
+            "note": "play opens the dialog and leaves its contents visible for the canvas and accessibility test."
+          }
+        ],
+        "aliases": [
+          "Modal"
+        ]
+      }
+    ]
+  },
+  {
+    "item": 12,
+    "brief": "**Popover, HoverCard, Tooltip and DropdownMenu.** Restyle them to the tokens.",
+    "components": [
+      {
+        "name": "Popover",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "open",
+            "storyId": "primitives-popover--open"
+          },
+          {
+            "kind": "state",
+            "name": "closed",
+            "storyId": "primitives-popover--closed"
+          }
+        ]
+      },
+      {
+        "name": "HoverCard",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "open",
+            "storyId": "primitives-hovercard--open"
+          },
+          {
+            "kind": "state",
+            "name": "closed",
+            "storyId": "primitives-hovercard--closed"
+          }
+        ]
+      },
+      {
+        "name": "Tooltip",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "open",
+            "storyId": "primitives-tooltip--open"
+          },
+          {
+            "kind": "state",
+            "name": "closed",
+            "storyId": "primitives-tooltip--closed"
+          }
+        ]
+      },
+      {
+        "name": "DropdownMenu",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "open",
+            "storyId": "primitives-dropdownmenu--open"
+          },
+          {
+            "kind": "state",
+            "name": "closed",
+            "storyId": "primitives-dropdownmenu--closed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 13,
+    "brief": "**Command.** The cmdk list, which the command palette, quick open and the mention and slash popovers use.",
+    "components": [
+      {
+        "name": "Command",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "cmdk list",
+            "storyId": "primitives-command--commands"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 14,
+    "brief": "**Tabs.** A panel style and an underline style. It replaces the tab bars in `RightSidebar`, `EditorTabs` and `ActivityFeedTab`.",
+    "components": [
+      {
+        "name": "Tabs",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "panel",
+            "storyId": "primitives-tabs--panel"
+          },
+          {
+            "kind": "variant",
+            "name": "underline",
+            "storyId": "primitives-tabs--underline"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 15,
+    "brief": "**Layout helpers.** ScrollArea, Separator, ResizablePanels, Collapsible and Accordion.",
+    "components": [
+      {
+        "name": "ScrollArea",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "scrolling",
+            "storyId": "primitives-scrollarea--overflow"
+          }
+        ]
+      },
+      {
+        "name": "Separator",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "horizontal",
+            "storyId": "primitives-separator--horizontal"
+          },
+          {
+            "kind": "variant",
+            "name": "vertical",
+            "storyId": "primitives-separator--vertical"
+          }
+        ]
+      },
+      {
+        "name": "ResizablePanels",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "resizing",
+            "storyId": "primitives-resizablepanels--keyboard",
+            "note": "play focuses the separator and resizes with ArrowRight."
+          }
+        ]
+      },
+      {
+        "name": "Collapsible",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "open",
+            "storyId": "primitives-collapsible--open"
+          },
+          {
+            "kind": "state",
+            "name": "closed",
+            "storyId": "primitives-collapsible--closed"
+          }
+        ]
+      },
+      {
+        "name": "Accordion",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "expanded",
+            "storyId": "primitives-accordion--expanded"
+          },
+          {
+            "kind": "state",
+            "name": "collapsed",
+            "storyId": "primitives-accordion--collapsed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 16,
+    "brief": "**Progress and Meter.** Linear progress and a segmented meter. The meter replaces `ContextMeter`.",
+    "components": [
+      {
+        "name": "Progress",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "linear",
+            "storyId": "primitives-progress--in-progress"
+          }
+        ]
+      },
+      {
+        "name": "Meter",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "segmented",
+            "storyId": "primitives-meter--normal"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 17,
+    "brief": "**Avatar and AvatarStack.** AvatarStack replaces `PresenceAvatars`, with presence colours and an overflow count.",
+    "components": [
+      {
+        "name": "Avatar",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "image",
+            "storyId": "primitives-avatar--image"
+          },
+          {
+            "kind": "variant",
+            "name": "fallback",
+            "storyId": "primitives-avatar--fallback"
+          }
+        ]
+      },
+      {
+        "name": "AvatarStack",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "presence colours",
+            "storyId": "primitives-avatarstack--no-overflow"
+          },
+          {
+            "kind": "feature",
+            "name": "overflow count",
+            "storyId": "primitives-avatarstack--small"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 18,
+    "brief": "**Toast.** Info, success, warning and error, with an optional action. It replaces `Toast/*`.",
+    "components": [
+      {
+        "name": "Toast",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "info",
+            "storyId": "primitives-toast--info"
+          },
+          {
+            "kind": "variant",
+            "name": "success",
+            "storyId": "primitives-toast--success"
+          },
+          {
+            "kind": "variant",
+            "name": "warning",
+            "storyId": "primitives-toast--warning"
+          },
+          {
+            "kind": "variant",
+            "name": "error",
+            "storyId": "primitives-toast--error"
+          },
+          {
+            "kind": "feature",
+            "name": "optional action",
+            "storyId": "primitives-toast--with-action"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 19,
+    "brief": "**Callout.** Info, warning, error and view-only, inline. It replaces the sharing error box, the view-only notes, the \"secret answers stay on the host\" note and the host-unreachable state.",
+    "components": [
+      {
+        "name": "Callout",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "info",
+            "storyId": "primitives-callout--info"
+          },
+          {
+            "kind": "variant",
+            "name": "warning",
+            "storyId": "primitives-callout--warning"
+          },
+          {
+            "kind": "variant",
+            "name": "error",
+            "storyId": "primitives-callout--error"
+          },
+          {
+            "kind": "variant",
+            "name": "view-only",
+            "storyId": "primitives-callout--view-only"
+          },
+          {
+            "kind": "state",
+            "name": "host unreachable",
+            "storyId": "primitives-callout--warning"
+          },
+          {
+            "kind": "feature",
+            "name": "secret answers stay on the host",
+            "storyId": "primitives-callout--info"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 20,
+    "brief": "**Card and Surface.** Plain, strong, muted and approval surfaces, with an optional header and footer.",
+    "components": [
+      {
+        "name": "Card",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "plain",
+            "storyId": "primitives-card--plain"
+          },
+          {
+            "kind": "variant",
+            "name": "strong",
+            "storyId": "primitives-card--strong"
+          },
+          {
+            "kind": "variant",
+            "name": "muted",
+            "storyId": "primitives-card--muted"
+          },
+          {
+            "kind": "variant",
+            "name": "approval",
+            "storyId": "primitives-card--approval"
+          },
+          {
+            "kind": "feature",
+            "name": "optional header",
+            "storyId": "primitives-card--with-header-and-footer"
+          },
+          {
+            "kind": "feature",
+            "name": "optional footer",
+            "storyId": "primitives-card--with-header-and-footer"
+          }
+        ]
+      },
+      {
+        "name": "Surface",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "plain",
+            "storyId": "primitives-surface--plain"
+          },
+          {
+            "kind": "variant",
+            "name": "strong",
+            "storyId": "primitives-surface--strong"
+          },
+          {
+            "kind": "variant",
+            "name": "muted",
+            "storyId": "primitives-surface--muted"
+          },
+          {
+            "kind": "variant",
+            "name": "approval",
+            "storyId": "primitives-surface--approval"
+          },
+          {
+            "kind": "feature",
+            "name": "optional header",
+            "storyId": "primitives-surface--with-header-and-footer"
+          },
+          {
+            "kind": "feature",
+            "name": "optional footer",
+            "storyId": "primitives-surface--with-header-and-footer"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 21,
+    "brief": "**KodaLogo.** The ASCII logo (`KodaAsciiLogo`) in sm, md and lg.",
+    "components": [
+      {
+        "name": "KodaLogo",
+        "entries": [
+          {
+            "kind": "size",
+            "name": "sm",
+            "storyId": "brand-kodalogo--small"
+          },
+          {
+            "kind": "size",
+            "name": "md",
+            "storyId": "brand-kodalogo--medium"
+          },
+          {
+            "kind": "size",
+            "name": "lg",
+            "storyId": "brand-kodalogo--large"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 22,
+    "brief": "**Spinner.** The wave, scan, pulse, matrix and bounce variants from `KodaSpinner.tsx`, plus `LoadingScreen`.",
+    "components": [
+      {
+        "name": "Spinner",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "wave",
+            "storyId": "brand-spinner--wave"
+          },
+          {
+            "kind": "variant",
+            "name": "scan",
+            "storyId": "brand-spinner--scan"
+          },
+          {
+            "kind": "variant",
+            "name": "pulse",
+            "storyId": "brand-spinner--pulse"
+          },
+          {
+            "kind": "variant",
+            "name": "matrix",
+            "storyId": "brand-spinner--matrix"
+          },
+          {
+            "kind": "variant",
+            "name": "bounce",
+            "storyId": "brand-spinner--bounce"
+          }
+        ]
+      },
+      {
+        "name": "LoadingScreen",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "loading screen",
+            "storyId": "brand-loadingscreen--indeterminate"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 23,
+    "brief": "**WorkingIndicator.** Full and compact (`WorkingIndicator`, `CompactWorkingIndicator`).",
+    "components": [
+      {
+        "name": "WorkingIndicator",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "full",
+            "storyId": "brand-workingindicator--full"
+          },
+          {
+            "kind": "variant",
+            "name": "compact",
+            "storyId": "brand-workingindicator--compact"
+          }
+        ]
+      },
+      {
+        "name": "CompactWorkingIndicator",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "compact",
+            "storyId": "brand-compactworkingindicator--compact"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 24,
+    "brief": "**TerminalSection.** The `┌─ NAME ─┐` framed section from `Settings.tsx`, with an optional action in its header.",
+    "components": [
+      {
+        "name": "TerminalSection",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "framed section",
+            "storyId": "brand-terminalsection--default"
+          },
+          {
+            "kind": "feature",
+            "name": "optional header action",
+            "storyId": "brand-terminalsection--with-header-action"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 25,
+    "brief": "**Panel and PanelHeader.** Sidebar sections and right-panel headers, each with a title, a count and actions.",
+    "components": [
+      {
+        "name": "Panel",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "sidebar",
+            "storyId": "brand-panel--sidebar"
+          },
+          {
+            "kind": "variant",
+            "name": "right panel",
+            "storyId": "brand-panel--right-panel"
+          },
+          {
+            "kind": "feature",
+            "name": "title",
+            "storyId": "brand-panel--with-actions"
+          },
+          {
+            "kind": "feature",
+            "name": "count",
+            "storyId": "brand-panel--with-actions"
+          },
+          {
+            "kind": "feature",
+            "name": "actions",
+            "storyId": "brand-panel--with-actions"
+          }
+        ]
+      },
+      {
+        "name": "PanelHeader",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "title",
+            "storyId": "brand-panelheader--with-actions"
+          },
+          {
+            "kind": "feature",
+            "name": "count",
+            "storyId": "brand-panelheader--with-actions"
+          },
+          {
+            "kind": "feature",
+            "name": "actions",
+            "storyId": "brand-panelheader--with-actions"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 26,
+    "brief": "**EmptyState.** ASCII art or an icon, a message and an optional action.",
+    "components": [
+      {
+        "name": "EmptyState",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "ASCII art",
+            "storyId": "brand-emptystate--ascii-art"
+          },
+          {
+            "kind": "variant",
+            "name": "icon",
+            "storyId": "brand-emptystate--with-icon"
+          },
+          {
+            "kind": "feature",
+            "name": "message",
+            "storyId": "brand-emptystate--message"
+          },
+          {
+            "kind": "feature",
+            "name": "optional action",
+            "storyId": "brand-emptystate--with-action"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 27,
+    "brief": "**NavItem (ListRow).** A leading icon, a label, secondary meta, a trailing status or count, and hover actions. States: active, unread, running and disabled. It is the base of `SessionButton`, the repo and workspace rows in `Sidebar`, `FileTreeItem` and the shared workspace links.",
+    "components": [
+      {
+        "name": "NavItem",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "active",
+            "storyId": "brand-navitem--active"
+          },
+          {
+            "kind": "state",
+            "name": "unread",
+            "storyId": "brand-navitem--unread"
+          },
+          {
+            "kind": "state",
+            "name": "running",
+            "storyId": "brand-navitem--running"
+          },
+          {
+            "kind": "state",
+            "name": "disabled",
+            "storyId": "brand-navitem--disabled"
+          },
+          {
+            "kind": "state",
+            "name": "hover actions",
+            "storyId": "brand-navitem--hover-actions",
+            "note": "play hovers the row to reveal its action slot."
+          },
+          {
+            "kind": "state",
+            "name": "keyboard focus",
+            "storyId": "brand-navitem--keyboard-focus",
+            "note": "play focuses the row and asserts it has focus."
+          },
+          {
+            "kind": "feature",
+            "name": "leading icon",
+            "storyId": "brand-navitem--default"
+          },
+          {
+            "kind": "feature",
+            "name": "label",
+            "storyId": "brand-navitem--default"
+          },
+          {
+            "kind": "feature",
+            "name": "secondary meta",
+            "storyId": "brand-navitem--default"
+          },
+          {
+            "kind": "feature",
+            "name": "trailing status",
+            "storyId": "brand-navitem--with-status"
+          },
+          {
+            "kind": "feature",
+            "name": "trailing count",
+            "storyId": "brand-navitem--with-count"
+          }
+        ],
+        "aliases": [
+          "ListRow"
+        ]
+      }
+    ]
+  },
+  {
+    "item": 28,
+    "brief": "**Tree.** One expandable tree with keyboard navigation. It replaces `DiffView/FileTree` and `FileExplorer/FileTree`.",
+    "components": [
+      {
+        "name": "Tree",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "expanded",
+            "storyId": "brand-tree--expanded"
+          },
+          {
+            "kind": "state",
+            "name": "collapsed",
+            "storyId": "brand-tree--collapsed"
+          },
+          {
+            "kind": "feature",
+            "name": "keyboard navigation",
+            "storyId": "brand-tree--keyboard-navigation",
+            "note": "play expands with ArrowRight and navigates with arrows, Home and End."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 29,
+    "brief": "**FileIcon.**",
+    "components": [
+      {
+        "name": "FileIcon",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "file icon",
+            "storyId": "brand-fileicon--type-script-react"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 30,
+    "brief": "**DiffStat.** The `+12 −3` counts and a small change bar.",
+    "components": [
+      {
+        "name": "DiffStat",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "addition count",
+            "storyId": "brand-diffstat--mixed"
+          },
+          {
+            "kind": "feature",
+            "name": "deletion count",
+            "storyId": "brand-diffstat--mixed"
+          },
+          {
+            "kind": "feature",
+            "name": "change bar",
+            "storyId": "brand-diffstat--mixed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 31,
+    "brief": "**CodeBlock and InlineCode.** A code block with a language label, a copy button and wrapping.",
+    "components": [
+      {
+        "name": "CodeBlock",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "language label",
+            "storyId": "brand-codeblock--default"
+          },
+          {
+            "kind": "feature",
+            "name": "copy button",
+            "storyId": "brand-codeblock--copy"
+          },
+          {
+            "kind": "feature",
+            "name": "wrapping",
+            "storyId": "brand-codeblock--wrapped"
+          }
+        ]
+      },
+      {
+        "name": "InlineCode",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "inline code",
+            "storyId": "brand-inlinecode--default"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 32,
+    "brief": "**MessageBubble.** User, assistant and system variants, with an author label for shared sessions and a hover slot for the action bar.",
+    "components": [
+      {
+        "name": "MessageBubble",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "user",
+            "storyId": "patterns-messagebubble--user"
+          },
+          {
+            "kind": "variant",
+            "name": "assistant",
+            "storyId": "patterns-messagebubble--assistant"
+          },
+          {
+            "kind": "variant",
+            "name": "system",
+            "storyId": "patterns-messagebubble--system"
+          },
+          {
+            "kind": "feature",
+            "name": "shared author label",
+            "storyId": "patterns-messagebubble--shared-author"
+          },
+          {
+            "kind": "feature",
+            "name": "hover action slot",
+            "storyId": "patterns-messagebubble--hover-actions",
+            "note": "play hovers the article and focuses its action button."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 33,
+    "brief": "**ToolBlock.** A tool call that is running, done or failed. It is open while running and collapses when done, with a summary row (`ToolCallSummary`).",
+    "components": [
+      {
+        "name": "ToolBlock",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "running",
+            "storyId": "patterns-toolblock--running"
+          },
+          {
+            "kind": "state",
+            "name": "done",
+            "storyId": "patterns-toolblock--done",
+            "note": "play asserts the initially collapsed result, then opens it."
+          },
+          {
+            "kind": "state",
+            "name": "failed",
+            "storyId": "patterns-toolblock--failed"
+          },
+          {
+            "kind": "feature",
+            "name": "open while running",
+            "storyId": "patterns-toolblock--running"
+          },
+          {
+            "kind": "feature",
+            "name": "collapses when done",
+            "storyId": "patterns-toolblock--completion-collapses",
+            "note": "play completes a running tool and asserts aria-expanded=false."
+          },
+          {
+            "kind": "feature",
+            "name": "summary row",
+            "storyId": "patterns-toolblock--done",
+            "note": "play asserts the initially collapsed result, then opens it."
+          }
+        ]
+      },
+      {
+        "name": "ToolCallSummary",
+        "entries": [
+          {
+            "kind": "state",
+            "name": "running",
+            "storyId": "patterns-toolcallsummary--running"
+          },
+          {
+            "kind": "state",
+            "name": "done",
+            "storyId": "patterns-toolcallsummary--done"
+          },
+          {
+            "kind": "state",
+            "name": "failed",
+            "storyId": "patterns-toolcallsummary--failed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 34,
+    "brief": "**ApprovalCard.** A command, file or network request, with approve and deny actions. Variants: actionable, read-only (view permission), resolved and withdrawn. It shows the host's name when the viewer is a collaborator. It replaces the markup in `ApprovalRequests`.",
+    "components": [
+      {
+        "name": "ApprovalCard",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "command",
+            "storyId": "patterns-approvalcard--command-request"
+          },
+          {
+            "kind": "variant",
+            "name": "file",
+            "storyId": "patterns-approvalcard--file-request"
+          },
+          {
+            "kind": "variant",
+            "name": "network",
+            "storyId": "patterns-approvalcard--network-request"
+          },
+          {
+            "kind": "variant",
+            "name": "actionable",
+            "storyId": "patterns-approvalcard--command-request"
+          },
+          {
+            "kind": "variant",
+            "name": "read-only",
+            "storyId": "patterns-approvalcard--read-only"
+          },
+          {
+            "kind": "variant",
+            "name": "resolved",
+            "storyId": "patterns-approvalcard--resolved"
+          },
+          {
+            "kind": "variant",
+            "name": "withdrawn",
+            "storyId": "patterns-approvalcard--withdrawn"
+          },
+          {
+            "kind": "feature",
+            "name": "approve action",
+            "storyId": "patterns-approvalcard--command-request"
+          },
+          {
+            "kind": "feature",
+            "name": "deny action",
+            "storyId": "patterns-approvalcard--deny"
+          },
+          {
+            "kind": "feature",
+            "name": "collaborator host name",
+            "storyId": "patterns-approvalcard--read-only"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 35,
+    "brief": "**QuestionCard.** Single choice, multiple choice, free text and a secret answer. The read-only and \"answer on the host\" states come from `QuestionRequests`. Merge it with `Interview/QuestionCard`.",
+    "components": [
+      {
+        "name": "QuestionCard",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "single choice",
+            "storyId": "patterns-questioncard--single-choice"
+          },
+          {
+            "kind": "variant",
+            "name": "multiple choice",
+            "storyId": "patterns-questioncard--multiple-choice"
+          },
+          {
+            "kind": "variant",
+            "name": "free text",
+            "storyId": "patterns-questioncard--free-text"
+          },
+          {
+            "kind": "variant",
+            "name": "secret answer",
+            "storyId": "patterns-questioncard--secret-answer"
+          },
+          {
+            "kind": "state",
+            "name": "read-only",
+            "storyId": "patterns-questioncard--read-only"
+          },
+          {
+            "kind": "state",
+            "name": "answer on the host",
+            "storyId": "patterns-questioncard--answer-on-host"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 36,
+    "brief": "**Composer.** A textarea, a model selector slot, a permission select, send and stop, an attachments slot and placeholder variants (own session, someone else's session, view only). It is the shell of `InputArea`.",
+    "components": [
+      {
+        "name": "Composer",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "own session placeholder",
+            "storyId": "patterns-composer--own-session",
+            "note": "The empty initial canvas shows the own-session placeholder; play types and sends a message."
+          },
+          {
+            "kind": "variant",
+            "name": "someone else's session placeholder",
+            "storyId": "patterns-composer--someone-elses-session"
+          },
+          {
+            "kind": "variant",
+            "name": "view only placeholder",
+            "storyId": "patterns-composer--view-only-placeholder"
+          },
+          {
+            "kind": "feature",
+            "name": "textarea",
+            "storyId": "patterns-composer--own-session",
+            "note": "The empty initial canvas shows the own-session placeholder; play types and sends a message."
+          },
+          {
+            "kind": "feature",
+            "name": "model selector slot",
+            "storyId": "patterns-composer--own-session",
+            "note": "The empty initial canvas shows the own-session placeholder; play types and sends a message."
+          },
+          {
+            "kind": "feature",
+            "name": "permission select",
+            "storyId": "patterns-composer--own-session",
+            "note": "The empty initial canvas shows the own-session placeholder; play types and sends a message."
+          },
+          {
+            "kind": "feature",
+            "name": "send",
+            "storyId": "patterns-composer--own-session",
+            "note": "The empty initial canvas shows the own-session placeholder; play types and sends a message."
+          },
+          {
+            "kind": "feature",
+            "name": "stop",
+            "storyId": "patterns-composer--running"
+          },
+          {
+            "kind": "feature",
+            "name": "attachments slot",
+            "storyId": "patterns-composer--with-attachments"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 37,
+    "brief": "**SharedBadge.** `[SHARED BY X · CONTROL]` and `[SHARED BY X · VIEW]`, with its `data-permission` attribute. It also covers the content of `CollaborationStatus`.",
+    "components": [
+      {
+        "name": "SharedBadge",
+        "entries": [
+          {
+            "kind": "variant",
+            "name": "control",
+            "storyId": "patterns-sharedbadge--control"
+          },
+          {
+            "kind": "variant",
+            "name": "view",
+            "storyId": "patterns-sharedbadge--view"
+          },
+          {
+            "kind": "feature",
+            "name": "data-permission control",
+            "storyId": "patterns-sharedbadge--control"
+          },
+          {
+            "kind": "feature",
+            "name": "data-permission view",
+            "storyId": "patterns-sharedbadge--view"
+          },
+          {
+            "kind": "feature",
+            "name": "collaboration status",
+            "storyId": "patterns-sharedbadge--connection-status"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 38,
+    "brief": "**TerminalFrame.** Terminal chrome with a title, its status and a \"read-only mirror\" label for collaborators. The xterm instance renders inside it.",
+    "components": [
+      {
+        "name": "TerminalFrame",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "title",
+            "storyId": "patterns-terminalframe--host"
+          },
+          {
+            "kind": "feature",
+            "name": "status",
+            "storyId": "patterns-terminalframe--host"
+          },
+          {
+            "kind": "state",
+            "name": "read-only mirror",
+            "storyId": "patterns-terminalframe--read-only-mirror"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 39,
+    "brief": "**CommandPalette shell.** It is built on Command.",
+    "components": [
+      {
+        "name": "CommandPalette",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "Command shell",
+            "storyId": "patterns-commandpalette--embedded"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "item": 40,
+    "brief": "**AppShell.** The layout slots for the sidebar, top bar, main area and right panel (from `Layout`, `TopBar` and `RightSidebar`). Document it as a layout pattern with placeholder content.",
+    "components": [
+      {
+        "name": "AppShell",
+        "entries": [
+          {
+            "kind": "feature",
+            "name": "sidebar",
+            "storyId": "patterns-appshell--workspace"
+          },
+          {
+            "kind": "feature",
+            "name": "top bar",
+            "storyId": "patterns-appshell--workspace"
+          },
+          {
+            "kind": "feature",
+            "name": "main area",
+            "storyId": "patterns-appshell--workspace"
+          },
+          {
+            "kind": "feature",
+            "name": "right panel",
+            "storyId": "patterns-appshell--workspace"
+          },
+          {
+            "kind": "feature",
+            "name": "placeholder layout",
+            "storyId": "patterns-appshell--workspace"
+          }
+        ]
+      }
+    ]
+  }
+]
