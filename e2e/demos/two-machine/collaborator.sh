@@ -29,6 +29,7 @@ start() {
   mkdir -p "$STATE/data"
   export KODA_DATA_DIR="$STATE/data" KODA_DB_PATH="$STATE/data/koda.db" KODA_SOCKET="$STATE/koda.sock"
   export KODA_USER_NAME="${KODA_USER_NAME:-Alex}" KODA_HTTP_HOST=localhost KODA_HTTP_PORT="$RPC_PORT"
+  export KODA_COLLAB_MODE=development
   export KODA_MODE=local KODA_AUTH_ENABLED=false GIT_TERMINAL_PROMPT=0
   export VITE_PORT="$VITE_PORT" VITE_HTTP_RPC_PORT="$RPC_PORT" KODA_CORS_ORIGINS="http://localhost:$VITE_PORT"
   local chrome

@@ -29,11 +29,13 @@ for (const mode of ['development-key', 'service'] as const) {
 for (const agent of ['codex', 'claude'] as const) {
 test(`Liveblocks ${mode} ${agent}: two separate instances, live streaming/presence, control relay, enforced view access`, async ({ browser }, testInfo) => {
   if (agent === 'codex') requireCodex()
-  requireLiveblocks()
-  const worker = mode === 'service' ? new CollaborationWorker(testInfo) : undefined
+  const deployedUrl = mode === 'service' ? process.env.KODA_PROOF_COLLAB_URL : undefined
+  if (!deployedUrl) requireLiveblocks()
+  const worker = mode === 'service' && !deployedUrl ? new CollaborationWorker(testInfo) : undefined
   if (worker) { try { await worker.start() } catch (error) { await worker.cleanup(); throw error } }
-  const host = new KodaInstance('A', testInfo, { serviceUrl: worker?.url })
-  const guest = new KodaInstance('B', testInfo, { serviceUrl: worker?.url })
+  const serviceUrl = deployedUrl || worker?.url
+  const host = new KodaInstance('A', testInfo, { serviceUrl })
+  const guest = new KodaInstance('B', testInfo, { serviceUrl })
   const contextA = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const contextB = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
   const a = await contextA.newPage()
@@ -56,6 +58,7 @@ test(`Liveblocks ${mode} ${agent}: two separate instances, live streaming/presen
     await expect(a.getByTestId('agent-chat-container')).toHaveAttribute('data-session-id', /.+/)
     const sessionId = await a.getByTestId('agent-chat-container').getAttribute('data-session-id')
     if (agent === 'claude') host.trackClaudeSession(sessionId!, workspace.worktreePath)
+    else host.trackCodexSession(sessionId!, workspace.worktreePath)
     const permissionMode = (await host.rpc<{ permissionMode: string }>(`${agent}.get`, { sessionId })).permissionMode
     expect(permissionMode).toBe(agent === 'claude' ? 'bypassPermissions' : 'default')
     roomId = `workspace:${workspace.worktreeId}`
@@ -144,7 +147,7 @@ test(`Liveblocks ${mode} ${agent}: two separate instances, live streaming/presen
     expect(upstreamSession.threadId).toBeTruthy()
     writeFileSync(testInfo.outputPath('evidence.json'), JSON.stringify({
       hostPids: host.pids, guestPids: guest.pids, separateDataDirectories: host.dataDir !== guest.dataDir,
-      mode, sidecarsHaveDevelopmentKey: mode === 'development-key', agent, permissionMode, sessionId, threadId: upstreamSession.threadId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
+      mode, serviceUrl, sidecarsHaveDevelopmentKey: mode === 'development-key', agent, permissionMode, sessionId, threadId: upstreamSession.threadId, worktreeId: workspace.worktreeId, viewBackendRejection: rejection.error, revokedControlRejection: revoked.error,
       proof: `Two real sidecars, separate SQLite databases and browser contexts, real ${agent} runtime and Liveblocks cloud. Side-by-side PNGs compose unmodified captures of both browser windows; not native Tauri webview automation.`,
     }, null, 2))
   } finally {
@@ -155,7 +158,11 @@ test(`Liveblocks ${mode} ${agent}: two separate instances, live streaming/presen
       () => contextA.close(), () => contextB.close(),
       async () => {
         if (!roomId) return
-        if (worker) { await host.rpc('collaboration.deleteRoom', { roomId }); return }
+        if (mode === 'service') {
+          await host.rpc('collaboration.deleteRoom', { roomId })
+          writeFileSync(testInfo.outputPath('room-cleanup.json'), JSON.stringify({ roomId, serviceUrl, ownerDeleteSucceeded: true }, null, 2))
+          return
+        }
         const response = await fetch(`https://api.liveblocks.io/v2/rooms/${encodeURIComponent(roomId)}`, {
           method: 'DELETE', headers: { Authorization: `Bearer ${process.env.LIVEBLOCKS_SECRET_KEY}` }, signal: AbortSignal.timeout(15_000),
         })

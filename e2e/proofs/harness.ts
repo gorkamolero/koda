@@ -153,6 +153,7 @@ export class KodaInstance {
       KODA_SOCKET: join(this.root, 'koda.sock'),
       KODA_HTTP_HOST: 'localhost', KODA_HTTP_PORT: String(this.rpcPort),
       KODA_MODE: 'local', KODA_AUTH_ENABLED: 'false',
+      KODA_COLLAB_MODE: this.serviceUrl ? 'service' : 'development',
       VITE_PORT: String(this.vitePort), VITE_HTTP_RPC_PORT: String(this.rpcPort),
       KODA_VITE_CACHE_DIR: join(this.root, 'vite-cache'),
       KODA_CORS_ORIGINS: this.url,
