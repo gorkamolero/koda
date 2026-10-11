@@ -1,0 +1,10 @@
+import type { Meta, StoryObj } from '@storybook/react-vite'
+import { expect, userEvent, within } from 'storybook/test'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from './dropdown-menu'
+import { Button } from './button'
+const meta = { title: 'Primitives/DropdownMenu', component: DropdownMenu, subcomponents: { DropdownMenuContent, DropdownMenuItem }, tags: ['autodocs'], render: args => <DropdownMenu {...args}><DropdownMenuTrigger asChild><Button variant="bracket">Workspace actions</Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuLabel>design-system</DropdownMenuLabel><DropdownMenuItem>Copy branch name</DropdownMenuItem><DropdownMenuItem disabled>Delete main branch</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked>Show hidden files</DropdownMenuCheckboxItem><DropdownMenuRadioGroup value="name"><DropdownMenuRadioItem value="name">Sort by name</DropdownMenuRadioItem><DropdownMenuRadioItem value="status">Sort by status</DropdownMenuRadioItem></DropdownMenuRadioGroup><DropdownMenuSub><DropdownMenuSubTrigger>Share permission</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuItem>View</DropdownMenuItem><DropdownMenuItem>Control</DropdownMenuItem></DropdownMenuSubContent></DropdownMenuSub></DropdownMenuContent></DropdownMenu> } satisfies Meta<typeof DropdownMenu>
+export default meta
+type Story = StoryObj<typeof meta>
+export const Closed: Story = {}
+export const Open: Story = { args: { defaultOpen: true } }
+export const Keyboard: Story = { play: async ({ canvasElement }) => { const trigger = within(canvasElement).getByRole('button'); trigger.focus(); await userEvent.keyboard('{Enter}'); await expect(within(canvasElement.ownerDocument.body).getByRole('menu')).toBeVisible(); await userEvent.keyboard('{Escape}'); await expect(trigger).toHaveFocus() } }
