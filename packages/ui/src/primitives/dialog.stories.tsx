@@ -11,3 +11,7 @@ export const Small: Story = { args: { size: 'sm' } }
 export const Large: Story = { args: { size: 'lg' } }
 export const OpenAndEscape: Story = { play: async ({ canvasElement }) => { const canvas = within(canvasElement); const trigger = canvas.getByRole('button', { name: 'Share workspace' }); await userEvent.click(trigger); const document = within(canvasElement.ownerDocument.body); await expect(document.getByRole('dialog')).toBeVisible(); await userEvent.keyboard('{Escape}'); await expect(document.queryByRole('dialog')).not.toBeInTheDocument(); await expect(trigger).toHaveFocus() } }
 export const Open: Story = { play: async ({ canvasElement }) => { await userEvent.click(within(canvasElement).getByRole('button', { name: 'Share workspace' })) } }
+
+/** Leave the small and large widths open so both the canvas and axe inspect the actual modal. */
+export const OpenSmall: Story = { ...Open, args: { size: 'sm' } }
+export const OpenLarge: Story = { ...Open, args: { size: 'lg' } }

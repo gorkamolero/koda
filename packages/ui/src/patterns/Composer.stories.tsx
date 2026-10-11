@@ -19,3 +19,13 @@ export const CustomPlaceholder: Story = { args: { placeholder: 'Describe the exp
 
 
 export const TerminalComposer: Story = { args: { appearance: 'terminal', textareaProps: { 'data-testid': 'chat-input' }, footer: <div className="border-t border-dashed border-border-subtle bg-surface-composer text-text-on-composer p-2"><Button type="submit" variant="bracket" size="sm">Send</Button></div> }, play: async ({ canvasElement, args }) => { const canvas = within(canvasElement); await userEvent.type(canvas.getByTestId('chat-input'), 'Review the session.'); await userEvent.click(canvas.getByRole('button', { name: 'Send' })); await expect(args.onSend).toHaveBeenCalledOnce() } }
+
+export const ViewOnlyPlaceholder: Story = {
+  args: { mode: 'view-only', ownerName: 'Gorka', value: '' },
+  play: async ({ canvasElement }) => {
+    const input = within(canvasElement).getByRole('textbox', { name: 'Message' })
+    await expect(input).toHaveValue('')
+    await expect(input).toHaveAttribute('placeholder', 'View only · Gorka controls this session')
+    await expect(input).toBeDisabled()
+  },
+}
