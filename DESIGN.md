@@ -31,7 +31,7 @@ Tailwind consumers can use `@koda/ui/tailwind-preset`, import `@koda/ui/source-s
 | Layers | Base, sticky, popover, modal and toast |
 | Icons | Lucide at 12, 14 and 16, with the desktop's file-extension mapping in `FileIcon` |
 
-The theme toolbar sets `data-koda-theme="obsidian|light|dim|graphite"` and the desktop's `.dark`/`.light` class. Desktop's theme loader retains its existing theme IDs and imported-theme translator. Tests compare every original resolved token against a captured pre-move fixture in all four themes; CSS and typed objects are checked for parity.
+The theme toolbar sets `data-koda-theme="obsidian|light|dim|graphite"` and the desktop's `.dark`/`.light` class. Desktop's theme loader retains its existing theme IDs and imported-theme translator. Tests compare original resolved tokens against a captured pre-move fixture in all four themes, with an explicit exception for the now-opaque Light popover; CSS and typed objects are checked for parity.
 
 Light intentionally retains some dark terminal and panel surfaces from the existing application. New components use the matching `text-on-*` foreground tokens there. Do not “correct” inherited legacy values during a token-only move.
 
@@ -152,3 +152,11 @@ Playwright captures the actual desktop with deterministic browser RPC fixtures i
 The public Storybook is <https://koda-storybook.pages.dev>, a static build on Cloudflare Pages (project `koda-storybook`). `pnpm storybook:deploy` builds it and publishes it with `wrangler pages deploy`, using the Cloudflare account wrangler is signed in to. There is no CI deploy.
 
 The build serves from the site root. Set `STORYBOOK_BASE` to serve it from a subpath instead. Storybook's own frame and its docs pages use the Obsidian tokens (`.storybook/kodaTheme.ts`).
+
+### Floating surfaces
+
+Use `--surface-popover` for dialogs, menus, tooltips, selects, hover cards and toasts. It is opaque in every bundled theme (Light: `#ffffff`); `--surface-card` and status tints can be translucent and are only suitable inside an opaque surface. Desktop dialogs inherit the shared dashed border and popover shadow without surface overrides.
+
+`--surface-overlay` includes its alpha: Obsidian, Dim and Graphite use `rgba(0, 0, 0, 0.8)`; Light uses `rgba(0, 0, 0, 0.45)`. Apply it directly without additional opacity. The `.light` fallback also uses 45% black.
+
+Use `--text-secondary` for dialog labels, hints and close labels, and `--text-action` for action text. Secondary text on the popover surface meets WCAG AA (4.5:1) in all four themes; token tests enforce this pairing. Do not use decorative `--text-dim` or `--text-faint` for these labels.

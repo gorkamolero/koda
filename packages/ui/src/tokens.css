@@ -97,6 +97,7 @@
   --surface-hover: var(--black-hover);
   --surface-active: var(--accent-terracotta-soft);
   --surface-popover: var(--black-card);
+  --surface-overlay: rgba(0, 0, 0, 0.8);
   --surface-bubble: var(--black-card);
   --surface-bubble-user: var(--accent-terracotta-soft);
   --surface-terminal: var(--black-pure);
@@ -358,6 +359,7 @@
   --surface-hover: #f0f0f0;
   --surface-active: rgba(224, 122, 95, 0.15);
   --surface-popover: #ffffff;
+  --surface-overlay: rgba(0, 0, 0, 0.45);
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-strong: rgba(0, 0, 0, 0.12);
   --border-accent: var(--accent-terracotta);
@@ -449,6 +451,7 @@
   --surface-hover: #1a1a1a;
   --surface-active: rgba(224, 122, 95, 0.15);
   --surface-popover: #141414;
+  --surface-overlay: rgba(0, 0, 0, 0.8);
   --surface-bubble: var(--black-card);
   --surface-bubble-user: rgba(224, 122, 95, 0.15);
   --surface-terminal: var(--black-pure);
@@ -625,7 +628,8 @@
   --surface-control-disabled: var(--black-elevated);
   --surface-hover: rgba(0, 0, 0, 0.04);
   --surface-active: rgba(100, 200, 255, 0.2);
-  --surface-popover: rgba(255, 255, 255, 0.98);
+  --surface-popover: #ffffff;
+  --surface-overlay: rgba(0, 0, 0, 0.45);
   --surface-bubble: var(--black-card);
   --surface-bubble-user: rgba(60, 140, 255, 0.3);
   --surface-terminal: var(--black-pure);
@@ -803,6 +807,7 @@
   --surface-hover: #1f1f1f;
   --surface-active: rgba(224, 122, 95, 0.12);
   --surface-popover: #171717;
+  --surface-overlay: rgba(0, 0, 0, 0.8);
   --surface-bubble: var(--black-card);
   --surface-bubble-user: rgba(224, 122, 95, 0.12);
   --surface-terminal: var(--black-pure);
@@ -980,6 +985,7 @@
   --surface-hover: #2c2f35;
   --surface-active: rgba(224, 122, 95, 0.18);
   --surface-popover: #2a2d33;
+  --surface-overlay: rgba(0, 0, 0, 0.8);
   --surface-bubble: var(--black-card);
   --surface-bubble-user: rgba(224, 122, 95, 0.18);
   --surface-terminal: var(--black-pure);

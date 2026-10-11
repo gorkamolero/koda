@@ -58,6 +58,7 @@ export default {
   			'surface-hover': 'var(--surface-hover)',
   			'surface-active': 'var(--surface-active)',
   			'surface-popover': 'var(--surface-popover)',
+      'surface-overlay': 'var(--surface-overlay)',
   			'surface-bubble': 'var(--surface-bubble)',
   			'surface-bubble-user': 'var(--surface-bubble-user)',
   			'surface-terminal': 'var(--surface-terminal)',

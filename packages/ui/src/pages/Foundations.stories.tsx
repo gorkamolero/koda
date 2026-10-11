@@ -16,6 +16,15 @@ function Foundations({ section = 'all' }: { section?: 'all' | 'color' | 'type' |
         <p className="break-all p-3 text-xs text-text-primary">{name}</p>
       </div>)}</div>
     </TerminalSection>)}
+    {show('color') && <TerminalSection title="Floating surfaces">
+      <p className="mb-3 text-text-secondary">Opaque popovers use secondary text for labels. Modal overlays dim Light by 45% and dark themes by 80%.</p>
+      <div className="relative overflow-hidden bg-surface-messages p-8">
+        <div aria-hidden="true" className="absolute inset-0 bg-surface-overlay" />
+        <div className="relative border border-dashed border-border-strong bg-surface-popover p-4 shadow-popover">
+          <p>Dialog / popover</p><p className="mt-2 text-text-secondary">ATTACH EXISTING REPO: · [ESC] CLOSE</p>
+        </div>
+      </div>
+    </TerminalSection>}
     {show('type') && <TerminalSection title="Typography"><div className="space-y-4">{Object.entries(typography).map(([name, role]) => <div key={name} className="grid gap-2 border-b border-border-subtle pb-4 md:grid-cols-3"><div><h2 className="text-sm font-semibold capitalize">{name}</h2><p className="mt-1 text-xs text-text-secondary">{role.fontSize} / {role.lineHeight} / {role.letterSpacing}</p></div><div className="md:col-span-2" style={role}>{name === 'label' ? '[REVIEW CHANGES]' : name === 'code' ? 'git diff --stat HEAD' : 'A workspace for work worth reviewing.'}</div></div>)}</div></TerminalSection>}
     {show('scales') && <>
       <TerminalSection title="Spacing"><div className="space-y-2">{Object.entries(spacing).map(([step, size]) => <div key={step} className="flex items-center gap-4"><span className="w-14 shrink-0">{step}</span><div aria-hidden="true" className="foundation-spacing h-3 max-w-full bg-text-muted" style={{ '--sample-space': size } as CSSProperties} /><span className="text-text-secondary">{size}</span></div>)}</div></TerminalSection>

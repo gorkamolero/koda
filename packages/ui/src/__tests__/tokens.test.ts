@@ -41,7 +41,9 @@ describe('shared Koda tokens', () => {
     // Fixture captured from the original :root + .light + bundled theme cascade.
     // Resolving aliases catches visually different substitutions, not just names.
     for (const [key, value] of Object.entries(expected)) {
-      expect(resolveToken(tokens[key as keyof typeof tokens], tokens), `${theme.name}: ${key}`).toBe(value)
+      // koda-token-exception: Regression reference for the intentionally opaque Light surface.
+      const current = name === 'codexLightTheme' && key === '--surface-popover' ? '#ffffff' : value
+      expect(resolveToken(tokens[key as keyof typeof tokens], tokens), `${theme.name}: ${key}`).toBe(current)
     }
   })
 
@@ -60,6 +62,24 @@ describe('shared Koda tokens', () => {
     for (const [name, theme] of Object.entries(themes)) {
       expect(declarations(css, `[data-koda-theme="${name}"]`)).toEqual(theme.variables)
     }
+  })
+
+  it.each(Object.entries(themes))('keeps %s floating surfaces opaque with AA secondary text', (name, theme) => {
+    const tokens = { ...baseTokens, ...theme.variables }
+    const surface = resolveToken(tokens['--surface-popover'], tokens)
+    expect(surface).toMatch(/^#[0-9a-f]{6}$/i)
+    expect(tokens['--surface-overlay']).toBe(name === 'light' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.8)')
+    const luminance = (hex: string) => {
+      const rgb = hex.slice(1).match(/../g)!.map(channel => {
+        const value = parseInt(channel, 16) / 255
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+      })
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+    }
+    const background = luminance(surface)
+    const foreground = luminance(resolveToken(tokens['--text-secondary'], tokens))
+    const ratio = (Math.max(background, foreground) + 0.05) / (Math.min(background, foreground) + 0.05)
+    expect(ratio).toBeGreaterThanOrEqual(4.5)
   })
 
   it('makes shadcn colors aliases of named Koda colors', () => {
