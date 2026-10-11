@@ -168,7 +168,17 @@ export const baseColorTokens = {
   "--text-on-approval": "var(--text-primary)",
   "--text-on-control-hover": "var(--text-primary)",
   "--text-on-control-disabled": "var(--text-primary)",
-  "--text-action": "var(--accent-terracotta)"
+  "--focus-ring-color": "var(--text-action)",
+  "--text-action": "var(--accent-terracotta)",
+  "--text-secondary": "var(--warm-500)",
+  "--status-success-foreground": "var(--status-success)",
+  "--status-warning-foreground": "var(--status-warning)",
+  "--status-error-foreground": "var(--status-error)",
+  "--status-processing-foreground": "var(--status-processing)",
+  "--status-reviewing-foreground": "var(--status-reviewing)",
+  "--status-ready-foreground": "var(--status-ready)",
+  "--status-unread-foreground": "var(--status-unread)",
+  "--status-unknown-foreground": "var(--text-muted)"
 } as const
 
 export type ThemeTokenName = keyof typeof baseColorTokens
@@ -259,6 +269,9 @@ export const foundationTokens = {
   "--icon-sm": "12px",
   "--icon-md": "14px",
   "--icon-lg": "16px",
+  "--focus-ring-width": "2px",
+  "--focus-ring-offset": "2px",
+  "--duration-reduced": "0.01ms",
   "--type-display-sm-size": "8px",
   "--type-display-md-size": "10px",
   "--type-display-lg-size": "12px",
@@ -336,7 +349,17 @@ export const lightClassTokens = {
   "--text-on-approval": "var(--warm-700)",
   "--text-on-control-hover": "var(--warm-700)",
   "--text-on-control-disabled": "var(--warm-700)",
-  "--text-action": "#2563a6"
+  "--focus-ring-color": "var(--text-action)",
+  "--text-action": "#2563a6",
+  "--text-secondary": "#525252",
+  "--status-success-foreground": "#166534",
+  "--status-warning-foreground": "#854d0e",
+  "--status-error-foreground": "#b91c1c",
+  "--status-processing-foreground": "var(--text-action)",
+  "--status-reviewing-foreground": "#0e7490",
+  "--status-ready-foreground": "#166534",
+  "--status-unread-foreground": "#1d4ed8",
+  "--status-unknown-foreground": "var(--text-muted)"
 } as const satisfies Partial<ThemeTokens>
 
 export interface ThemeDefinition {
@@ -452,6 +475,7 @@ export const kodaGraphiteTheme: ThemeDefinition = {
   type: "dark",
   variables: {
     ...baseColorTokens,
+    "--text-secondary": "var(--warm-600)",
     "--text-primary": "#cdd0d4",
     "--text-strong": "#eceef1",
     "--text-emphasis": "#dde0e4",

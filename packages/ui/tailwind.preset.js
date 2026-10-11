@@ -9,6 +9,9 @@ export default {
             'surface-base': 'var(--surface-base)',
             ...Object.fromEntries(['terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval', 'control-hover', 'control-disabled'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
             'text-action': 'var(--text-action)',
+            focus: 'var(--focus-ring-color)',
+            'text-secondary': 'var(--text-secondary)',
+            ...Object.fromEntries(['success', 'warning', 'error', 'processing', 'reviewing', 'ready', 'unread', 'unknown'].map(status => [`status-${status}-foreground`, `var(--status-${status}-foreground)`])),
 			/* Gray scale for direct access */
 			gray: {
 				0: 'var(--gray-0)',

@@ -165,7 +165,17 @@
   --text-on-approval: var(--text-primary);
   --text-on-control-hover: var(--text-primary);
   --text-on-control-disabled: var(--text-primary);
+  --focus-ring-color: var(--text-action);
   --text-action: var(--accent-terracotta);
+  --text-secondary: var(--warm-500);
+  --status-success-foreground: var(--status-success);
+  --status-warning-foreground: var(--status-warning);
+  --status-error-foreground: var(--status-error);
+  --status-processing-foreground: var(--status-processing);
+  --status-reviewing-foreground: var(--status-reviewing);
+  --status-ready-foreground: var(--status-ready);
+  --status-unread-foreground: var(--status-unread);
+  --status-unknown-foreground: var(--text-muted);
   --sidebar-width: 280px;
   --topbar-height: 44px;
   --right-panel-width: 230px;
@@ -249,6 +259,9 @@
   --icon-sm: 12px;
   --icon-md: 14px;
   --icon-lg: 16px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --duration-reduced: 0.01ms;
   --type-display-sm-size: 8px;
   --type-display-md-size: 10px;
   --type-display-lg-size: 12px;
@@ -323,7 +336,17 @@
   --text-on-approval: var(--warm-700);
   --text-on-control-hover: var(--warm-700);
   --text-on-control-disabled: var(--warm-700);
+  --focus-ring-color: var(--text-action);
   --text-action: #2563a6;
+  --text-secondary: #525252;
+  --status-success-foreground: #166534;
+  --status-warning-foreground: #854d0e;
+  --status-error-foreground: #b91c1c;
+  --status-processing-foreground: var(--text-action);
+  --status-reviewing-foreground: #0e7490;
+  --status-ready-foreground: #166534;
+  --status-unread-foreground: #1d4ed8;
+  --status-unknown-foreground: var(--text-muted);
 }
 
 [data-koda-theme="obsidian"] {
@@ -490,7 +513,17 @@
   --text-on-approval: var(--text-primary);
   --text-on-control-hover: var(--text-primary);
   --text-on-control-disabled: var(--text-primary);
+  --focus-ring-color: var(--text-action);
   --text-action: var(--accent-terracotta);
+  --text-secondary: var(--warm-500);
+  --status-success-foreground: var(--status-success);
+  --status-warning-foreground: var(--status-warning);
+  --status-error-foreground: var(--status-error);
+  --status-processing-foreground: var(--status-processing);
+  --status-reviewing-foreground: var(--status-reviewing);
+  --status-ready-foreground: var(--status-ready);
+  --status-unread-foreground: var(--status-unread);
+  --status-unknown-foreground: var(--text-muted);
 }
 
 [data-koda-theme="light"] {
@@ -657,7 +690,17 @@
   --text-on-approval: var(--warm-700);
   --text-on-control-hover: var(--warm-700);
   --text-on-control-disabled: var(--warm-700);
+  --focus-ring-color: var(--text-action);
   --text-action: #2563a6;
+  --text-secondary: #525252;
+  --status-success-foreground: #166534;
+  --status-warning-foreground: #854d0e;
+  --status-error-foreground: #b91c1c;
+  --status-processing-foreground: var(--text-action);
+  --status-reviewing-foreground: #0e7490;
+  --status-ready-foreground: #166534;
+  --status-unread-foreground: #1d4ed8;
+  --status-unknown-foreground: var(--text-muted);
 }
 
 [data-koda-theme="dim"] {
@@ -824,7 +867,17 @@
   --text-on-approval: var(--text-primary);
   --text-on-control-hover: var(--text-primary);
   --text-on-control-disabled: var(--text-primary);
+  --focus-ring-color: var(--text-action);
   --text-action: var(--accent-terracotta);
+  --text-secondary: var(--warm-500);
+  --status-success-foreground: var(--status-success);
+  --status-warning-foreground: var(--status-warning);
+  --status-error-foreground: var(--status-error);
+  --status-processing-foreground: var(--status-processing);
+  --status-reviewing-foreground: var(--status-reviewing);
+  --status-ready-foreground: var(--status-ready);
+  --status-unread-foreground: var(--status-unread);
+  --status-unknown-foreground: var(--text-muted);
 }
 
 [data-koda-theme="graphite"] {
@@ -991,7 +1044,17 @@
   --text-on-approval: var(--text-primary);
   --text-on-control-hover: var(--text-primary);
   --text-on-control-disabled: var(--text-primary);
+  --focus-ring-color: var(--text-action);
   --text-action: var(--accent-terracotta);
+  --text-secondary: var(--warm-600);
+  --status-success-foreground: var(--status-success);
+  --status-warning-foreground: var(--status-warning);
+  --status-error-foreground: var(--status-error);
+  --status-processing-foreground: var(--status-processing);
+  --status-reviewing-foreground: var(--status-reviewing);
+  --status-ready-foreground: var(--status-ready);
+  --status-unread-foreground: var(--status-unread);
+  --status-unknown-foreground: var(--text-muted);
 }
 
 .reduced-transparency {
