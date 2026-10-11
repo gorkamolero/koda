@@ -90,10 +90,10 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
 
   const files = flattenedItems.filter(({ node }) => !isDiffFolder(node))
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (!['j', 'k', 'n', 'p'].includes(event.key)) return
+    if (!['ArrowDown', 'ArrowUp', 'j', 'k', 'n', 'p'].includes(event.key)) return
     event.preventDefault()
     const current = files.findIndex(({ node }) => node.id === selectedFileId)
-    const next = files[current + (event.key === 'j' || event.key === 'n' ? 1 : -1)]
+    const next = files[current + (['ArrowDown', 'j', 'n'].includes(event.key) ? 1 : -1)]
     if (next) setSelectedFileId(next.node.id)
     if (event.key === 'n') onNavigateNext?.()
     if (event.key === 'p') onNavigatePrev?.()
@@ -170,7 +170,15 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
 
       <Tree items={toItems(tree)} label="Changed files" containerRef={parentRef} className="flex-1 overflow-auto fade-mask-y" data-virtualized="true" selectedId={selectedFileId ?? undefined} expandedIds={expandedFolders} indent="3" rowClassName="text-sm"
         onSelect={item => { if (!item.children) setSelectedFileId(item.id) }} onExpandedChange={item => toggleFolder(item.id)} onKeyDown={handleKeyDown}
-        rowProps={item => { const node = nodes.get(item.id); return node && !isDiffFolder(node) ? { 'data-testid': `diff-file-${node.path.replace(/[./]/g, '-')}`, 'data-selected': selectedFileId === node.id, 'data-file-status': node.status } : { 'data-testid': 'diff-folder-item', 'data-expanded': expandedFolders.has(item.id) } }}
+        rowProps={item => {
+          const node = nodes.get(item.id)
+          return {
+            // Diff shortcuts select files through the feature's bubbling handler;
+            // they must not also invoke the Tree's filename typeahead.
+            onKeyDown: event => { if (['j', 'k', 'n', 'p'].includes(event.key)) event.preventDefault() },
+            ...(node && !isDiffFolder(node) ? { 'data-testid': `diff-file-${node.path.replace(/[./]/g, '-')}`, 'data-selected': selectedFileId === node.id, 'data-file-status': node.status } : { 'data-testid': 'diff-folder-item', 'data-expanded': expandedFolders.has(item.id) }),
+          }
+        }}
         virtual={{ rows: virtualizer.getVirtualItems(), totalSize: virtualizer.getTotalSize(), measureElement: virtualizer.measureElement, scrollToIndex: index => { const offset = virtualizer.getOffsetForIndex(index, 'auto'); if (offset) virtualizer.scrollToOffset(offset[0]) } }} />
     </div>
   )

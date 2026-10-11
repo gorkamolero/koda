@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Tree } from './index'
+import { Input } from '../primitives'
 import { expect, userEvent, within, fn } from 'storybook/test'
 
 const meta = { title: 'Brand/Tree', component: Tree, tags: ['autodocs'], parameters: { layout: 'padded' }, args: { label: 'Workspace files', items: [{ id: 'src', label: 'src', children: [{ id: 'app', label: 'App.tsx' }, { id: 'index', label: 'index.ts' }] }, { id: 'readme', label: 'README.md' }, { id: 'lock', label: 'pnpm-lock.yaml', disabled: true }], onSelect: fn() },  } satisfies Meta<typeof Tree>
@@ -48,5 +49,27 @@ export const VirtualKeyboardNavigation: Story = {
     await expect(canvas.getByRole('treeitem', { name: 'file-99.ts' })).toHaveFocus()
     await userEvent.keyboard('{Home}')
     await expect(canvas.getByRole('treeitem', { name: 'file-0.ts' })).toHaveFocus()
+  },
+}
+
+export const PreservesComposerFocus: Story = {
+  render: function ComposerAndTree(args) {
+    const [draft, setDraft] = useState('')
+    return <><Input aria-label="Draft message" autoFocus value={draft} onChange={event => setDraft(event.target.value)} /><Tree {...args} selectedId="readme" virtual={{ totalSize: 84, rows: args.items.map((item, index) => ({ index, key: item.id, start: index * 28 })) }} /></>
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const composer = canvas.getByRole('textbox', { name: 'Draft message' })
+    await expect(composer).toHaveFocus()
+    await userEvent.type(composer, 'Keep this draft')
+    await expect(composer).toHaveFocus()
+    await expect(composer).toHaveValue('Keep this draft')
+    canvas.getByRole('treeitem', { name: 'src' }).focus()
+    await userEvent.keyboard('{ArrowDown}')
+    await expect(canvas.getByRole('treeitem', { name: 'README.md' })).toHaveFocus()
+    await userEvent.click(composer)
+    await userEvent.type(composer, ' while files update')
+    await expect(composer).toHaveFocus()
+    await expect(composer).toHaveValue('Keep this draft while files update')
   },
 }

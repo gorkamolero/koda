@@ -170,14 +170,17 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
   const expanded = expandedIds ?? localExpanded
   const [focused, setFocused] = useState<string | undefined>(selectedId)
   const refs = useRef(new Map<string, HTMLDivElement>())
+  const pendingFocus = useRef<string>()
   const typeahead = useRef({ text: '', time: 0 })
   const rows: { item: TreeItem; level: number; parent?: string; pos: number; count: number }[] = []
   function visit(nodes: TreeItem[], level: number, parent?: string) { nodes.forEach((item, index) => { rows.push({ item, level: level + (item.depth ?? 0), parent, pos: index + 1, count: nodes.length }); if (item.children && expanded.has(item.id)) visit(item.children, level + 1, item.id) }) }
   visit(items, 1)
   const enabled = rows.filter(row => !row.item.disabled)
   const focusId = enabled.some(row => row.item.id === focused) ? focused : enabled[0]?.item.id
-  useEffect(() => { if (focused) refs.current.get(focused)?.focus({ preventScroll: true }) }, [focused, virtual?.rows])
-  function move(id?: string) { if (id) { setFocused(id); const element = refs.current.get(id); if (element) element.focus(); else virtual?.scrollToIndex?.(rows.findIndex(row => row.item.id === id)) } }
+  // Only finish an explicit move to an unmounted virtual row. A selected item
+  // must not take focus from a composer when this tree mounts or rerenders.
+  useEffect(() => { const element = pendingFocus.current ? refs.current.get(pendingFocus.current) : undefined; if (element) { pendingFocus.current = undefined; element.focus({ preventScroll: true }) } }, [virtual?.rows])
+  function move(id?: string) { if (id) { setFocused(id); const element = refs.current.get(id); pendingFocus.current = element ? undefined : id; if (element) element.focus(); else virtual?.scrollToIndex?.(rows.findIndex(row => row.item.id === id)) } }
   function toggle(item: TreeItem, open: boolean) {
     if (!expandedIds) setExpanded(current => { const next = new Set(current); if (open) next.add(item.id); else next.delete(item.id); return next })
     onExpandedChange?.(item, open)
@@ -187,7 +190,7 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
     return <div key={item.id} {...custom} ref={element => { if (element) refs.current.set(item.id, element); else refs.current.delete(item.id) }} role="treeitem" aria-label={item.label} tabIndex={item.id === focusId ? 0 : -1} aria-level={level} aria-posinset={pos} aria-setsize={count} aria-selected={selectedId === item.id} aria-expanded={item.children ? expanded.has(item.id) : undefined} aria-disabled={item.disabled || undefined}
       className={cn('flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface-hover', focus, selectedId === item.id && 'bg-surface-active', item.disabled && 'opacity-50', rowClassName, custom?.className)}
       style={{ ...custom?.style, paddingLeft: `calc(var(--space-2) + ${level - 1} * var(--space-${indent}))` }}
-      onFocus={() => setFocused(item.id)} onClick={() => { if (!item.disabled) { move(item.id); onSelect?.(item); if (item.children) toggle(item, !expanded.has(item.id)) } }}
+      onFocus={() => { pendingFocus.current = undefined; setFocused(item.id) }} onClick={() => { if (!item.disabled) { move(item.id); onSelect?.(item); if (item.children) toggle(item, !expanded.has(item.id)) } }}
       onKeyDown={event => {
         custom?.onKeyDown?.(event)
         if (item.disabled || event.defaultPrevented) return
@@ -210,7 +213,7 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
       {item.icon ?? <FileIcon filename={item.label} type={item.children ? 'directory' : 'file'} isExpanded={expanded.has(item.id)} />}<span className="min-w-0 flex-1 truncate">{item.content ?? item.label}</span>{item.meta}
     </div>
   }
-  return <div ref={containerRef} role="tree" aria-label={label} className={cn('font-code text-xs', className)} {...props}>
+  return <div ref={containerRef} role="tree" aria-label={label} className={cn('font-code text-xs', className)} {...props} onBlurCapture={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) pendingFocus.current = undefined; props.onBlurCapture?.(event) }}>
     {virtual ? <div className="relative w-full" style={{ height: virtual.totalSize }}>{virtual.rows.map(row => rows[row.index] && <div key={String(row.key)} data-index={row.index} ref={virtual.measureElement} className="absolute left-0 top-0 w-full" style={{ transform: `translateY(${row.start}px)` }}>{renderRow(rows[row.index]!)}</div>)}</div> : rows.map(renderRow)}
   </div>
 }

@@ -436,16 +436,17 @@ function TerminalTab({
   onClose,
 }: TerminalTabProps): React.ReactElement {
   return (
-    <div className="group flex items-center">
+    <div className={cn("group relative flex items-center", active ? "text-text-accent" : "text-text-muted hover:text-text-primary")}>
     <Button variant="unstyled"
       onClick={onClick}
       data-testid={testId}
       data-active={active}
       className={cn(
-        'group flex items-center gap-1 px-2 py-1 text-xs transition-colors',
+        'flex items-center pl-2 py-1 text-xs transition-colors',
+        closable ? 'pr-6' : 'pr-2',
         active
           ? 'text-text-accent bg-surface-active'
-          : 'text-text-muted hover:text-text-primary hover:bg-surface-hover'
+          : 'text-text-muted group-hover:text-text-primary group-hover:bg-surface-hover'
       )}
     >
       <span>[{label}]</span>
@@ -458,7 +459,7 @@ function TerminalTab({
             e.stopPropagation()
             onClose?.()
           }}
-          className="opacity-0 group-hover:opacity-100 hover:text-status-error transition-opacity"
+          className="absolute right-2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-status-error transition-opacity"
         >
           <X className="size-3" />
         </Button>

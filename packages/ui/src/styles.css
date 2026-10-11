@@ -18,7 +18,8 @@
     *, *::before, *::after {
       animation-duration: var(--duration-reduced) !important;
       animation-iteration-count: 1 !important;
-      transition-duration: var(--duration-reduced) !important;
+      /* A nonzero universal duration also transitions synchronous font/layout measurements. */
+      transition: none !important;
     }
   }
 }
