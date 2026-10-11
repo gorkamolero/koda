@@ -75,7 +75,7 @@ pnpm --filter @koda/ui exec playwright install chromium
 pnpm test-storybook     # Browser stories and accessibility checks
 ```
 
-Public Storybook: [koda-storybook.pages.dev](https://koda-storybook.pages.dev), on Cloudflare Pages. `pnpm storybook:deploy` builds it and publishes it with the Cloudflare account wrangler is signed in to.
+Public Storybook: [gorkamolero.github.io/koda](https://gorkamolero.github.io/koda/), on GitHub Pages. `pnpm storybook:pages` builds it and publishes it to the `gh-pages` branch. A mirror runs on Cloudflare Pages at [koda-storybook.pages.dev](https://koda-storybook.pages.dev), published with `pnpm storybook:deploy`.
 
 ![Koda Storybook: host workspace composed from the shared design system](docs/design-system.png)
 

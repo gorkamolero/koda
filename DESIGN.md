@@ -149,9 +149,9 @@ Playwright captures the actual desktop with deterministic browser RPC fixtures i
 
 ## Publication
 
-The public Storybook is <https://koda-storybook.pages.dev>, a static build on Cloudflare Pages (project `koda-storybook`). `pnpm storybook:deploy` builds it and publishes it with `wrangler pages deploy`, using the Cloudflare account wrangler is signed in to. There is no CI deploy.
+The public Storybook is <https://gorkamolero.github.io/koda/>, on GitHub Pages. `pnpm storybook:pages` builds it with `STORYBOOK_BASE=/koda/` and commits the output to the `gh-pages` branch from a temporary directory, as a fast-forward on the previous deploy; GitHub's branch build serves it (with `.nojekyll`, so Storybook's files pass through untouched). There is no Actions workflow.
 
-The build serves from the site root. Set `STORYBOOK_BASE` to serve it from a subpath instead. Storybook's own frame and its docs pages use the Obsidian tokens (`.storybook/kodaTheme.ts`).
+A mirror is <https://koda-storybook.pages.dev> on Cloudflare Pages (project `koda-storybook`). `pnpm storybook:deploy` builds it for the site root and publishes it with `wrangler pages deploy`, using the Cloudflare account wrangler is signed in to. Storybook's own frame and its docs pages use the Obsidian tokens (`.storybook/kodaTheme.ts`).
 
 ### Floating surfaces
 
