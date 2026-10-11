@@ -266,7 +266,7 @@ function WorktreeRow({
 
         {/* Unread count */}
         {unreadCount > 0 && (
-          <span className="px-1 bg-border-accent text-text-inverse text-micro font-bold">
+          <span className="px-1 bg-border-accent text-text-on-accent text-micro font-bold">
             {unreadCount}
           </span>
         )}
@@ -649,10 +649,6 @@ function SidebarFooter({ onAddRepo, hasWorkspace }: { onAddRepo: () => void; has
         </div>
       </div>
 
-      {/* ASCII footer decoration */}
-      <div className="px-3 py-1 text-2xs text-text-dim/50">
-        └─────────────────────────────┘
-      </div>
     </div>
   )
 }
@@ -700,7 +696,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
+              'text-border-accent hover:bg-border-accent hover:text-text-on-accent',
               'font-mono text-xs uppercase tracking-wider',
               'transition-colors duration-100'
             )}
@@ -737,7 +733,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
+              'text-border-accent hover:bg-border-accent hover:text-text-on-accent',
               'font-mono text-xs uppercase tracking-wider',
               'transition-colors duration-100'
             )}

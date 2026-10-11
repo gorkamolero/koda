@@ -7,7 +7,7 @@ import { Lock, Terminal as TerminalIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { rpcRequest } from '@/lib/tauri'
 import { onPtyData, onPtyExit } from '@/lib/sidecarRpc'
-import { TERMINAL_OPTIONS } from './terminalOptions'
+import { TERMINAL_OPTIONS, syncTerminalTheme } from './terminalOptions'
 import '@xterm/xterm/css/xterm.css'
 
 type HostTerminal = { sessionId: string; pid: number; workingDirectory: string; createdAt: string }
@@ -32,6 +32,7 @@ export function RemoteTerminalPanel({ worktreeId, hostName }: { worktreeId: stri
     for (const { sessionId } of terminals) {
       if (mirrors.current.has(sessionId)) continue
       const terminal = new Terminal({ ...TERMINAL_OPTIONS, disableStdin: true, cursorBlink: false })
+      const stopTheme = syncTerminalTheme(terminal)
       const fitAddon = new FitAddon()
       terminal.loadAddon(fitAddon)
       // Output that arrives while the snapshot loads is written after it.
@@ -48,7 +49,7 @@ export function RemoteTerminalPanel({ worktreeId, hostName }: { worktreeId: stri
         .then(({ data }) => terminal.write(data))
         .catch(() => {})
         .finally(() => { for (const data of pending ?? []) terminal.write(data); pending = null })
-      mirrors.current.set(sessionId, { terminal, fitAddon, dispose: () => { stopData(); stopExit(); terminal.dispose() } })
+      mirrors.current.set(sessionId, { terminal, fitAddon, dispose: () => { stopTheme(); stopData(); stopExit(); terminal.dispose() } })
     }
     setActiveId((current) => current && open.has(current) ? current : terminals[0]?.sessionId ?? null)
   }, [terminals])
@@ -88,7 +89,7 @@ export function RemoteTerminalPanel({ worktreeId, hostName }: { worktreeId: stri
             >
               <TerminalIcon className="h-3 w-3" />
               <span>Terminal {index + 1}</span>
-              <span className="text-muted-foreground/60 text-2xs">({item.pid})</span>
+              <span className="text-text-faint text-2xs">({item.pid})</span>
             </Button>
           ))}
         </div>

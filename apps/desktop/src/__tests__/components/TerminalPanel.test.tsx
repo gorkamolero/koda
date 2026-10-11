@@ -11,6 +11,7 @@ vi.mock('@/lib/tauri', () => ({ rpcRequest }))
 vi.mock('@/lib/sidecarRpc', () => ({ onPtyData, onPtyExit }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit = vi.fn() } }))
 vi.mock('@xterm/xterm', () => ({ Terminal: class {
+  options = {}
   cols = 80
   rows = 24
   element?: HTMLDivElement

@@ -63,7 +63,7 @@ function TerminalSelect({
       onChange={(e) => { onChange(e.target.value) }}
       className={cn(
         'w-full px-3 py-2 text-xs font-mono',
-        'bg-[var(--black-soft)] border border-dashed border-border-subtle',
+        'border-dashed',
         'text-text-primary',
         'focus:outline-none focus:border-text-accent',
         'transition-colors cursor-pointer'
@@ -85,7 +85,7 @@ function ShortcutRow({ action, keys }: { action: string; keys: string }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-dashed border-border-subtle last:border-0">
       <span className="text-text-muted">{action}</span>
-      <Kbd className="px-2 py-1 bg-[var(--black-soft)] border border-dashed border-border-subtle text-text-accent">
+      <Kbd className="px-2 py-1 bg-surface-control border border-dashed border-border-subtle text-text-accent">
         {keys}
       </Kbd>
     </div>
@@ -110,7 +110,7 @@ function CollaborationSettings() {
     } catch (e) { setSaveError(e instanceof Error ? e.message : String(e)) }
     finally { setSaving(false) }
   }
-  const inputClass = 'rounded-none h-auto text-xs w-full px-3 py-2 bg-[var(--black-soft)] border border-dashed border-border-subtle text-text-primary focus:outline-none focus:border-text-accent'
+  const inputClass = 'rounded-none h-auto text-xs w-full px-3 py-2 bg-surface-control border border-dashed border-border-subtle text-text-primary focus:outline-none focus:border-text-accent'
   return <TerminalSection compact className="[&_h2]:text-text-accent" title="COLLABORATION" description="Share workspaces using your install identity. Your first share registers it automatically.">
     <div className="space-y-4">
       <TerminalField label="DISPLAY NAME">
@@ -156,15 +156,9 @@ export function Settings() {
       <div className="max-w-2xl mx-auto p-8">
         {/* ASCII Header */}
         <div className="mb-8 text-xs">
-          <div className="text-text-faint mb-4">
-            ┌{'─'.repeat(40)}┐
-          </div>
           <div className="text-center mb-4">
             <h1 className="text-xl text-text-accent tracking-wider">[SETTINGS]</h1>
             <p className="text-text-muted mt-2">Configure your workspace preferences</p>
-          </div>
-          <div className="text-text-faint">
-            └{'─'.repeat(40)}┘
           </div>
         </div>
 
@@ -271,9 +265,7 @@ export function Settings() {
 
           {/* Footer */}
           <div className="text-center text-text-faint text-2xs pt-4">
-            <div>{'─'.repeat(40)}</div>
             <div className="py-2">KODA TERMINAL v0.1.0</div>
-            <div>{'─'.repeat(40)}</div>
           </div>
         </div>
       </div>

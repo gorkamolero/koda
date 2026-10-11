@@ -269,7 +269,7 @@ function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
           className={cn(
             'px-6 py-3 font-mono text-xs uppercase tracking-wider',
             'border border-dashed border-border-accent',
-            'text-border-accent hover:bg-border-accent hover:text-text-inverse',
+            'text-border-accent hover:bg-border-accent hover:text-text-on-accent',
             'transition-colors duration-100'
           )}
         >
@@ -360,7 +360,7 @@ export function WorkspaceList() {
             className={cn(
               'px-4 py-2 font-mono text-xs uppercase tracking-wider',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
+              'text-border-accent hover:bg-border-accent hover:text-text-on-accent',
               'transition-colors duration-100'
             )}
           >

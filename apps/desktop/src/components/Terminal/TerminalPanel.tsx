@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { rpcRequest } from '@/lib/tauri'
 import { onPtyData, onPtyExit } from '@/lib/sidecarRpc'
 import '@xterm/xterm/css/xterm.css'
-import { TERMINAL_OPTIONS } from './terminalOptions'
+import { TERMINAL_OPTIONS, syncTerminalTheme } from './terminalOptions'
 
 interface TerminalTab {
   id: string
@@ -204,7 +204,7 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
       ptySessionId: null,
       pid: null,
       connecting: true,
-      disposeListeners: [],
+      disposeListeners: [syncTerminalTheme(terminal)],
     }
 
     scope.tabs.set(id, newTab)
@@ -316,7 +316,7 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
               )}
               <span>{tab.title}</span>
               {tab.pid && (
-                <span className="text-muted-foreground/60 text-2xs" data-testid="terminal-pid">
+                <span className="text-text-faint text-2xs" data-testid="terminal-pid">
                   ({tab.pid})
                 </span>
               )}

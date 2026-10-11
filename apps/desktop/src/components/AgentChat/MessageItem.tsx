@@ -169,7 +169,7 @@ export const MessageItem = memo(function MessageItem({
     error={isError}
     summary={hasContentBlocks && message.contentBlocks ? <ToolCallSummary contentBlocks={message.contentBlocks} className="mb-2" /> : undefined}
     heading={<><div className="flex items-center gap-2 text-text-faint"><span>┌─</span><span className="text-text-accent">KODA</span>{isStreaming && <span className="text-status-warning">[STREAMING]</span>}{isError && <span className="text-status-error">[ERROR]</span>}</div>{message.model && <span className="text-text-faint text-2xs">{message.model.includes('opus') ? 'opus-4.5' : message.model.includes('sonnet') ? 'sonnet-4' : message.model.includes('haiku') ? 'haiku' : message.model}</span>}</>}
-    footer={isStreaming ? <div className="flex items-center justify-between px-3 py-1.5 border-t border-dashed border-border-subtle"><WorkingIndicator startTime={message.startTime ?? message.timestamp} className="text-xs" /><span className="text-text-faint">─┘</span></div> : <div className="px-3 py-1 text-text-faint">└{'─'.repeat(40)}┘</div>}
+    footer={isStreaming ? <div className="flex items-center justify-between px-3 py-1.5 border-t border-dashed border-border-subtle"><WorkingIndicator startTime={message.startTime ?? message.timestamp} className="text-xs" /></div> : undefined}
   >
     <div className="prose prose-sm prose-invert prose-pre:bg-[var(--black-soft)] prose-pre:border prose-pre:border-dashed prose-pre:border-border-subtle max-w-none">
       {hasContentBlocks && message.contentBlocks ? <div className="space-y-3">

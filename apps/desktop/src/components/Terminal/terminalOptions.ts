@@ -53,3 +53,30 @@ export const TERMINAL_OPTIONS: ConstructorParameters<typeof Terminal>[0] = {
   cursorStyle: 'bar',
   scrollback: 1000,
 }
+
+/** Resolve shared CSS tokens at xterm's API boundary, including live theme changes. */
+export function syncTerminalTheme(terminal: Terminal): () => void {
+  const update = () => {
+    const css = getComputedStyle(document.documentElement)
+    const color = (token: string) => css.getPropertyValue(token).trim()
+    const background = color('--surface-terminal')
+    const foreground = color('--text-primary')
+    terminal.options.theme = {
+      background, foreground, cursor: color('--text-action'), cursorAccent: background,
+      selectionBackground: color('--surface-active'),
+      black: color('--text-strong'), brightBlack: color('--text-faint'),
+      white: foreground, brightWhite: color('--text-strong'),
+      red: color('--status-error'), brightRed: color('--status-error'),
+      green: color('--status-success'), brightGreen: color('--status-success'),
+      yellow: color('--status-warning'), brightYellow: color('--status-warning'),
+      blue: color('--status-unread'), brightBlue: color('--status-unread'),
+      magenta: color('--text-action'), brightMagenta: color('--text-action'),
+      cyan: color('--status-reviewing'), brightCyan: color('--status-reviewing'),
+    }
+    terminal.options.minimumContrastRatio = 4.5
+  }
+  update()
+  const observer = new MutationObserver(update)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-koda-theme'] })
+  return () => observer.disconnect()
+}

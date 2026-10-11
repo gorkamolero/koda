@@ -324,7 +324,7 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
           />
 
           {/* Footer controls - integrated into the box */}
-          <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-border-subtle group-focus-within:border-text-accent/50 bg-[var(--black-rich)] transition-colors">
+          <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-border-subtle group-focus-within:border-text-accent/50 bg-surface-composer transition-colors">
             {/* Left controls: Model, Thinking, Plan */}
             <div className="flex items-center gap-1 text-xs">
               {/* Model selector */}
