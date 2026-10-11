@@ -7,6 +7,7 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
+    "test:terminal": "playwright test --config terminal.config.ts",
     "test:proof": "playwright test --config proof.config.ts",
     "typecheck:proof": "tsc --noEmit -p tsconfig.proof.json",
     "test:proof:codex": "playwright test --config proof.config.ts codex-proof.spec.ts",

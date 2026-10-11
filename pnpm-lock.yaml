@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  xterm@5.3.0:
+    hash: zsviqmevbjnjsxd2c3wk5hga6q
+    path: patches/xterm@5.3.0.patch
+
 importers:
 
   .:
@@ -136,10 +141,10 @@ importers:
         version: 1.0.7(tailwindcss@3.4.19(tsx@4.21.0))
       xterm:
         specifier: ^5.3.0
-        version: 5.3.0
+        version: 5.3.0(patch_hash=zsviqmevbjnjsxd2c3wk5hga6q)
       xterm-addon-fit:
         specifier: ^0.8.0
-        version: 0.8.0(xterm@5.3.0)
+        version: 0.8.0(xterm@5.3.0(patch_hash=zsviqmevbjnjsxd2c3wk5hga6q))
       yjs:
         specifier: ^13.6.29
         version: 13.6.29
@@ -13531,11 +13536,11 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  xterm-addon-fit@0.8.0(xterm@5.3.0):
+  xterm-addon-fit@0.8.0(xterm@5.3.0(patch_hash=zsviqmevbjnjsxd2c3wk5hga6q)):
     dependencies:
-      xterm: 5.3.0
+      xterm: 5.3.0(patch_hash=zsviqmevbjnjsxd2c3wk5hga6q)
 
-  xterm@5.3.0: {}
+  xterm@5.3.0(patch_hash=zsviqmevbjnjsxd2c3wk5hga6q): {}
 
   y-indexeddb@9.0.12(yjs@13.6.29):
     dependencies:
