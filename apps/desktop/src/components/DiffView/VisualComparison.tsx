@@ -1,3 +1,4 @@
+import { Button, Input } from '@koda/ui'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { selectedFileAtom, visualStateAtom, type VisualCompareMode } from '@/store/diff'
@@ -189,7 +190,7 @@ export function VisualComparison() {
         <div className="flex items-center gap-2">
           {/* Compare mode buttons */}
           <div className="flex items-center gap-1 bg-secondary rounded-md p-0.5">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => { setCompareMode('slider') }}
               className={`
@@ -198,8 +199,8 @@ export function VisualComparison() {
               `}
             >
               Slider
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => { setCompareMode('side-by-side') }}
               className={`
@@ -208,8 +209,8 @@ export function VisualComparison() {
               `}
             >
               Side by Side
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={() => { setCompareMode('overlay') }}
               className={`
@@ -218,11 +219,11 @@ export function VisualComparison() {
               `}
             >
               Overlay
-            </button>
+            </Button>
           </div>
 
           {/* Pixel diff toggle */}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={togglePixelOverlay}
             className={`
@@ -245,7 +246,7 @@ export function VisualComparison() {
               />
             </svg>
             Pixel Diff
-          </button>
+          </Button>
         </div>
 
         {/* Difference percentage */}
@@ -259,10 +260,10 @@ export function VisualComparison() {
               font-mono font-medium
               ${
                 visualState.differencePercent > 10
-                  ? 'text-red-500'
+                  ? 'text-status-error'
                   : visualState.differencePercent > 5
-                    ? 'text-yellow-500'
-                    : 'text-green-500'
+                    ? 'text-status-warning'
+                    : 'text-status-success'
               }
             `}
           >
@@ -512,7 +513,7 @@ function OverlayComparison({
       {/* Opacity slider */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-background/90 rounded-lg shadow-lg">
         <span className="text-xs text-muted-foreground">Before</span>
-        <input
+        <Input
           type="range"
           min="0"
           max="1"

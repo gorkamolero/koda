@@ -1,3 +1,4 @@
+import { Button, DiffStat, Tree, type TreeItem } from '@koda/ui'
 import { useRef, useCallback, useEffect, useMemo } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -12,11 +13,10 @@ import {
   fileFilterAtom,
   fileCountsByStatusAtom,
   type DiffTreeNode,
-  type DiffFile,
   type FileStatus,
   type DiffFileFilter,
 } from '@/store/diff'
-import { ChevronRight, Folder, Plus, Minus, FileEdit, Files } from 'lucide-react'
+import { Plus, Minus, FileEdit, Files } from 'lucide-react'
 
 /**
  * File status badge colors - using design tokens
@@ -88,97 +88,28 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
     overscan: 5,
   })
 
-  const handleItemClick = useCallback(
-    (node: DiffTreeNode) => {
-      if (isDiffFolder(node)) {
-        toggleFolder(node.id)
-      } else {
-        setSelectedFileId(node.id)
-      }
-    },
-    [toggleFolder, setSelectedFileId]
-  )
-
-  // Keyboard navigation
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const files = flattenedItems.filter(({ node }) => !isDiffFolder(node))
-      const currentIndex = files.findIndex(({ node }) => {
-        if (isDiffFolder(node)) return false
-        return node.id === selectedFileId
-      })
-
-      switch (e.key) {
-        case 'ArrowDown':
-        case 'j': {
-          e.preventDefault()
-          const nextItem = files[currentIndex + 1]
-          if (currentIndex < files.length - 1 && nextItem && !isDiffFolder(nextItem.node)) {
-            setSelectedFileId(nextItem.node.id)
-          }
-          break
-        }
-        case 'ArrowUp':
-        case 'k': {
-          e.preventDefault()
-          const prevItem = files[currentIndex - 1]
-          if (currentIndex > 0 && prevItem && !isDiffFolder(prevItem.node)) {
-            setSelectedFileId(prevItem.node.id)
-          }
-          break
-        }
-        case 'n': {
-          e.preventDefault()
-          onNavigateNext?.()
-          const nextItem = files[currentIndex + 1]
-          if (currentIndex < files.length - 1 && nextItem && !isDiffFolder(nextItem.node)) {
-            setSelectedFileId(nextItem.node.id)
-          }
-          break
-        }
-        case 'p': {
-          e.preventDefault()
-          onNavigatePrev?.()
-          const prevItem = files[currentIndex - 1]
-          if (currentIndex > 0 && prevItem && !isDiffFolder(prevItem.node)) {
-            setSelectedFileId(prevItem.node.id)
-          }
-          break
-        }
-        case 'Enter':
-        case ' ': {
-          e.preventDefault()
-          // Toggle folder or select file at current index
-          const current = flattenedItems[currentIndex]
-          if (current) {
-            handleItemClick(current.node)
-          }
-          break
-        }
-      }
-    },
-    [
-      flattenedItems,
-      selectedFileId,
-      setSelectedFileId,
-      handleItemClick,
-      onNavigateNext,
-      onNavigatePrev,
-    ]
-  )
-
-  // Scroll selected item into view
+  const files = flattenedItems.filter(({ node }) => !isDiffFolder(node))
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (!['j', 'k', 'n', 'p'].includes(event.key)) return
+    event.preventDefault()
+    const current = files.findIndex(({ node }) => node.id === selectedFileId)
+    const next = files[current + (event.key === 'j' || event.key === 'n' ? 1 : -1)]
+    if (next) setSelectedFileId(next.node.id)
+    if (event.key === 'n') onNavigateNext?.()
+    if (event.key === 'p') onNavigatePrev?.()
+  }, [files, selectedFileId, setSelectedFileId, onNavigateNext, onNavigatePrev])
   useEffect(() => {
-    if (selectedFileId) {
-      const index = flattenedItems.findIndex(({ node }) => {
-        if (isDiffFolder(node)) return false
-        return node.id === selectedFileId
-      })
-      if (index !== -1) {
-        virtualizer.scrollToIndex(index, { align: 'auto' })
-      }
-    }
+    const index = flattenedItems.findIndex(({ node }) => node.id === selectedFileId)
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'auto' })
   }, [selectedFileId, flattenedItems, virtualizer])
+  const nodes = new Map(flattenedItems.map(({ node }) => [node.id, node]))
+  function toItems(nodes: DiffTreeNode[]): TreeItem[] {
+    return nodes.map(node => isDiffFolder(node) ? { id: node.id, label: node.name, children: toItems(node.children) } : {
+      id: node.id, label: node.path,
+      icon: <span className={cn('flex size-4 shrink-0 items-center justify-center rounded text-2xs font-bold', STATUS_COLORS[node.status].bg, STATUS_COLORS[node.status].text)} data-testid="file-status-badge" data-status={node.status}>{STATUS_LABELS[node.status]}</span>,
+      meta: <DiffStat additions={node.additions} deletions={node.deletions} showBar={false} />,
+    })
+  }
 
   return (
     <div className="flex flex-col h-full bg-surface-sidebar" data-testid="diff-file-tree">
@@ -204,7 +135,7 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
           if (count === 0 && tab.id !== 'all') return null
 
           return (
-            <button
+            <Button variant="unstyled"
               key={tab.id}
               type="button"
               onClick={() => { setFileFilter(tab.id); }}
@@ -222,7 +153,7 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
               {count > 0 && (
                 <span
                   className={cn(
-                    'px-1 py-0.5 text-[10px] rounded',
+                    'px-1 py-0.5 text-2xs rounded',
                     isActive
                       ? 'bg-surface-control text-text-primary'
                       : 'bg-surface-control/50 text-text-faint'
@@ -231,167 +162,15 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
                   {count}
                 </span>
               )}
-            </button>
+            </Button>
           )
         })}
       </div>
 
-      {/* Virtualized list */}
-      <div
-        ref={parentRef}
-        className="flex-1 overflow-auto fade-mask-y"
-        data-virtualized="true"
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-        role="tree"
-        aria-label="Changed files"
-      >
-        <div
-          style={{
-            height: `${String(virtualizer.getTotalSize())}px`,
-            width: '100%',
-            position: 'relative',
-          }}
-        >
-          {virtualizer.getVirtualItems().map((virtualItem) => {
-            const item = flattenedItems[virtualItem.index]
-            if (!item) return null
-            const { node, depth } = item
-            const isFolder = isDiffFolder(node)
-            const isSelected = !isFolder && node.id === selectedFileId
-
-            return (
-              <div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${String(virtualItem.start)}px)`,
-                }}
-              >
-                {isFolder ? (
-                  <FolderItem
-                    folder={node}
-                    depth={depth}
-                    isExpanded={expandedFolders.has(node.id)}
-                    onClick={() => { handleItemClick(node) }}
-                  />
-                ) : (
-                  <FileItem
-                    file={node}
-                    depth={depth}
-                    isSelected={isSelected}
-                    onClick={() => { handleItemClick(node) }}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <Tree items={toItems(tree)} label="Changed files" containerRef={parentRef} className="flex-1 overflow-auto fade-mask-y" data-virtualized="true" selectedId={selectedFileId ?? undefined} expandedIds={expandedFolders} indent="3" rowClassName="text-sm"
+        onSelect={item => { if (!item.children) setSelectedFileId(item.id) }} onExpandedChange={item => toggleFolder(item.id)} onKeyDown={handleKeyDown}
+        rowProps={item => { const node = nodes.get(item.id); return node && !isDiffFolder(node) ? { 'data-testid': `diff-file-${node.path.replace(/[./]/g, '-')}`, 'data-selected': selectedFileId === node.id, 'data-file-status': node.status } : { 'data-testid': 'diff-folder-item', 'data-expanded': expandedFolders.has(item.id) } }}
+        virtual={{ rows: virtualizer.getVirtualItems(), totalSize: virtualizer.getTotalSize(), measureElement: virtualizer.measureElement, scrollToIndex: index => virtualizer.scrollToIndex(index) }} />
     </div>
-  )
-}
-
-interface FolderItemProps {
-  folder: {
-    id: string
-    name: string
-  }
-  depth: number
-  isExpanded: boolean
-  onClick: () => void
-}
-
-function FolderItem({ folder, depth, isExpanded, onClick }: FolderItemProps) {
-  return (
-    <button
-      type="button"
-      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-surface-hover transition-colors text-left"
-      style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
-      onClick={onClick}
-      data-testid="diff-folder-item"
-      data-expanded={isExpanded}
-      aria-expanded={isExpanded}
-      role="treeitem"
-    >
-      {/* Expand/collapse icon */}
-      <ChevronRight
-        className={cn(
-          'w-4 h-4 text-text-dim transition-transform',
-          isExpanded && 'rotate-90'
-        )}
-      />
-
-      {/* Folder icon */}
-      <Folder className="w-4 h-4 text-status-warning" />
-
-      <span className="text-sm text-text-primary truncate">{folder.name}</span>
-    </button>
-  )
-}
-
-interface FileItemProps {
-  file: DiffFile
-  depth: number
-  isSelected: boolean
-  onClick: () => void
-}
-
-function FileItem({ file, depth, isSelected, onClick }: FileItemProps) {
-  const statusColor = STATUS_COLORS[file.status]
-  const statusLabel = STATUS_LABELS[file.status]
-  // Generate a testid-safe version of the file path (replace . and / with -)
-  const fileTestId = `diff-file-${file.path.replace(/[./]/g, '-')}`
-
-  return (
-    <button
-      type="button"
-      className={cn(
-        'w-full flex items-center gap-2 px-2 py-1.5 transition-colors text-left group',
-        isSelected
-          ? 'bg-surface-active text-text-strong'
-          : 'hover:bg-surface-hover'
-      )}
-      style={{ paddingLeft: `${String(depth * 12 + 8)}px` }}
-      onClick={onClick}
-      data-testid={fileTestId}
-      data-selected={isSelected}
-      data-file-status={file.status}
-      role="treeitem"
-      aria-selected={isSelected}
-    >
-      {/* Status badge - show first like Conductor */}
-      <span
-        className={cn(
-          'w-4 h-4 flex items-center justify-center rounded text-[10px] font-bold flex-shrink-0',
-          statusColor.bg,
-          statusColor.text
-        )}
-        data-testid="file-status-badge"
-        data-status={file.status}
-      >
-        {statusLabel}
-      </span>
-
-      {/* Full file path - like Conductor */}
-      <span className="text-sm truncate flex-1 text-text-primary font-mono">
-        {file.path}
-      </span>
-
-      {/* Change stats - colored like Conductor */}
-      <div className="flex items-center gap-1.5 text-xs flex-shrink-0 tabular-nums">
-        {file.additions > 0 && (
-          <span className="text-[--git-green]">+{file.additions}</span>
-        )}
-        {file.deletions > 0 && (
-          <span className="text-[--git-red]">-{file.deletions}</span>
-        )}
-      </div>
-    </button>
   )
 }

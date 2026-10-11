@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { Activity } from 'lucide-react'
 import { useUnreadCount } from '@/hooks/useActivity'
 import { cn } from '@/lib/utils'
@@ -17,7 +18,7 @@ export function ActivityFeedTab({ workspaceId, isActive, onClick }: ActivityFeed
   const unreadCount = data?.count ?? 0
 
   return (
-    <button
+    <Button variant="unstyled"
       data-testid="activity-feed-tab"
       onClick={onClick}
       className={cn(
@@ -33,11 +34,11 @@ export function ActivityFeedTab({ workspaceId, isActive, onClick }: ActivityFeed
       {unreadCount > 0 && (
         <span
           data-testid="unread-badge"
-          className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold bg-status-error text-white rounded-full"
+          className="absolute -top-1 -right-1 min-w-4 h-4 flex items-center justify-center px-1 text-2xs font-bold bg-status-error text-inverse rounded-full"
         >
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
-    </button>
+    </Button>
   )
 }

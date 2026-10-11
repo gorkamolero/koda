@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useEffect, useCallback } from 'react'
 import { useAtom, useSetAtom } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -129,13 +130,13 @@ export function FileExplorer({ rootPath }: FileExplorerProps) {
         </div>
 
         {/* Refresh button */}
-        <button
+        <Button variant="unstyled"
           className="p-1 text-text-muted hover:text-text-accent transition-colors"
           title="[REFRESH]"
           onClick={handleRefresh}
         >
           <RefreshCw className={cn('size-3', isLoading && 'animate-spin')} />
-        </button>
+        </Button>
       </div>
 
       {/* Error state */}

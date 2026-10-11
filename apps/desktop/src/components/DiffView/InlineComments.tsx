@@ -1,3 +1,4 @@
+import { Button, Textarea } from '@koda/ui'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import {
@@ -147,14 +148,14 @@ export function InlineComments() {
           className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
           style={{
             top: `${String((activeInput.lineNumber - 1) * 20 + 40)}px`,
-            left: activeInput.side === 'original' ? '50px' : '50%',
+            left: activeInput.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
           }}
           data-testid="diff-comment-input-container"
         >
           <div className="mb-2 text-xs text-muted-foreground">
             Line {activeInput.lineNumber} ({activeInput.side})
           </div>
-          <textarea
+          <Textarea
             ref={inputRef}
             value={commentText}
             onChange={(e) => { setCommentText(e.target.value) }}
@@ -163,15 +164,15 @@ export function InlineComments() {
             data-testid="diff-comment-input"
           />
           <div className="flex justify-end gap-2 mt-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={handleCancelComment}
               className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
               data-testid="diff-comment-cancel"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={handleSubmitComment}
               disabled={!commentText.trim()}
@@ -179,7 +180,7 @@ export function InlineComments() {
               data-testid="diff-comment-submit"
             >
               Comment
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -190,7 +191,7 @@ export function InlineComments() {
           className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
-            left: selectedComment.side === 'original' ? '50px' : '50%',
+            left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
           }}
           data-testid="diff-comment-popup"
         >
@@ -204,7 +205,7 @@ export function InlineComments() {
               <span className="text-sm font-medium">{selectedComment.author}</span>
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => { handleEditComment(selectedComment) }}
                 className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -224,11 +225,11 @@ export function InlineComments() {
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                   />
                 </svg>
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => { setShowDeleteConfirm(true) }}
-                className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                className="p-1 text-muted-foreground hover:text-status-error transition-colors"
                 data-testid="diff-comment-delete"
                 aria-label="Delete comment"
               >
@@ -245,8 +246,8 @@ export function InlineComments() {
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
                 </svg>
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => { setSelectedComment(null) }}
                 className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -265,7 +266,7 @@ export function InlineComments() {
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-              </button>
+              </Button>
             </div>
           </div>
           <p className="text-sm text-foreground">{selectedComment.content}</p>
@@ -281,12 +282,12 @@ export function InlineComments() {
           className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
-            left: selectedComment.side === 'original' ? '50px' : '50%',
+            left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
           }}
           data-testid="diff-comment-edit-container"
         >
           <div className="mb-2 text-sm font-medium">Edit Comment</div>
-          <textarea
+          <Textarea
             ref={editInputRef}
             value={editText}
             onChange={(e) => { setEditText(e.target.value) }}
@@ -294,7 +295,7 @@ export function InlineComments() {
             data-testid="diff-comment-edit-input"
           />
           <div className="flex justify-end gap-2 mt-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => {
                 setIsEditing(false)
@@ -303,8 +304,8 @@ export function InlineComments() {
               className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={handleSaveEdit}
               disabled={!editText.trim()}
@@ -312,7 +313,7 @@ export function InlineComments() {
               data-testid="diff-comment-save"
             >
               Save
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -323,7 +324,7 @@ export function InlineComments() {
           className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
-            left: selectedComment.side === 'original' ? '50px' : '50%',
+            left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
           }}
           data-testid="diff-comment-delete-container"
         >
@@ -332,34 +333,34 @@ export function InlineComments() {
             This action cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => { setShowDeleteConfirm(false) }}
               className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               type="button"
               onClick={handleDeleteComment}
-              className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+              className="px-3 py-1.5 text-sm bg-status-error text-inverse rounded-md hover:bg-status-error/90 transition-colors"
               data-testid="diff-comment-delete-confirm"
             >
               Delete
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Click handlers for comment markers - expose as hook for DiffEditor */}
       {comments.map((comment) => (
-        <button
+        <Button variant="unstyled"
           key={comment.id}
           type="button"
           className="absolute w-4 h-4 bg-primary rounded-full cursor-pointer hover:scale-110 transition-transform z-10"
           style={{
             top: `${String((comment.lineNumber - 1) * 20 + 28)}px`,
-            left: comment.side === 'original' ? '4px' : '50%',
+            left: comment.side === 'original' ? 'var(--space-1)' : '50%',
           }}
           onClick={() => { handleCommentMarkerClick(comment) }}
           data-testid="diff-comment-marker"
@@ -378,7 +379,7 @@ export function InlineComments() {
               clipRule="evenodd"
             />
           </svg>
-        </button>
+        </Button>
       ))}
     </>
   )

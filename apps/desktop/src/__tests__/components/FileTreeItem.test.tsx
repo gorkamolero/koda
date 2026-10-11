@@ -231,8 +231,8 @@ describe('FileTreeItem', () => {
       renderWithStore(entry)
 
       const item = screen.getByRole('treeitem')
-      // depth * 16 + 8 = 2 * 16 + 8 = 40px
-      expect(item).toHaveStyle({ paddingLeft: '40px' })
+      // Tree retains the two indentation steps using the shared spacing tokens.
+      expect(item).toHaveStyle({ paddingLeft: 'calc(var(--space-2) + 2 * var(--space-4))' })
     })
   })
 })

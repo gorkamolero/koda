@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { FileEdit, CheckCircle, AlertCircle, Bookmark } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Activity, ActivityType } from '@/lib/rpc'
@@ -41,7 +42,7 @@ export function ActivityEntry({ activity, onClick }: ActivityEntryProps) {
   const isError = activity.type === 'agent_error'
 
   return (
-    <button
+    <Button variant="unstyled"
       data-testid={`activity-entry-${activity.type}`}
       onClick={onClick}
       className={cn(
@@ -56,16 +57,16 @@ export function ActivityEntry({ activity, onClick }: ActivityEntryProps) {
           <span className={cn('truncate', activity.read ? 'text-text-muted' : 'text-text-primary')}>
             {activity.title}
           </span>
-          <span className="text-[10px] text-text-faint flex-shrink-0">
+          <span className="text-2xs text-text-faint flex-shrink-0">
             {formatTimeAgo(activity.createdAt)}
           </span>
         </div>
         {activity.description && (
-          <p className="text-[10px] text-text-faint truncate mt-0.5">
+          <p className="text-2xs text-text-faint truncate mt-0.5">
             {activity.description}
           </p>
         )}
       </div>
-    </button>
+    </Button>
   )
 }

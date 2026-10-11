@@ -1,138 +1,40 @@
-import { useRef, useCallback, type KeyboardEvent } from 'react'
+import { useRef, useCallback, useMemo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAtomValue, useSetAtom } from 'jotai'
-import {
-  flattenedTreeAtom,
-  selectedPathAtom,
-  type FlattenedEntry,
-} from '@/store/fileExplorer'
-import { FileTreeItem } from './FileTreeItem'
-import { Folder } from 'lucide-react'
+import { Tree, EmptyState, type TreeItem } from '@koda/ui'
+import { Folder, Loader2 } from 'lucide-react'
+import { fileTreeAtom, flattenedTreeAtom, expandedPathsAtom, toggleExpandedAtom, selectedPathAtom, type FileEntry, type FlattenedEntry } from '@/store/fileExplorer'
 
 interface FileTreeProps {
   onFileOpen: (entry: FlattenedEntry) => void
   onExpand?: (entry: FlattenedEntry) => void
 }
 
-/**
- * Virtualized file tree component
- * Uses @tanstack/react-virtual for 60fps scrolling performance
- */
+/** The feature owns directory data and virtualization; Tree supplies rows and keyboard behavior. */
 export function FileTree({ onFileOpen, onExpand }: FileTreeProps) {
+  const tree = useAtomValue(fileTreeAtom)
   const flattenedTree = useAtomValue(flattenedTreeAtom)
+  const expandedPaths = useAtomValue(expandedPathsAtom)
+  const toggleExpanded = useSetAtom(toggleExpandedAtom)
   const setSelectedPath = useSetAtom(selectedPathAtom)
   const selectedPath = useAtomValue(selectedPathAtom)
   const parentRef = useRef<HTMLDivElement>(null)
+  const entries = useMemo(() => new Map(flattenedTree.map(entry => [entry.path, entry])), [flattenedTree])
+  const items = useMemo(() => {
+    const map = (nodes: FileEntry[]): TreeItem[] => nodes.map(entry => ({
+      id: entry.path, label: entry.name,
+      children: entry.type === 'directory' ? map(entry.children ?? []) : undefined,
+      meta: <>{entry.isLoading && <Loader2 className="size-3 animate-spin text-text-dim" />}{entry.type === 'directory' && expandedPaths.has(entry.path) && entry.children && <span data-testid="folder-children" className="hidden" />}</>,
+    }))
+    return map(tree)
+  }, [tree, expandedPaths])
+  const virtualizer = useVirtualizer({ count: flattenedTree.length, getScrollElement: () => parentRef.current, estimateSize: useCallback(() => 28, []), overscan: 10 })
 
-  // Virtual list setup
-  const virtualizer = useVirtualizer({
-    count: flattenedTree.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: useCallback(() => 28, []), // Height per row
-    overscan: 10, // Render extra rows for smooth scrolling
-  })
+  if (!flattenedTree.length) return <EmptyState data-testid="file-tree" data-virtualized="true" className="h-full" icon={<Folder className="size-10" />} message="No files loaded" />
 
-  const virtualItems = virtualizer.getVirtualItems()
-
-  // Handle selection
-  const handleSelect = useCallback(
-    (entry: FlattenedEntry) => {
-      setSelectedPath(entry.path)
-    },
-    [setSelectedPath]
-  )
-
-  // Keyboard navigation for the tree
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLDivElement>) => {
-      if (flattenedTree.length === 0) return
-
-      const currentIndex = flattenedTree.findIndex(
-        (item) => item.path === selectedPath
-      )
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        const nextIndex = currentIndex < flattenedTree.length - 1 ? currentIndex + 1 : 0
-        const nextItem = flattenedTree[nextIndex]
-        if (nextItem) {
-          setSelectedPath(nextItem.path)
-          virtualizer.scrollToIndex(nextIndex)
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        const prevIndex = currentIndex > 0 ? currentIndex - 1 : flattenedTree.length - 1
-        const prevItem = flattenedTree[prevIndex]
-        if (prevItem) {
-          setSelectedPath(prevItem.path)
-          virtualizer.scrollToIndex(prevIndex)
-        }
-      }
-    },
-    [flattenedTree, selectedPath, setSelectedPath, virtualizer]
-  )
-
-  if (flattenedTree.length === 0) {
-    return (
-      <div
-        data-testid="file-tree"
-        data-virtualized="true"
-        className="h-full flex flex-col items-center justify-center text-center p-8"
-      >
-        <Folder className="w-10 h-10 text-text-dim mb-3" />
-        <p className="text-text-muted text-sm">No files loaded</p>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      ref={parentRef}
-      data-testid="file-tree"
-      data-virtualized="true"
-      role="tree"
-      tabIndex={0}
-      className="h-full overflow-auto focus:outline-none pt-2"
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        style={{
-          height: `${String(virtualizer.getTotalSize())}px`,
-          width: '100%',
-          position: 'relative',
-        }}
-      >
-        {virtualItems.map((virtualItem) => {
-          const entry = flattenedTree[virtualItem.index]
-          if (!entry) return null
-
-          return (
-            <div
-              key={virtualItem.key}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${String(virtualItem.start)}px)`,
-              }}
-            >
-              <FileTreeItem
-                entry={entry}
-                onSelect={handleSelect}
-                onOpen={onFileOpen}
-                onExpand={onExpand}
-              />
-              {/* Render folder children indicator for collapsed state */}
-              {entry.type === 'directory' && entry.isExpanded && entry.children && (
-                <div data-testid="folder-children" className="hidden" />
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+  return <Tree items={items} containerRef={parentRef} label="Files" data-testid="file-tree" data-virtualized="true" className="h-full overflow-auto pt-2" rowClassName="gap-1 py-1 text-sm" expandButtonTestId="expand-button" selectedId={selectedPath ?? undefined} expandedIds={expandedPaths}
+    onSelect={item => { const entry = entries.get(item.id); if (entry) { setSelectedPath(entry.path); if (entry.type === 'file') onFileOpen(entry) } }}
+    onExpandedChange={(item, expanded) => { const entry = entries.get(item.id); if (expanded && entry) onExpand?.(entry); toggleExpanded(item.id) }}
+    rowProps={item => ({ 'data-testid': `file-item-${item.label.replace(/\./g, '-').toLowerCase()}`, 'data-type': item.children ? 'directory' : 'file', 'data-selected': selectedPath === item.id })}
+    virtual={{ rows: virtualizer.getVirtualItems(), totalSize: virtualizer.getTotalSize(), measureElement: virtualizer.measureElement, scrollToIndex: index => virtualizer.scrollToIndex(index) }} />
 }

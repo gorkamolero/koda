@@ -1,3 +1,4 @@
+import { Button, NavItem, IconButton, DiffStat } from '@koda/ui'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useSetAtom } from 'jotai'
@@ -63,50 +64,15 @@ function FileRow({
   const testId = `diff-file-${filename.replace(/\./g, '-').toLowerCase()}`
 
   return (
-    <div
-      className="group flex items-center py-1.5 px-3 gap-2 hover:bg-surface-hover cursor-pointer text-xs font-mono transition-colors"
-      data-testid={testId}
-      data-file-status={file.status}
-      onClick={onClick}
-    >
-      {/* Status indicator */}
+    <NavItem label={file.path} onClick={onClick} data-testid={testId} data-file-status={file.status} className="text-xs" buttonClassName="py-1.5 px-3 gap-2 rounded-none font-mono"
+      actions={<>
+        <IconButton variant="unstyled" aria-label="Undo changes" title="Undo changes" className="p-1 text-text-muted hover:text-text-accent" onClick={event => event.stopPropagation()}><Undo2 className="size-3" /></IconButton>
+        <IconButton variant="unstyled" aria-label="File actions" className="p-1 text-text-muted hover:text-text-accent" onClick={event => event.stopPropagation()}><ChevronDown className="size-3" /></IconButton>
+      </>}>
       <span className={cn('w-4 text-center', statusColor)}>[{statusLabel}]</span>
-
-      {/* File path */}
-      <div className="flex-1 min-w-0 overflow-hidden flex items-baseline">
-        {directory && (
-          <span className="text-text-faint truncate">{directory}</span>
-        )}
-        <span className="text-text-primary truncate">{filename}</span>
-      </div>
-
-      {/* Stats - visible by default, hide on hover */}
-      <div className="flex items-center gap-2 group-hover:hidden">
-        {(file.additions ?? 0) > 0 && (
-          <span className="text-[--git-green]">+{file.additions}</span>
-        )}
-        {(file.deletions ?? 0) > 0 && (
-          <span className="text-[--git-red]">-{file.deletions}</span>
-        )}
-      </div>
-
-      {/* Actions - hidden by default, show on hover */}
-      <div className="hidden group-hover:flex items-center gap-1">
-        <button
-          className="p-1 text-text-muted hover:text-text-accent transition-colors"
-          title="Undo changes"
-          onClick={(e) => { e.stopPropagation() }}
-        >
-          <Undo2 className="size-3" />
-        </button>
-        <button
-          className="p-1 text-text-muted hover:text-text-accent transition-colors"
-          onClick={(e) => { e.stopPropagation() }}
-        >
-          <ChevronDown className="size-3" />
-        </button>
-      </div>
-    </div>
+      <span className="flex min-w-0 flex-1 items-baseline overflow-hidden">{directory && <span className="truncate text-text-faint">{directory}</span>}<span className="truncate text-text-primary">{filename}</span></span>
+      <DiffStat additions={file.additions ?? 0} deletions={file.deletions ?? 0} showBar={false} className="group-hover:hidden" />
+    </NavItem>
   )
 }
 
@@ -245,7 +211,7 @@ export function DiffView({ workspaceId, rootPath }: DiffViewProps) {
         <section className="border-t border-dashed border-border-subtle p-3 text-xs">
           <div className="flex items-center justify-between mb-2">
             <span className="text-text-primary">{selectedDiff.path}</span>
-            {selectedDiff.status !== 'deleted' && <button onClick={() => void handleFileClick(selectedDiff)} className="text-text-accent">Open file</button>}
+            {selectedDiff.status !== 'deleted' && <Button variant="unstyled" onClick={() => void handleFileClick(selectedDiff)} className="text-text-accent">Open file</Button>}
           </div>
           <pre data-testid="selected-file-diff" className="whitespace-pre overflow-x-auto text-text-muted">{selectedDiff.diff || 'No text diff available'}</pre>
         </section>

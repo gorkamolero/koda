@@ -1,3 +1,4 @@
+import { Button, Card, Callout } from '@koda/ui'
 import { useState } from 'react'
 import {
   CheckCircle2,
@@ -118,14 +119,14 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
               View PR
             </a>
           )}
-          <button
+          <Button variant="unstyled"
             onClick={() => void refetch()}
             disabled={isRefetching}
             className="flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted hover:text-text-primary rounded hover:bg-surface-hover transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -143,17 +144,18 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
             const isExpanded = expandedChecks.has(check.id)
 
             return (
-              <div
+              <Card
                 key={check.id}
                 data-testid={`check-item-${check.id}`}
                 data-status={check.status}
                 className="border border-border-subtle rounded-lg bg-surface-control/30 overflow-hidden"
               >
                 {/* Check header */}
-                <button
+                <div className="flex items-center">
+                <Button variant="unstyled"
                   onClick={() => { toggleCheck(check.id); }}
                   data-testid={`check-button-${check.id}`}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
+                  className="min-w-0 flex-1 flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors"
                 >
                   {/* Expand icon */}
                   <span className="text-text-dim">
@@ -177,32 +179,34 @@ export function ChecksView({ workspaceId }: ChecksViewProps) {
                     <span className="text-xs text-text-faint">{check.duration}</span>
                   )}
 
+                </Button>
                   {/* External link */}
                   {check.url && (
                     <a
+                      aria-label={`Open ${check.name} check`}
                       href={check.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => { e.stopPropagation(); }}
-                      className="p-1 text-text-muted hover:text-text-primary"
+                      className="mr-4 p-1 text-text-muted hover:text-text-primary"
                     >
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                </button>
+                </div>
 
                 {/* Expanded details */}
                 {isExpanded && (
                   <div className="px-4 pb-3 pt-1 border-t border-border-subtle/50">
                     <p className="text-xs text-text-muted">{check.description ?? `Status: ${check.status}`}</p>
                     {check.status === 'failure' && (
-                      <div className="mt-2 p-2 rounded bg-status-error/10 text-xs text-status-error font-mono">
+                      <Callout tone="error" className="mt-2 p-2 rounded bg-status-error/10 text-xs text-status-error font-mono">
                         Check failed. {check.url ? 'Click the link to see logs.' : ''}
-                      </div>
+                      </Callout>
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             )
           })}
         </div>
