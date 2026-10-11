@@ -1,6 +1,7 @@
-import { useId, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { useId, useState, type HTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from 'react'
 import { Check, ChevronDown, ChevronRight, Circle, LockKeyhole, Square, Wifi, WifiOff, X } from 'lucide-react'
 import { Button, Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives'
+import { cn } from '../primitives/utils'
 import { Spinner } from '../brand'
 
 const cx = (...values: (string | false | undefined)[]) => values.filter(Boolean).join(' ')
@@ -12,8 +13,19 @@ export interface MessageBubbleProps extends HTMLAttributes<HTMLElement> {
   author?: string
   actions?: ReactNode
   timestamp?: string
+  appearance?: 'card' | 'terminal'
+  heading?: ReactNode
+  summary?: ReactNode
+  footer?: ReactNode
+  error?: boolean
 }
-export function MessageBubble({ variant = 'assistant', author, actions, timestamp, children, className, ...props }: MessageBubbleProps) {
+export function MessageBubble({ variant = 'assistant', author, actions, timestamp, appearance = 'card', heading, summary, footer, error, children, className, ...props }: MessageBubbleProps) {
+  if (appearance === 'terminal') return <article aria-label={`${author ?? variant} message`} className={cn('group relative px-6 font-code', variant === 'system' ? 'py-2 text-xs' : 'py-3', variant === 'assistant' && 'text-xs', className)} {...props}>
+    {variant === 'system' ? <div className="flex justify-center"><span className="text-text-faint">─── </span><span className="text-text-muted">{children}</span><span className="text-text-faint"> ───</span></div> : variant === 'user' ? <>
+      {author && <div className="text-xs text-text-muted mb-1" data-testid="message-author">{author}</div>}<div className="flex gap-2 text-sm"><span className="text-text-accent shrink-0">&gt;</span><div className="text-text-primary whitespace-pre-wrap break-words">{children}</div></div>
+    </> : <>{summary}<div className={cn('border border-dashed border-border-subtle', error && 'border-status-error/50')}>{heading && <div className="flex items-center justify-between px-3 py-1.5 border-b border-dashed border-border-subtle">{heading}</div>}<div className="px-4 py-3">{children}</div>{footer}</div></>}
+    {actions && <div className="absolute right-6 top-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">{actions}</div>}
+  </article>
   return <article aria-label={`${author ?? variant} message`} className={cx('group relative rounded-md border border-border-subtle p-4 font-code text-sm', variant === 'user' ? 'ml-8 bg-surface-card-strong text-text-primary' : variant === 'system' ? 'bg-surface-card-muted text-text-secondary' : 'mr-8 bg-surface-card text-text-primary', className)} {...props}>
     <div className="mb-2 flex items-center gap-2 text-xs text-text-secondary"><span className="uppercase">[{author ?? variant}]</span>{timestamp && <time>{timestamp}</time>}<div className="ml-auto opacity-0 focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">{actions}</div></div><div className="space-y-3">{children}</div>
   </article>
@@ -24,17 +36,18 @@ export interface ToolCallSummaryProps extends HTMLAttributes<HTMLSpanElement> { 
 export function ToolCallSummary({ tool, status, summary, duration, className, ...props }: ToolCallSummaryProps) {
   return <span className={cx('flex min-w-0 flex-1 items-center gap-2 font-code text-xs', className)} {...props}>{status === 'running' ? <Spinner label="Running" showLabel={false} /> : status === 'done' ? <Check aria-hidden="true" className="size-3 text-status-success" /> : <X aria-hidden="true" className="size-3 text-status-error" />}<span>{tool}</span><span className="text-text-secondary">{summary ?? status}</span><span className="sr-only">{status}</span>{duration && <span className="ml-auto text-text-secondary">{duration}</span>}</span>
 }
-export interface ToolBlockProps extends HTMLAttributes<HTMLDivElement> { tool: string; status?: ToolBlockStatus; summary?: string; duration?: string; defaultOpen?: boolean }
+export interface ToolBlockProps extends HTMLAttributes<HTMLDivElement> { tool: string; status?: ToolBlockStatus; summary?: string; duration?: string; defaultOpen?: boolean; header?: ReactNode; bodyClassName?: string }
 /** Running calls open automatically; completed calls collapse until expanded. */
-export function ToolBlock({ tool, status = 'running', summary, duration, defaultOpen, children, className, ...props }: ToolBlockProps) {
+export function ToolBlock({ tool, status = 'running', summary, duration, defaultOpen, header, bodyClassName, children, className, ...props }: ToolBlockProps) {
   const id = useId()
-  const [expansion, setExpansion] = useState({ status, open: defaultOpen ?? status === 'running' })
-  const open = expansion.status === status ? expansion.open : status === 'running'
-  return <div className={cx('border border-dashed border-border-subtle bg-surface-card font-code text-text-primary', className)} {...props}><button type="button" className={cx('flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover', focus)} aria-expanded={open} aria-controls={id} onClick={() => setExpansion({ status, open: !open })}>{open ? <ChevronDown aria-hidden="true" className="size-3" /> : <ChevronRight aria-hidden="true" className="size-3" />}<ToolCallSummary tool={tool} status={status} summary={summary} duration={duration} /></button><div id={id} hidden={!open} className="border-t border-dashed border-border-subtle p-3 text-xs">{children}</div></div>
+  const [expansion, setExpansion] = useState({ status, open: defaultOpen ?? status === 'running', toggled: false })
+  const open = expansion.toggled || expansion.status === status ? expansion.open : status === 'running'
+  return <div data-state={open ? 'open' : 'closed'} className={cn('border border-dashed border-border-subtle bg-surface-card font-code text-text-primary', className)} {...props}><button type="button" className={cx('flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover', focus)} aria-expanded={open} aria-controls={id} onClick={() => setExpansion({ status, open: !open, toggled: true })}>{header ?? <>{open ? <ChevronDown aria-hidden="true" className="size-3" /> : <ChevronRight aria-hidden="true" className="size-3" />}<ToolCallSummary tool={tool} status={status} summary={summary} duration={duration} /></>}</button><div id={id} hidden={!open} className={cn("border-t border-dashed border-border-subtle p-3 text-xs", bodyClassName)}>{children}</div></div>
 }
 
 export type ApprovalState = 'actionable' | 'read-only' | 'resolved' | 'withdrawn'
 export interface ApprovalCardProps extends HTMLAttributes<HTMLElement> {
+  appearance?: 'card' | 'terminal'
   kind?: 'command' | 'file' | 'network'
   title?: string
   reason: string
@@ -52,11 +65,11 @@ export interface ApprovalCardProps extends HTMLAttributes<HTMLElement> {
   onApprove?: () => void
   onDeny?: () => void
 }
-export function ApprovalCard({ kind = 'command', title, reason, state = 'actionable', command, path, network, files, details, hostName, resolution = 'Approved once', busy = false, error, onApprove, onDeny, className, ...props }: ApprovalCardProps) {
+export function ApprovalCard({ appearance = 'card', kind = 'command', title, reason, state = 'actionable', command, path, network, files, details, hostName, resolution = 'Approved once', busy = false, error, onApprove, onDeny, className, ...props }: ApprovalCardProps) {
   const id = useId(), disabled = state !== 'actionable' || busy
-  return <section aria-labelledby={id} data-testid="approval-card" className={cx('space-y-3 border border-border-accent bg-surface-card p-4 font-code text-xs text-text-primary', className)} {...props}>
+  return <section aria-labelledby={props['aria-label'] ? undefined : id} data-testid="approval-card" className={cn('border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'space-y-2 border-text-accent/40 p-3 [&_h3]:text-xs [&_pre]:bg-transparent [&_pre]:p-0 [&_p]:text-text-muted' : 'space-y-3 border-border-accent p-4', className)} {...props}>
     <h3 id={id} className="text-sm font-medium">{title ?? `Permission needed · ${kind}`}</h3><p className="text-text-secondary">{reason}</p>
-    {hostName && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
+    {hostName && appearance !== 'terminal' && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
     {command && <div><span className="text-text-secondary">Command</span><pre data-testid="approval-command" className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-surface-card-muted p-2">{command}</pre></div>}
     {path && <p className="break-all">Path: <code data-testid="approval-path">{path}</code></p>}
     {network && <p data-testid="approval-network" className="break-all">Network: {network}</p>}
@@ -66,7 +79,7 @@ export function ApprovalCard({ kind = 'command', title, reason, state = 'actiona
     {state === 'resolved' && <p role="status">[RESOLVED] {resolution}</p>}
     {state === 'withdrawn' && <p role="status">[WITHDRAWN] This request is no longer available.</p>}
     {error && <p role="alert" className="flex items-start gap-2 text-text-primary"><X aria-hidden="true" className="size-4 shrink-0 text-status-error" />{error}</p>}
-    {(state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" data-testid="approval-allow" disabled={disabled} loading={busy} onClick={() => { if (!disabled) onApprove?.() }}>Approve once</Button><Button variant="outline" size="sm" data-testid="approval-deny" disabled={disabled} onClick={() => { if (!disabled) onDeny?.() }}>Deny</Button></div>}
+    {(state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-text-accent' : undefined} data-testid="approval-allow" disabled={disabled} loading={appearance !== 'terminal' && busy} onClick={() => { if (!disabled) onApprove?.() }}>{busy ? 'Sending…' : 'Approve once'}</Button><Button variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-status-error' : undefined} data-testid="approval-deny" disabled={disabled} onClick={() => { if (!disabled) onDeny?.() }}>Deny</Button></div>}
   </section>
 }
 
@@ -74,7 +87,13 @@ export interface QuestionOption { value: string; label: string; description?: st
 export type QuestionValue = string | string[]
 export interface QuestionCardProps extends Omit<HTMLAttributes<HTMLFormElement>, 'onChange' | 'onSubmit'> {
   title?: string
-  question: string
+  question?: string
+  appearance?: 'card' | 'terminal'
+  /** Composed fields allow a request to collect several answers in one form. */
+  ready?: boolean
+  requiresHost?: boolean
+  submitLabel?: string
+  footerNote?: ReactNode
   variant?: 'single' | 'multiple' | 'text' | 'secret'
   options?: QuestionOption[]
   value?: QuestionValue
@@ -87,29 +106,34 @@ export interface QuestionCardProps extends Omit<HTMLAttributes<HTMLFormElement>,
   busy?: boolean
   error?: string
 }
-export function QuestionCard({ title = 'Your answer is needed', question, variant = 'single', options = [], value = variant === 'multiple' ? [] : '', onValueChange, onSubmit, onCancel, state = 'actionable', hostName, busy = false, error, className, ...props }: QuestionCardProps) {
-  const id = useId(), secretElsewhere = variant === 'secret' && hostName !== undefined
+export function QuestionCard({ title = 'Your answer is needed', question, appearance = 'card', children, ready: readyProp, requiresHost = false, submitLabel = 'Submit answer', footerNote, variant = 'single', options = [], value = variant === 'multiple' ? [] : '', onValueChange, onSubmit, onCancel, state = 'actionable', hostName, busy = false, error, className, ...props }: QuestionCardProps) {
+  const id = useId(), secretElsewhere = (variant === 'secret' || requiresHost) && hostName !== undefined
   const disabled = state !== 'actionable' || busy || secretElsewhere
-  const ready = Array.isArray(value) ? value.length > 0 : value.trim().length > 0
+  const ready = readyProp ?? (Array.isArray(value) ? value.length > 0 : value.trim().length > 0)
   const selected = Array.isArray(value) ? value : [value]
-  return <form aria-label="Agent question" autoComplete="off" data-testid="question-card" className={cx('space-y-4 border border-border-accent bg-surface-card p-4 font-code text-xs text-text-primary', className)} onSubmit={event => { event.preventDefault(); if (!disabled && ready) onSubmit?.(value) }} {...props}>
+  return <form aria-label="Agent question" autoComplete="off" data-testid="question-card" className={cn('space-y-4 border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'border-text-accent/40 p-3 [&>h3]:text-xs' : 'border-border-accent p-4', className)} onSubmit={event => { event.preventDefault(); if (!disabled && ready) onSubmit?.(value) }} {...props}>
     <h3 className="text-sm font-medium">{title}</h3>
-    {hostName && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
-    <fieldset disabled={disabled} className="min-w-0 space-y-3"><legend className="mb-2 text-sm">{question}</legend>
+    {hostName && appearance !== 'terminal' && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
+    {children ?? <fieldset disabled={disabled} className="min-w-0 space-y-3"><legend className="mb-2 text-sm">{question}</legend>
       {(variant === 'single' || variant === 'multiple') && <><p className="text-text-secondary">{variant === 'multiple' ? 'Choose one or more.' : 'Choose one.'}</p>{options.map((option, index) => <label key={option.value} className="flex cursor-pointer items-start gap-2"><input className={cx('mt-0.5 size-4 shrink-0 accent-text-accent', focus)} type={variant === 'multiple' ? 'checkbox' : 'radio'} name={id} value={option.value} aria-labelledby={`${id}-label-${index}`} checked={selected.includes(option.value)} aria-describedby={option.description ? `${id}-${index}` : undefined} onChange={event => { if (!disabled) onValueChange?.(variant === 'single' ? option.value : event.target.checked ? [...selected, option.value] : selected.filter(item => item !== option.value)) }} /><span><span id={`${id}-label-${index}`}>{option.label}</span>{option.description && <span id={`${id}-${index}`} className="block text-text-secondary">{option.description}</span>}</span></label>)}</>}
       {variant === 'text' && <label className="block space-y-2"><span>Your answer</span><textarea rows={3} className={cx('block w-full rounded-sm border border-border-strong bg-surface-card-muted p-2 text-text-primary disabled:opacity-50', focus)} value={typeof value === 'string' ? value : ''} onChange={event => { if (!disabled) onValueChange?.(event.target.value) }} /></label>}
       {variant === 'secret' && !secretElsewhere && <label className="block space-y-2"><span>Secret answer</span><input type="password" autoComplete="off" className={cx('block w-full rounded-sm border border-border-strong bg-surface-card-muted p-2 text-text-primary disabled:opacity-50', focus)} value={typeof value === 'string' ? value : ''} onChange={event => { if (!disabled) onValueChange?.(event.target.value) }} /></label>}
-    </fieldset>
-    {secretElsewhere && <p data-testid="question-secret-on-host" className="flex gap-2 text-text-secondary"><LockKeyhole aria-hidden="true" className="size-4 shrink-0" />This asks for a secret, so {hostName || 'the host'} answers it on their machine.</p>}
+    </fieldset>}
+    {secretElsewhere && (appearance !== 'terminal' || state !== 'read-only') && <p data-testid="question-secret-on-host" className="flex gap-2 text-text-secondary"><LockKeyhole aria-hidden="true" className="size-4 shrink-0" />This asks for a secret, so {hostName || 'the host'} answers it on their machine.</p>}
     {state === 'read-only' && <p data-testid="question-view-only" className="text-text-secondary">View only: {hostName ?? 'the host'} or a collaborator with control can answer.</p>}
     {state === 'resolved' && <p role="status">[ANSWERED] Your answer has been sent.</p>}
     {state === 'withdrawn' && <p role="status">[WITHDRAWN] This question is no longer available.</p>}
     {error && <p role="alert" className="flex items-start gap-2 text-text-primary"><X aria-hidden="true" className="size-4 shrink-0 text-status-error" />{error}</p>}
-    {(state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button type="submit" variant="outline" size="sm" data-testid="question-submit" disabled={disabled || !ready} loading={busy}>Submit answer</Button><Button variant="outline" size="sm" data-testid="question-cancel" disabled={disabled} onClick={() => { if (!disabled) onCancel?.() }}>Cancel and stop</Button></div>}
+    {footerNote}
+    {(state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button type="submit" variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-text-accent' : undefined} data-testid="question-submit" disabled={disabled || !ready} loading={appearance !== 'terminal' && busy}>{busy ? 'Sending…' : submitLabel}</Button><Button variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-status-error' : undefined} data-testid="question-cancel" disabled={disabled} onClick={() => { if (!disabled) onCancel?.() }}>Cancel and stop</Button></div>}
   </form>
 }
 
 export interface ComposerProps extends Omit<HTMLAttributes<HTMLFormElement>, 'onChange' | 'onSubmit'> {
+  appearance?: 'card' | 'terminal'
+  textareaRef?: Ref<HTMLTextAreaElement>
+  textareaProps?: TextareaHTMLAttributes<HTMLTextAreaElement> & { [attribute: `data-${string}`]: string | undefined }
+  footer?: ReactNode
   value: string
   onValueChange?: (value: string) => void
   onSend?: () => void
@@ -127,9 +151,13 @@ export interface ComposerProps extends Omit<HTMLAttributes<HTMLFormElement>, 'on
   disabled?: boolean
   placeholder?: string
 }
-export function Composer({ value, onValueChange, onSend, onStop, mode = 'own', ownerName = 'Gorka', modelSelector, permission = 'on-request', permissionOptions = [{ value: 'on-request', label: 'Ask for approval' }, { value: 'read-only', label: 'Read only' }], onPermissionChange, settingsReadOnly = mode !== 'own', attachments, running = false, disabled = false, placeholder, className, ...props }: ComposerProps) {
+export function Composer({ appearance = 'card', textareaRef, textareaProps, footer, children, value, onValueChange, onSend, onStop, mode = 'own', ownerName = 'Gorka', modelSelector, permission = 'on-request', permissionOptions = [{ value: 'on-request', label: 'Ask for approval' }, { value: 'read-only', label: 'Read only' }], onPermissionChange, settingsReadOnly = mode !== 'own', attachments, running = false, disabled = false, placeholder, className, ...props }: ComposerProps) {
   const locked = disabled || mode === 'view-only'
   const hint = placeholder ?? (mode === 'view-only' ? `View only · ${ownerName} controls this session` : mode === 'shared' ? `Message ${ownerName}'s shared session…` : 'Ask Koda to build, explain, or fix…')
+  if (appearance === 'terminal') return <form aria-label="Message composer" className={cn('group border border-dashed border-border-subtle focus-within:border-text-accent transition-colors font-code', className)} onSubmit={event => { event.preventDefault(); if (!locked && !running && value.trim()) onSend?.() }} {...props}>
+    <div className="flex min-h-20 max-h-50 overflow-y-auto px-3 py-3"><span className="text-text-accent text-sm mr-2 mt-0.5 select-none">&gt;</span><textarea ref={textareaRef} aria-label="Message" value={value} disabled={locked || running} onChange={event => onValueChange?.(event.target.value)} placeholder={hint} {...textareaProps} className={cn('flex-1 min-h-15 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-faint focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed', textareaProps?.className)} /></div>
+    {children}{attachments}{footer}
+  </form>
   return <form aria-label="Message composer" className={cx('space-y-3 rounded-md border border-border-strong bg-surface-card p-3 font-code text-xs text-text-primary', className)} onSubmit={event => { event.preventDefault(); if (!locked && !running && value.trim()) onSend?.() }} {...props}>
     {attachments && <div aria-label="Attachments" className="flex flex-wrap gap-2">{attachments}</div>}
     <textarea aria-label="Message" value={value} disabled={locked} onChange={event => { if (!locked) onValueChange?.(event.target.value) }} onKeyDown={event => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && !locked && !running && value.trim()) { event.preventDefault(); onSend?.() } }} rows={3} placeholder={hint} className={cx('block w-full resize-y rounded-sm bg-transparent p-2 text-sm text-text-primary placeholder:text-text-secondary disabled:cursor-not-allowed', focus)} />
@@ -144,9 +172,9 @@ export function SharedBadge({ hostName, permission, status = 'connected', showSt
   return <span data-testid="shared-workspace-badge" className={cx('inline-flex flex-wrap items-center gap-2 font-code text-xs text-text-primary', className)} {...props} data-permission={permission}><span>[SHARED BY {hostName.toUpperCase()} · {permission.toUpperCase()}]</span>{showStatus && <span className="inline-flex items-center gap-1 text-text-secondary"><Icon aria-hidden="true" className={cx('size-3', status === 'connected' ? 'text-status-success' : status === 'disconnected' ? 'text-status-error' : 'text-status-warning')} />{status}</span>}</span>
 }
 
-export interface TerminalFrameProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title?: string; status?: 'running' | 'ready' | 'disconnected'; readOnly?: boolean; actions?: ReactNode }
-export function TerminalFrame({ title = 'Terminal', status = 'ready', readOnly = false, actions, children, className, ...props }: TerminalFrameProps) {
-  return <section aria-label={title} className={cx('overflow-hidden rounded-md border border-border-subtle bg-surface-terminal font-code text-xs text-text-on-terminal', className)} {...props}><div className="flex flex-wrap items-center gap-2 border-b border-border-subtle bg-background px-3 py-2 text-text-primary"><span className={cx('size-1.5 rounded-full', status === 'ready' ? 'bg-status-ready' : status === 'running' ? 'bg-status-processing' : 'bg-status-error')} /><h2 className="text-xs">[{title.toUpperCase()}]</h2><span className="text-text-secondary">{status}</span>{readOnly && <span className="text-text-secondary">· read-only mirror</span>}<div className="ml-auto">{actions}</div></div><div className="min-h-32 p-3">{children}</div></section>
+export interface TerminalFrameProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title?: string; status?: 'running' | 'ready' | 'disconnected'; readOnly?: boolean; actions?: ReactNode; header?: ReactNode; bodyClassName?: string }
+export function TerminalFrame({ title = 'Terminal', status = 'ready', readOnly = false, actions, header, bodyClassName, children, className, ...props }: TerminalFrameProps) {
+  return <section aria-label={title} className={cn('overflow-hidden rounded-md border border-border-subtle bg-surface-terminal font-code text-xs text-text-on-terminal', className)} {...props}>{header ?? <div className="flex flex-wrap items-center gap-2 border-b border-border-subtle bg-background px-3 py-2 text-text-primary"><span className={cx('size-1.5 rounded-full', status === 'ready' ? 'bg-status-ready' : status === 'running' ? 'bg-status-processing' : 'bg-status-error')} /><h2 className="text-xs">[{title.toUpperCase()}]</h2><span className="text-text-secondary">{status}</span>{readOnly && <span className="text-text-secondary">· read-only mirror</span>}<div className="ml-auto">{actions}</div></div>}<div className={cn("min-h-32 p-3", bodyClassName)}>{children}</div></section>
 }
 
 export interface PaletteCommand { id: string; label: string; group?: string; shortcut?: string; icon?: ReactNode; disabled?: boolean; onSelect?: () => void }

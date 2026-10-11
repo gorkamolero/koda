@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { expect, fn, userEvent, within } from 'storybook/test'
 import { Button } from './button'
-const meta = { title: 'Primitives/Button', component: Button, tags: ['autodocs'], args: { children: 'Share workspace', onClick: fn() }, argTypes: { variant: { control: 'select', options: ['primary', 'secondary', 'ghost', 'outline', 'destructive', 'link', 'bracket'] }, size: { control: 'select', options: ['sm', 'md', 'lg', 'icon'] } } } satisfies Meta<typeof Button>
+const meta = { title: 'Primitives/Button', component: Button, tags: ['autodocs'], args: { children: 'Share workspace', onClick: fn() }, argTypes: { variant: { control: 'select', options: ['primary', 'secondary', 'ghost', 'outline', 'destructive', 'link', 'bracket', 'unstyled'] }, size: { control: 'select', options: ['sm', 'md', 'lg', 'icon', 'none'] } } } satisfies Meta<typeof Button>
 export default meta
 type Story = StoryObj<typeof meta>
 export const Primary: Story = {}
@@ -24,3 +24,6 @@ export const DisabledChild: Story = { args: { disabled: true }, render: args => 
 export const LoadingChild: Story = { ...DisabledChild, args: { loading: true }, render: args => <Button asChild loading={args.loading}><a href="#workspace" onClick={args.onClick}>Opening workspace</a></Button> }
 
 export const SecondaryHover: Story = { args: { variant: 'secondary' }, play: async ({ canvasElement }) => { await userEvent.hover(within(canvasElement).getByRole('button')) } }
+
+/** Preserve custom terminal action typography while retaining shared focus and disabled behavior. */
+export const Unstyled: Story = { args: { variant: 'unstyled', children: '[ESC] CANCEL', className: 'font-code text-xs text-text-secondary' } }

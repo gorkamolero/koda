@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Copy, File, FileCode, FileJson, FileText, Folder, FolderOpen, Terminal } from 'lucide-react'
 import { Button } from '../primitives'
+import { Slot } from '@radix-ui/react-slot'
+import { cn } from '../primitives/utils'
 import './brand.css'
 
 const cx = (...values: (string | false | undefined)[]) => values.filter(Boolean).join(' ')
@@ -108,51 +110,104 @@ export function EmptyState({ message, description, art, icon, action, className,
   return <div className={cx('flex flex-col items-center justify-center gap-3 p-8 text-center font-code', className)} {...props}>{art ? <pre aria-hidden="true" className="text-text-secondary">{art}</pre> : icon && <span aria-hidden="true" className="text-text-secondary">{icon}</span>}<p className="text-sm text-text-primary">{message}</p>{description && <p className="max-w-sm text-xs text-text-secondary">{description}</p>}{action}</div>
 }
 
-export interface NavItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> { label: string; icon?: ReactNode; meta?: ReactNode; trailing?: ReactNode; actions?: ReactNode; active?: boolean; unread?: boolean; running?: boolean }
-export function NavItem({ label, icon, meta, trailing, actions, active, unread, running, disabled, className, ...props }: NavItemProps) {
-  return <div className={cx('group flex items-center font-code text-xs', active ? 'bg-surface-active' : 'hover:bg-surface-hover', disabled && 'opacity-50', className)}>
-    <button type="button" disabled={disabled} aria-current={active ? 'page' : undefined} className={cx('flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-text-primary disabled:cursor-not-allowed', focus)} {...props}>
-      {icon && <span aria-hidden="true" className="shrink-0 text-text-secondary">{icon}</span>}<span className="min-w-0 flex-1"><span className={cx('block truncate', unread && 'font-semibold')}>{label}</span>{meta && <span className="block truncate text-text-secondary">{meta}</span>}</span>{unread && <span className="size-1.5 rounded-full bg-status-unread"><span className="sr-only">Unread</span></span>}{running && <Spinner showLabel={false} label="Running" />}{trailing}
-    </button>{actions && <fieldset disabled={disabled} aria-label="Row actions" className="flex items-center pr-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">{actions}</fieldset>}
+export interface NavItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  label: string; icon?: ReactNode; meta?: ReactNode; trailing?: ReactNode; actions?: ReactNode
+  active?: boolean; unread?: boolean; running?: boolean
+  /** Compose a router link without nesting interactive elements. */
+  asChild?: boolean
+  /** Custom row content keeps feature-specific metadata in the consumer. */
+  children?: ReactNode
+  buttonClassName?: string
+}
+export function NavItem({ label, icon, meta, trailing, actions, active, unread, running, disabled, className, buttonClassName, asChild = false, children, ...props }: NavItemProps) {
+  const Control = asChild ? Slot : 'button'
+  return <div className={cn('group flex items-center font-code text-xs', active ? 'bg-surface-active' : 'hover:bg-surface-hover', disabled && 'opacity-50', className)}>
+    <Control type={asChild ? undefined : 'button'} disabled={asChild ? undefined : disabled} aria-disabled={disabled || undefined} aria-current={active ? 'page' : undefined} className={cn('flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-text-primary disabled:cursor-not-allowed', focus, buttonClassName)} {...props}>
+      {children ?? <>{icon && <span aria-hidden="true" className="shrink-0 text-text-secondary">{icon}</span>}<span className="min-w-0 flex-1"><span className={cn('block truncate', unread && 'font-semibold')}>{label}</span>{meta && <span className="block truncate text-text-secondary">{meta}</span>}</span>{unread && <span className="size-1.5 rounded-full bg-status-unread"><span className="sr-only">Unread</span></span>}{running && <Spinner showLabel={false} label="Running" />}{trailing}</>}
+    </Control>{actions && <fieldset disabled={disabled} aria-label="Row actions" className="flex items-center pr-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">{actions}</fieldset>}
   </div>
 }
 export const ListRow = NavItem
 
-export interface TreeItem { id: string; label: string; children?: TreeItem[]; icon?: ReactNode; disabled?: boolean; meta?: ReactNode }
-export interface TreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> { items: TreeItem[]; selectedId?: string; onSelect?: (item: TreeItem) => void; defaultExpandedIds?: string[]; label?: string }
-/** A roving-tabindex ARIA tree with arrows, Home/End, selection and typeahead. */
-export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], label = 'Files', className, ...props }: TreeProps) {
-  const [expanded, setExpanded] = useState(new Set(defaultExpandedIds))
+export interface TreeItem {
+  id: string
+  label: string
+  children?: TreeItem[]
+  icon?: ReactNode
+  disabled?: boolean
+  meta?: ReactNode
+  /** Optional label markup while retaining label for keyboard typeahead. */
+  content?: ReactNode
+  /** Depth offset for an independently rendered row. */
+  depth?: number
+}
+export type TreeRowProps = HTMLAttributes<HTMLDivElement> & { [attribute: `data-${string}`]: string | number | boolean | undefined }
+export interface TreeProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> {
+  items: TreeItem[]
+  selectedId?: string
+  onSelect?: (item: TreeItem) => void
+  defaultExpandedIds?: string[]
+  /** Controlled expansion lets the caller load children without moving data logic here. */
+  expandedIds?: ReadonlySet<string>
+  onExpandedChange?: (item: TreeItem, expanded: boolean) => void
+  rowProps?: (item: TreeItem) => TreeRowProps
+  label?: string
+  containerRef?: React.Ref<HTMLDivElement>
+  /** Measured rows supplied by the caller's virtualizer. */
+  virtual?: { rows: { index: number; start: number; key: string | number | bigint }[]; totalSize: number; measureElement?: (element: HTMLDivElement | null) => void; scrollToIndex?: (index: number) => void }
+  expandButtonTestId?: string
+  rowClassName?: string
+  indent?: '3' | '4'
+}
+/** A roving-tabindex ARIA tree with controlled expansion, virtual rows and typeahead. */
+export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], expandedIds, onExpandedChange, rowProps, label = 'Files', className, containerRef, virtual, expandButtonTestId, rowClassName, indent = '4', ...props }: TreeProps) {
+  const [localExpanded, setExpanded] = useState(new Set(defaultExpandedIds))
+  const expanded = expandedIds ?? localExpanded
   const [focused, setFocused] = useState<string | undefined>(selectedId)
   const refs = useRef(new Map<string, HTMLDivElement>())
   const typeahead = useRef({ text: '', time: 0 })
   const rows: { item: TreeItem; level: number; parent?: string; pos: number; count: number }[] = []
-  function visit(nodes: TreeItem[], level: number, parent?: string) { nodes.forEach((item, index) => { rows.push({ item, level, parent, pos: index + 1, count: nodes.length }); if (item.children && expanded.has(item.id)) visit(item.children, level + 1, item.id) }) }
+  function visit(nodes: TreeItem[], level: number, parent?: string) { nodes.forEach((item, index) => { rows.push({ item, level: level + (item.depth ?? 0), parent, pos: index + 1, count: nodes.length }); if (item.children && expanded.has(item.id)) visit(item.children, level + 1, item.id) }) }
   visit(items, 1)
   const enabled = rows.filter(row => !row.item.disabled)
   const focusId = enabled.some(row => row.item.id === focused) ? focused : enabled[0]?.item.id
-  function move(id?: string) { if (id) { setFocused(id); refs.current.get(id)?.focus() } }
-  function toggle(id: string, open: boolean) { setExpanded(current => { const next = new Set(current); if (open) next.add(id); else next.delete(id); return next }) }
-  return <div role="tree" aria-label={label} className={cx('font-code text-xs', className)} {...props}>{rows.map(({ item, level, parent, pos, count }) => <div key={item.id} ref={element => { if (element) refs.current.set(item.id, element); else refs.current.delete(item.id) }} role="treeitem" tabIndex={item.id === focusId ? 0 : -1} aria-level={level} aria-posinset={pos} aria-setsize={count} aria-selected={selectedId === item.id} aria-expanded={item.children ? expanded.has(item.id) : undefined} aria-disabled={item.disabled || undefined}
-    className={cx('flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface-hover', focus, selectedId === item.id && 'bg-surface-active', item.disabled && 'opacity-50')}
-    onFocus={() => setFocused(item.id)} onClick={() => { if (!item.disabled) { move(item.id); onSelect?.(item); if (item.children) toggle(item.id, !expanded.has(item.id)) } }}
-    onKeyDown={event => {
-      if (item.disabled) return
-      const index = enabled.findIndex(row => row.item.id === item.id)
-      if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End', 'Enter', ' '].includes(event.key)) event.preventDefault()
-      if (event.key === 'ArrowDown') move(enabled[Math.min(enabled.length - 1, index + 1)]?.item.id)
-      if (event.key === 'ArrowUp') move(enabled[Math.max(0, index - 1)]?.item.id)
-      if (event.key === 'Home') move(enabled[0]?.item.id)
-      if (event.key === 'End') move(enabled.at(-1)?.item.id)
-      if (event.key === 'ArrowRight' && item.children) { if (!expanded.has(item.id)) toggle(item.id, true); else move(item.children.find(child => !child.disabled)?.id) }
-      if (event.key === 'ArrowLeft') { if (item.children && expanded.has(item.id)) toggle(item.id, false); else { let ancestor = rows.find(row => row.item.id === parent); while (ancestor?.item.disabled) ancestor = rows.find(row => row.item.id === ancestor?.parent); move(ancestor?.item.id) } }
-      if (event.key === 'Enter' || event.key === ' ') onSelect?.(item)
-      if (event.key.length === 1 && event.key !== ' ' && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        const now = Date.now(); typeahead.current.text = now - typeahead.current.time > 600 ? event.key : typeahead.current.text + event.key; typeahead.current.time = now
-        const ordered = [...enabled.slice(index + 1), ...enabled.slice(0, index + 1)]
-        move(ordered.find(row => row.item.label.toLowerCase().startsWith(typeahead.current.text.toLowerCase()))?.item.id)
-      }
-    }}><span aria-hidden="true" className="inline-flex shrink-0">{Array.from({ length: level - 1 }, (_, index) => <span className="w-4" key={index} />)}{item.children ? expanded.has(item.id) ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" /> : <span className="w-3" />}</span>{item.icon ?? <FileIcon filename={item.label} type={item.children ? 'directory' : 'file'} isExpanded={expanded.has(item.id)} />}<span className="flex-1 truncate">{item.label}</span>{item.meta}</div>)}</div>
+  useEffect(() => { if (focused) refs.current.get(focused)?.focus({ preventScroll: true }) }, [focused, virtual?.rows])
+  function move(id?: string) { if (id) { setFocused(id); virtual?.scrollToIndex?.(rows.findIndex(row => row.item.id === id)); refs.current.get(id)?.focus() } }
+  function toggle(item: TreeItem, open: boolean) {
+    if (!expandedIds) setExpanded(current => { const next = new Set(current); if (open) next.add(item.id); else next.delete(item.id); return next })
+    onExpandedChange?.(item, open)
+  }
+  function renderRow({ item, level, parent, pos, count }: typeof rows[number]) {
+    const custom = rowProps?.(item)
+    return <div key={item.id} {...custom} ref={element => { if (element) refs.current.set(item.id, element); else refs.current.delete(item.id) }} role="treeitem" aria-label={item.label} tabIndex={item.id === focusId ? 0 : -1} aria-level={level} aria-posinset={pos} aria-setsize={count} aria-selected={selectedId === item.id} aria-expanded={item.children ? expanded.has(item.id) : undefined} aria-disabled={item.disabled || undefined}
+      className={cx('flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface-hover', focus, selectedId === item.id && 'bg-surface-active', item.disabled && 'opacity-50', rowClassName, custom?.className)}
+      style={{ ...custom?.style, paddingLeft: `calc(var(--space-2) + ${level - 1} * var(--space-${indent}))` }}
+      onFocus={() => setFocused(item.id)} onClick={() => { if (!item.disabled) { move(item.id); onSelect?.(item); if (item.children) toggle(item, !expanded.has(item.id)) } }}
+      onKeyDown={event => {
+        custom?.onKeyDown?.(event)
+        if (item.disabled || event.defaultPrevented) return
+        const index = enabled.findIndex(row => row.item.id === item.id)
+        if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End', 'Enter', ' '].includes(event.key)) event.preventDefault()
+        if (event.key === 'ArrowDown') move(enabled[Math.min(enabled.length - 1, index + 1)]?.item.id)
+        if (event.key === 'ArrowUp') move(enabled[Math.max(0, index - 1)]?.item.id)
+        if (event.key === 'Home') move(enabled[0]?.item.id)
+        if (event.key === 'End') move(enabled.at(-1)?.item.id)
+        if (event.key === 'ArrowRight' && item.children) { if (!expanded.has(item.id)) toggle(item, true); else move(item.children.find(child => !child.disabled)?.id) }
+        if (event.key === 'ArrowLeft') { if (item.children && expanded.has(item.id)) toggle(item, false); else { let ancestor = rows.find(row => row.item.id === parent); while (ancestor?.item.disabled) ancestor = rows.find(row => row.item.id === ancestor?.parent); move(ancestor?.item.id) } }
+        if (event.key === 'Enter' || event.key === ' ') { onSelect?.(item); if (item.children) toggle(item, !expanded.has(item.id)) }
+        if (event.key.length === 1 && event.key !== ' ' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          const now = Date.now(); typeahead.current.text = now - typeahead.current.time > 600 ? event.key : typeahead.current.text + event.key; typeahead.current.time = now
+          const ordered = [...enabled.slice(index + 1), ...enabled.slice(0, index + 1)]
+          move(ordered.find(row => row.item.label.toLowerCase().startsWith(typeahead.current.text.toLowerCase()))?.item.id)
+        }
+      }}>
+      {item.children ? <button type="button" tabIndex={-1} disabled={item.disabled} data-testid={expandButtonTestId} aria-label={expanded.has(item.id) ? 'Collapse' : 'Expand'} className="shrink-0 rounded-sm p-0.5 hover:bg-surface-control" onClick={event => { event.stopPropagation(); toggle(item, !expanded.has(item.id)) }}>{expanded.has(item.id) ? <ChevronDown aria-hidden="true" className="size-3" /> : <ChevronRight aria-hidden="true" className="size-3" />}</button> : <span aria-hidden="true" className="w-4 shrink-0" />}
+      {item.icon ?? <FileIcon filename={item.label} type={item.children ? 'directory' : 'file'} isExpanded={expanded.has(item.id)} />}<span className="min-w-0 flex-1 truncate">{item.content ?? item.label}</span>{item.meta}
+    </div>
+  }
+  return <div ref={containerRef} role="tree" aria-label={label} className={cx('font-code text-xs', className)} {...props}>
+    {virtual ? <div className="relative w-full" style={{ height: virtual.totalSize }}>{virtual.rows.map(row => rows[row.index] && <div key={String(row.key)} data-index={row.index} ref={virtual.measureElement} className="absolute left-0 top-0 w-full" style={{ transform: `translateY(${row.start}px)` }}>{renderRow(rows[row.index]!)}</div>)}</div> : rows.map(renderRow)}
+  </div>
 }
 
 export type FileIconType = 'ts' | 'tsx' | 'js' | 'jsx' | 'css' | 'json' | 'md' | 'html' | 'rust' | 'default'

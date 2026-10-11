@@ -17,3 +17,5 @@ export const ViewOnlyRunning: Story = { args: { running: true, mode: 'view-only'
 export const Disabled: Story = { args: { disabled: true } }
 export const CustomPlaceholder: Story = { args: { placeholder: 'Describe the expected reconnect behavior…' } }
 
+
+export const TerminalComposer: Story = { args: { appearance: 'terminal', textareaProps: { 'data-testid': 'chat-input' }, footer: <div className="border-t border-dashed border-border-subtle p-2"><Button type="submit" variant="bracket" size="sm">Send</Button></div> }, play: async ({ canvasElement, args }) => { const canvas = within(canvasElement); await userEvent.type(canvas.getByTestId('chat-input'), 'Review the session.'); await userEvent.click(canvas.getByRole('button', { name: 'Send' })); await expect(args.onSend).toHaveBeenCalledOnce() } }

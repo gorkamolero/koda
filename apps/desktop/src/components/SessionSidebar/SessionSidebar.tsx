@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { Session, Worktree } from '@/lib/rpc'
@@ -51,14 +52,14 @@ function SessionGroup({
 
   return (
     <div className="mb-2">
-      <button
+      <Button variant="unstyled"
         onClick={() => { setIsExpanded(!isExpanded) }}
         className="flex items-center gap-1.5 w-full px-2 py-1 text-xs font-medium text-text-faint uppercase tracking-wider hover:text-text-muted transition-colors"
       >
         <ChevronIcon className="w-3 h-3" />
         <span>{title}</span>
         <span className="text-text-dim">({sessions.length})</span>
-      </button>
+      </Button>
 
       {isExpanded && (
         <div className="mt-1">
@@ -130,7 +131,7 @@ export function SessionSidebar({
             {workspaceName}
           </span>
         </div>
-        <button
+        <Button variant="unstyled"
           onClick={() => { setShowNewSessionPicker(true) }}
           className={cn(
             'p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors',
@@ -139,7 +140,7 @@ export function SessionSidebar({
           title="New session"
         >
           <Plus className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       {/* New Session Picker */}
@@ -168,13 +169,13 @@ export function SessionSidebar({
             <p className="text-xs text-text-faint mt-1">
               Start a new session to begin
             </p>
-            <button
+            <Button variant="unstyled"
               onClick={() => { setShowNewSessionPicker(true) }}
               className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-status-unread/20 text-status-unread rounded-md hover:bg-status-unread/30 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               New Session
-            </button>
+            </Button>
           </div>
         ) : (
           <>

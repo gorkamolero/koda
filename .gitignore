@@ -65,3 +65,7 @@ proof-cleanup-results/
 .dev.vars.*
 .wrangler/
 collaboration.json
+
+# Desktop migration visual artifacts
+.migration-visual/
+.migration-tmp/

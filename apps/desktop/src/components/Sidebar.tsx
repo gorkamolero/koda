@@ -1,13 +1,13 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useWorkspaces, useWorkspaceRepos, useWorktreesByWorkspace, useSidecar, useRepos, useCreateRepo, useAttachRepo, useCreateStandaloneWorkspace } from '@/hooks/useRpc'
+import { useWorkspaces, useWorkspaceRepos, useWorktreesByWorkspace, useSidecar } from '@/hooks/useRpc'
 import { useClickOutside } from '@/hooks/useClickOutside'
 import { cn } from '@/lib/utils'
 import type { Worktree, WorktreeStatus, WorkspaceRepo } from '@/lib/rpc'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { selectedWorkspaceIdAtom, setWorkspaceContainersAtom } from '@/store/workspace'
-import { KodaSpinner } from '@/components/KodaSpinner'
-import { open } from '@tauri-apps/plugin-dialog'
+import { Button, NavItem, Spinner, StatusBadge, StatusDot } from '@koda/ui'
+import { AddRepoModal, CreateWorkspaceModal } from './WorkspaceDialogs'
 import { AgentOverviewButton, AgentOverviewPanel } from '@/components/AgentOverview'
 import { SharedWorkspacesSection } from '@/components/WorkspaceSharing'
 
@@ -73,7 +73,7 @@ function DropdownMenu({ isOpen, onClose, children }: DropdownMenuProps): React.R
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 z-50 mt-1 min-w-[180px] font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
+      className="absolute right-0 z-50 mt-1 min-w-45 font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
     >
       {children}
     </div>
@@ -89,7 +89,7 @@ interface MenuItemProps {
 
 function MenuItem({ label, shortcut, onClick, destructive }: MenuItemProps): React.ReactElement {
   return (
-    <button
+    <Button variant="unstyled"
       onClick={onClick}
       className={cn(
         'flex items-center justify-between gap-4 w-full px-3 py-1.5 text-left',
@@ -99,7 +99,7 @@ function MenuItem({ label, shortcut, onClick, destructive }: MenuItemProps): Rea
     >
       <span>{label}</span>
       {shortcut && <span className="text-text-dim">{shortcut}</span>}
-    </button>
+    </Button>
   )
 }
 
@@ -157,7 +157,7 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
+      <Button variant="unstyled"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 w-full px-3 py-2 font-mono text-xs hover:bg-surface-hover transition-colors"
       >
@@ -165,12 +165,12 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
         <span className="flex-1 text-left truncate text-text-primary">
           {selectedWorkspace?.name ?? 'Select Workspace'}
         </span>
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="absolute left-0 right-0 z-50 mt-1 bg-surface-card border border-dashed border-text-dim/30 max-h-48 overflow-y-auto">
           {workspaces?.map(ws => (
-            <button
+            <Button variant="unstyled"
               key={ws.id}
               onClick={() => {
                 setSelectedId(ws.id)
@@ -184,10 +184,10 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
             >
               <span>{ws.id === selectedId ? '▸' : '·'}</span>
               <span className="truncate">{ws.name}</span>
-            </button>
+            </Button>
           ))}
           <MenuSeparator />
-          <button
+          <Button variant="unstyled"
             onClick={() => {
               setIsOpen(false)
               onCreateWorkspace()
@@ -195,7 +195,7 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
             className="flex items-center gap-2 w-full px-3 py-1.5 text-left font-mono text-xs text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
           >
             [+] NEW WORKSPACE
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -233,10 +233,11 @@ function WorktreeRow({
 
   return (
     <>
+      <NavItem label={worktree.branch ?? 'unnamed'} asChild className="bg-transparent" buttonClassName="rounded-none p-0">
       <Link
         to="/workspace/$workspaceId/$worktreeId"
         params={{ workspaceId, worktreeId: worktree.id }}
-        className={cn(
+        className={cn('rounded-none',
           'group flex items-center gap-2 px-2 py-1.5 font-mono text-xs',
           'border-l-2 border-transparent',
           'hover:bg-surface-hover hover:border-l-border-accent/50',
@@ -252,9 +253,7 @@ function WorktreeRow({
         </span>
 
         {/* Status */}
-        <span className={cn('w-12 font-bold', statusColor)}>
-          [{statusLabel}]
-        </span>
+        <StatusBadge status={status === 'done' ? 'success' : status === 'blocked' ? 'error' : status === 'needs-review' ? 'warning' : 'processing'} showDot={false} className={cn('w-12 border-0 rounded-none p-0 bg-transparent font-bold', statusColor)}>[{statusLabel}]</StatusBadge>
 
         {/* Branch name */}
         <span className={cn(
@@ -267,7 +266,7 @@ function WorktreeRow({
 
         {/* Unread count */}
         {unreadCount > 0 && (
-          <span className="px-1 bg-border-accent text-white text-[9px] font-bold">
+          <span className="px-1 bg-border-accent text-text-inverse text-micro font-bold">
             {unreadCount}
           </span>
         )}
@@ -277,6 +276,7 @@ function WorktreeRow({
           {timeAgo}
         </span>
       </Link>
+      </NavItem>
 
       {/* Context menu */}
       {contextMenu && (
@@ -315,7 +315,7 @@ function WorktreeContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[180px] font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
+      className="fixed z-50 min-w-45 font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
       style={{ top: position.y, left: position.x }}
     >
       <div className="py-1">
@@ -411,21 +411,21 @@ function RepoGroup({
     <div className="mb-2">
       {/* Repo header */}
       <div className="flex items-center group">
-        <button
+        <NavItem label={repoName} className="flex-1"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 flex-1 px-2 py-1 font-mono text-xs hover:bg-surface-hover transition-colors"
+          buttonClassName="rounded-none flex items-center gap-2 flex-1 px-2 py-1 font-mono text-xs hover:bg-surface-hover transition-colors"
         >
           <span className="text-text-dim">{isExpanded ? '▼' : '▶'}</span>
           <span className="text-text-primary uppercase tracking-wide truncate flex-1 text-left">
             {repoName}
           </span>
           <span className="text-text-dim">({worktrees.length})</span>
-        </button>
+        </NavItem>
 
         {/* Actions (visible on hover) */}
         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity relative">
-          <button
-            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-[10px]"
+          <Button variant="unstyled"
+            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-2xs"
             title="More actions"
             onClick={(e) => {
               e.stopPropagation()
@@ -433,9 +433,9 @@ function RepoGroup({
             }}
           >
             [···]
-          </button>
-          <button
-            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-[10px]"
+          </Button>
+          <Button variant="unstyled"
+            className="px-1 py-0.5 text-text-dim hover:text-border-accent font-mono text-2xs"
             title="New worktree"
             onClick={(e) => {
               e.stopPropagation()
@@ -443,7 +443,7 @@ function RepoGroup({
             }}
           >
             [+]
-          </button>
+          </Button>
 
           {showDropdown && (
             <RepoActionsDropdown
@@ -561,11 +561,11 @@ function SidebarHeader({ onCreateWorkspace }: { onCreateWorkspace: () => void })
     <div className="border-b border-dashed border-text-dim/20">
       {/* Row 1: Traffic lights space + nav */}
       <div
-        className="flex items-center justify-between pl-[70px] pr-2 h-10"
+        className="flex items-center justify-between pl-window-controls pr-2 h-10"
         data-tauri-drag-region
       >
         <div className="flex-1" data-tauri-drag-region />
-        <div className="flex items-center gap-1 font-mono text-[10px]">
+        <div className="flex items-center gap-1 font-mono text-2xs">
           {/* Agent Overview */}
           <div ref={agentOverviewRef} className="relative">
             <AgentOverviewButton
@@ -576,25 +576,25 @@ function SidebarHeader({ onCreateWorkspace }: { onCreateWorkspace: () => void })
               <AgentOverviewPanel onClose={() => setIsAgentOverviewOpen(false)} />
             )}
           </div>
-          <button
+          <Button variant="unstyled"
             className="px-1 text-text-dim hover:text-border-accent transition-colors"
             onClick={() => void navigate({ to: '/' })}
             title="Back"
           >
             [←]
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             className="px-1 text-text-dim hover:text-border-accent transition-colors"
             title="Forward"
           >
             [→]
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Row 2: Workspace selector */}
       <div className="px-1 py-1 border-t border-dashed border-text-dim/20">
-        <div className="text-[10px] text-text-dim font-mono px-2 mb-1">
+        <div className="text-2xs text-text-dim font-mono px-2 mb-1">
           ┌─ WORKSPACE ───────────────────
         </div>
         <WorkspaceSelector onCreateWorkspace={onCreateWorkspace} />
@@ -615,34 +615,30 @@ function SidebarFooter({ onAddRepo, hasWorkspace }: { onAddRepo: () => void; has
       {/* Quick actions - only show when workspace is selected */}
       {hasWorkspace && (
         <div className="px-2 py-1 space-y-0.5 border-t border-dashed border-text-dim/20">
-          <button
+          <Button variant="unstyled"
             className="flex items-center gap-2 w-full px-2 py-1 text-xs text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
             onClick={onAddRepo}
           >
             [+] ADD REPO TO WORKSPACE
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Bottom status bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-text-dim/20 text-[10px]">
+      <div className="flex items-center justify-between px-3 py-2 border-t border-dashed border-text-dim/20 text-2xs">
         <div className="flex items-center gap-2">
-          <span className={cn(
-            status?.running ? 'text-status-success' : 'text-text-dim'
-          )}>
-            {status?.running ? '●' : '○'}
-          </span>
+          <StatusDot status={status?.running ? 'success' : 'unknown'} />
           <span className="text-text-dim uppercase">
             {status?.running ? 'ONLINE' : 'OFFLINE'}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button variant="unstyled"
             className="text-text-dim hover:text-border-accent transition-colors"
             title="Help"
           >
             [?]
-          </button>
+          </Button>
           <Link
             to="/settings"
             className="text-text-dim hover:text-border-accent transition-colors"
@@ -654,7 +650,7 @@ function SidebarFooter({ onAddRepo, hasWorkspace }: { onAddRepo: () => void; has
       </div>
 
       {/* ASCII footer decoration */}
-      <div className="px-3 py-1 text-[10px] text-text-dim/50">
+      <div className="px-3 py-1 text-2xs text-text-dim/50">
         └─────────────────────────────┘
       </div>
     </div>
@@ -691,7 +687,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
     return (
       <div className="flex-1 flex items-center justify-center font-mono">
         <div className="text-center">
-          <pre className="text-[10px] text-text-dim mb-4">
+          <pre className="text-2xs text-text-dim mb-4">
 {`┌──────────────────┐
 │  NO WORKSPACE    │
 │                  │
@@ -699,18 +695,18 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
 │  get started     │
 └──────────────────┘`}
           </pre>
-          <button
+          <Button variant="unstyled"
             onClick={onCreateWorkspace}
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-white',
+              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
               'font-mono text-xs uppercase tracking-wider',
               'transition-colors duration-100'
             )}
           >
             [+] NEW WORKSPACE
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -719,7 +715,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
   if (loadingRepos || loadingWorktrees) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <KodaSpinner style="scan" />
+        <Spinner variant="scan" showLabel={false} />
       </div>
     )
   }
@@ -728,7 +724,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
     return (
       <div className="flex-1 flex items-center justify-center font-mono">
         <div className="text-center">
-          <pre className="text-[10px] text-text-dim mb-4">
+          <pre className="text-2xs text-text-dim mb-4">
 {`┌──────────────────┐
 │  NO REPOS YET    │
 │                  │
@@ -736,18 +732,18 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
 │  this workspace  │
 └──────────────────┘`}
           </pre>
-          <button
+          <Button variant="unstyled"
             onClick={onAddRepo}
             className={cn(
               'inline-flex items-center gap-2 px-4 py-2',
               'border border-dashed border-border-accent',
-              'text-border-accent hover:bg-border-accent hover:text-white',
+              'text-border-accent hover:bg-border-accent hover:text-text-inverse',
               'font-mono text-xs uppercase tracking-wider',
               'transition-colors duration-100'
             )}
           >
             [+] ADD REPO
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -756,7 +752,7 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
   return (
     <div className="px-1">
       {/* Section header */}
-      <div className="px-2 py-1.5 text-[10px] text-text-dim font-mono">
+      <div className="px-2 py-1.5 text-2xs text-text-dim font-mono">
         ├─ REPOS ─────────────────────
       </div>
 
@@ -770,255 +766,6 @@ function WorkspaceContent({ onAddRepo, onCreateWorkspace }: { onAddRepo: () => v
           defaultBranch={wsRepo.repoDefaultBranch ?? 'main'}
         />
       ))}
-    </div>
-  )
-}
-
-// ============================================================================
-// Create Workspace Modal
-// ============================================================================
-
-function CreateWorkspaceModal({
-  isOpen,
-  onClose,
-  onCreated,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  onCreated: (workspaceId: string) => void
-}): React.ReactElement | null {
-  const createWorkspace = useCreateStandaloneWorkspace()
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useClickOutside(menuRef, {
-    onClickOutside: onClose,
-    onEscape: onClose,
-    enabled: isOpen,
-  })
-
-  if (!isOpen) return null
-
-  const handleCreate = async () => {
-    if (!name.trim()) return
-
-    try {
-      setError(null)
-      const workspace = await createWorkspace.mutateAsync({ name: name.trim() })
-      setName('')
-      onCreated(workspace.id)
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace')
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div
-        ref={menuRef}
-        className="w-full max-w-md mx-4 animate-in zoom-in-95 slide-in-from-bottom-2 duration-200"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="bg-surface-card border border-dashed border-text-dim/30 font-mono">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-dashed border-text-dim/20">
-            <div className="text-xs text-border-accent">┌─ NEW WORKSPACE ─────────────</div>
-          </div>
-
-          {/* Content */}
-          <div className="p-4 space-y-4">
-            {error && (
-              <div className="text-status-error text-xs border border-dashed border-status-error p-2">
-                ERROR: {error}
-              </div>
-            )}
-
-            <div>
-              <p className="text-[10px] text-text-dim mb-2 uppercase">WORKSPACE NAME:</p>
-              <div className="flex items-center gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
-                <span className="text-text-dim">{'>'}</span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="my-workspace"
-                  className="flex-1 bg-transparent text-text-primary placeholder:text-text-dim/50 outline-none text-sm"
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') void handleCreate()
-                    if (e.key === 'Escape') onClose()
-                  }}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => void handleCreate()}
-              disabled={!name.trim() || createWorkspace.isPending}
-              className="w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50"
-            >
-              {createWorkspace.isPending ? 'CREATING...' : '[+] CREATE WORKSPACE'}
-            </button>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-dashed border-text-dim/20 flex justify-end">
-            <button
-              onClick={onClose}
-              className="text-xs text-text-dim hover:text-text-primary transition-colors"
-            >
-              [ESC] CANCEL
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// Add Repo Modal
-// ============================================================================
-
-function AddRepoModal({
-  isOpen,
-  onClose,
-  workspaceId,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  workspaceId: string
-}): React.ReactElement | null {
-  const { data: repos } = useRepos()
-  const createRepo = useCreateRepo()
-  const attachRepo = useAttachRepo()
-  const [error, setError] = useState<string | null>(null)
-  const [isAttaching, setIsAttaching] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useClickOutside(menuRef, {
-    onClickOutside: onClose,
-    onEscape: onClose,
-    enabled: isOpen,
-  })
-
-  if (!isOpen) return null
-
-  const handleSelectFolder = async () => {
-    try {
-      setError(null)
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: 'Select Git Repository',
-      })
-
-      if (selected && typeof selected === 'string') {
-        setIsAttaching(true)
-        // First create/register the repo
-        const repo = await createRepo.mutateAsync({ rootPath: selected })
-        // Then attach it to the workspace
-        await attachRepo.mutateAsync({ workspaceId, repoId: repo.id })
-        onClose()
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add repository')
-    } finally {
-      setIsAttaching(false)
-    }
-  }
-
-  const handleAttachExisting = async (repoId: string) => {
-    try {
-      setError(null)
-      setIsAttaching(true)
-      await attachRepo.mutateAsync({ workspaceId, repoId })
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to attach repository')
-    } finally {
-      setIsAttaching(false)
-    }
-  }
-
-  // Filter out repos already attached to this workspace
-  const availableRepos = repos?.filter(r => r.id) ?? []
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div
-        ref={menuRef}
-        className="w-full max-w-md mx-4 animate-in zoom-in-95 slide-in-from-bottom-2 duration-200"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="bg-surface-card border border-dashed border-text-dim/30 font-mono">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-dashed border-text-dim/20">
-            <div className="text-xs text-border-accent">┌─ ADD REPOSITORY ─────────────</div>
-          </div>
-
-          {/* Content */}
-          <div className="p-4 space-y-4">
-            {error && (
-              <div className="text-status-error text-xs border border-dashed border-status-error p-2">
-                ERROR: {error}
-              </div>
-            )}
-
-            {/* Existing repos */}
-            {availableRepos.length > 0 && (
-              <div>
-                <p className="text-[10px] text-text-dim mb-2 uppercase">ATTACH EXISTING REPO:</p>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {availableRepos.map((repo, i) => (
-                    <button
-                      key={repo.id}
-                      onClick={() => void handleAttachExisting(repo.id)}
-                      disabled={isAttaching}
-                      className="w-full text-left p-2 text-xs border border-dashed border-text-dim/30 hover:border-border-accent hover:text-border-accent transition-colors disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-text-dim">[{i + 1}]</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate text-text-primary">{repo.name ?? 'unnamed'}</div>
-                          <div className="truncate text-[10px] text-text-dim">{repo.rootPath}</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Add new */}
-            <button
-              onClick={() => void handleSelectFolder()}
-              disabled={isAttaching}
-              className="w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50"
-            >
-              {isAttaching ? 'ADDING...' : '[+] ADD NEW GIT REPOSITORY'}
-            </button>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 py-3 border-t border-dashed border-text-dim/20 flex justify-end">
-            <button
-              onClick={onClose}
-              className="text-xs text-text-dim hover:text-text-primary transition-colors"
-            >
-              [ESC] CANCEL
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1061,7 +808,8 @@ export function Sidebar(): React.ReactElement {
       <CreateWorkspaceModal
         isOpen={isCreateWorkspaceOpen}
         onClose={() => setIsCreateWorkspaceOpen(false)}
-        onCreated={handleWorkspaceCreated}
+        onCreated={workspace => handleWorkspaceCreated(workspace.id)}
+        createLabel="[+] CREATE WORKSPACE" nameLabel="WORKSPACE NAME:"
       />
 
       {/* Add Repo Modal */}

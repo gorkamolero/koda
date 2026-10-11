@@ -11,8 +11,10 @@ export interface MeterProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Accessible description of what is being measured. */
   label: string
   valueText?: string
+  variant?: 'segmented' | 'continuous'
+  valueDisplay?: React.ReactNode
 }
-export function Meter({ value, max = 100, segments = 12, label, valueText, className, ...props }: MeterProps) {
+export function Meter({ value, max = 100, segments = 12, label, valueText, variant = 'segmented', valueDisplay, className, ...props }: MeterProps) {
   const safeMax = Math.max(1, max); const ratio = Math.max(0, Math.min(1, value / safeMax)); const count = Math.max(1, Math.min(100, segments)); const filled = Math.ceil(ratio * count)
-  return <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={safeMax} aria-valuenow={Math.min(safeMax, Math.max(0, value))} aria-valuetext={valueText} className={cn('flex items-center gap-3 font-code text-xs text-text-primary', className)} {...props}><div className="flex flex-1 gap-0.5" aria-hidden="true">{Array.from({ length: count }, (_, index) => <span key={index} className={cn('h-2 min-w-1 flex-1', index >= filled ? 'bg-surface-control' : ratio >= 0.9 ? 'bg-status-error' : ratio >= 0.7 ? 'bg-status-warning' : 'bg-status-success')} />)}</div><span>{valueText ?? `${Math.round(ratio * 100)}%`}</span></div>
+  return <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={safeMax} aria-valuenow={Math.min(safeMax, Math.max(0, value))} aria-valuetext={valueText} className={cn('flex items-center gap-3 font-code text-xs text-text-primary', className)} {...props}>{variant === 'continuous' ? <div aria-hidden="true" className="h-1.5 w-32 overflow-hidden rounded-full bg-surface-control"><div className={cn('h-full rounded-full bg-gradient-to-r transition-all duration-slow', ratio >= 0.9 ? 'from-status-warning to-status-error' : ratio >= 0.7 ? 'from-[var(--meter-start)] to-status-warning' : 'from-[var(--meter-start)] to-[var(--meter-end)]')} style={{ width: `${ratio * 100}%` }} /></div> : <div className="flex flex-1 gap-0.5" aria-hidden="true">{Array.from({ length: count }, (_, index) => <span key={index} className={cn('h-2 min-w-1 flex-1', index >= filled ? 'bg-surface-control' : ratio >= 0.9 ? 'bg-status-error' : ratio >= 0.7 ? 'bg-status-warning' : 'bg-status-success')} />)}</div>}{valueDisplay ?? <span>{valueText ?? `${Math.round(ratio * 100)}%`}</span>}</div>
 }

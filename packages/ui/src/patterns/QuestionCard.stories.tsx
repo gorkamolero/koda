@@ -19,3 +19,6 @@ export const Withdrawn: Story = { args: { state: 'withdrawn' } }
 export const Sending: Story = { args: { busy: true, value: 'inline' } }
 export const ResponseError: Story = { args: { error: 'The host disconnected before this answer was sent.', value: 'inline' } }
 
+
+export const ComposedRequest: Story = { args: { appearance: 'terminal', ready: true, submitLabel: 'Submit answers', children: <fieldset><legend>Approach</legend><p>Use the existing reconnect behavior.</p></fieldset> }, play: async ({ canvasElement, args }) => { await userEvent.click(within(canvasElement).getByRole('button', { name: 'Submit answers' })); await expect(args.onSubmit).toHaveBeenCalledOnce() } }
+export const ComposedSecretOnHost: Story = { args: { appearance: 'terminal', requiresHost: true, hostName: 'Gorka', ready: true, children: <p>A private answer is required.</p> }, play: async ({ canvasElement }) => { await expect(within(canvasElement).getByRole('button', { name: 'Submit answer' })).toBeDisabled() } }

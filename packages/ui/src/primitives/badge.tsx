@@ -13,6 +13,6 @@ export interface StatusDotProps extends React.HTMLAttributes<HTMLSpanElement> { 
 export function StatusDot({ status, label, className, ...props }: StatusDotProps) {
   return <span role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} className={cn('inline-block size-2 shrink-0 rounded-full', statusClasses[status], className)} {...props} />
 }
-export interface StatusBadgeProps extends BadgeProps { status: Status }
-export function StatusBadge({ status, children, ...props }: StatusBadgeProps) { return <Badge {...props}><StatusDot status={status} />{children ?? status}</Badge> }
+export interface StatusBadgeProps extends BadgeProps { status: Status; showDot?: boolean }
+export function StatusBadge({ status, children, showDot = true, ...props }: StatusBadgeProps) { return <Badge {...props}>{showDot && <StatusDot status={status} />}{children ?? status}</Badge> }
 export function Kbd({ className, ...props }: React.HTMLAttributes<HTMLElement>) { return <kbd className={cn('inline-flex items-center rounded-sm border border-border-muted bg-surface-control px-1.5 py-0.5 font-code text-xs text-text-primary', className)} {...props} /> }

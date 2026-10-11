@@ -186,6 +186,24 @@ export type ThemeTokens = Record<ThemeTokenName, string>
 
 /** Shared spacing, typography, dimensions, effects, motion and layer foundations. */
 export const foundationTokens = {
+  "--meter-start": "#62b7ff",
+  "--meter-end": "#4fe3a3",
+
+  "--presence-red": "#ef4444",
+  "--presence-orange": "#f97316",
+  "--presence-yellow": "#eab308",
+  "--presence-green": "#22c55e",
+  "--presence-teal": "#14b8a6",
+  "--presence-blue": "#3b82f6",
+  "--presence-violet": "#8b5cf6",
+  "--presence-pink": "#ec4899",
+  "--presence-indigo": "#6366f1",
+  "--presence-cyan": "#06b6d4",
+  "--text-inverse": "#ffffff",
+  "--space-15": "3.75rem",
+  "--space-50": "12.5rem",
+  "--space-45": "11.25rem",
+
   "--sidebar-width": "280px",
   "--topbar-height": "44px",
   "--right-panel-width": "230px",
@@ -293,6 +311,10 @@ export const foundationTokens = {
   "--type-body-tracking": "0",
   "--type-caption-font": "var(--font-code)",
   "--type-caption-size": "11px",
+  "--type-2xs-size": "10px",
+  "--type-micro-size": "9px",
+  "--type-tiny-size": "8px",
+  "--space-window-controls": "4.375rem",
   "--type-caption-line-height": "1.4",
   "--type-caption-tracking": "0",
   "--type-code-font": "var(--font-code)",

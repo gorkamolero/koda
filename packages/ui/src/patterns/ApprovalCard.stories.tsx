@@ -19,3 +19,5 @@ export const Deny: Story = { play: async ({ canvasElement, args }) => { await us
 
 
 export const FileChanges: Story = { args: { kind: 'file', command: undefined, path: undefined, reason: 'Codex wants to apply the reconnect fix and its regression test.', files: [{ path: 'src/components/WorkspaceSharing.tsx', kind: 'Update' }, { path: 'src/__tests__/WorkspaceSharing.test.tsx', kind: 'Update' }] } }
+
+export const TerminalRequest: Story = { args: { appearance: 'terminal', 'aria-label': 'Permission request: command_execution' }, play: async ({ canvasElement }) => { await expect(within(canvasElement).getByRole('region', { name: 'Permission request: command_execution' })).toBeVisible() } }
