@@ -4,7 +4,7 @@ import { Button } from '../primitives'
 import './brand.css'
 
 const cx = (...values: (string | false | undefined)[]) => values.filter(Boolean).join(' ')
-const focus = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-messages'
+const focus = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-messages'
 
 /** The original Koda splash logo, preserved from desktop's kodaArt.ts. */
 export const KODA_ASCII = `██╗  ██╗ ██████╗ ██████╗  █████╗
@@ -33,7 +33,7 @@ export interface KodaLogoProps extends HTMLAttributes<HTMLPreElement> {
 }
 export function KodaLogo({ size = 'lg', animated = false, className, ...props }: KodaLogoProps) {
   const frame = useFrame(100, 9, animated)
-  return <pre role="img" aria-label="Koda" className={cx('koda-logo font-code leading-tight', `koda-logo-${size}`, className)} {...props}>{KODA_ASCII.split('\n').map((line, index) => <span aria-hidden="true" key={line} className={cx('block transition-colors duration-fast', animated && frame === index ? 'text-text-action koda-text-glow' : animated && Math.abs(frame - index) === 1 ? 'text-status-success-foreground' : 'text-text-muted')}>{line}</span>)}</pre>
+  return <pre role="img" aria-label="Koda" className={cx('koda-logo font-code leading-tight', `koda-logo-${size}`, className)} {...props}>{KODA_ASCII.split('\n').map((line, index) => <span aria-hidden="true" key={line} className={cx('block transition-colors duration-fast', animated && frame === index ? 'text-text-action koda-text-glow' : animated && Math.abs(frame - index) === 1 ? 'text-status-success-foreground' : 'text-text-secondary')}>{line}</span>)}</pre>
 }
 
 export type SpinnerVariant = 'wave' | 'scan' | 'pulse' | 'matrix' | 'bounce'
@@ -51,7 +51,7 @@ const matrixChars = '01アイウエオカキクケコサシスセソタチツテ
 export function Spinner({ variant = 'wave', label = 'Loading', showLabel = true, speed, className, ...props }: SpinnerProps) {
   const frame = useFrame(speed ?? speeds[variant], lengths[variant])
   return <span role="status" aria-label={label} className={cx('inline-flex items-center gap-2 font-code text-sm', className)} {...props}>
-    <span aria-hidden="true" className={cx('inline-flex tracking-wider', variant === 'pulse' && cx('transition-all duration-normal', frame === 0 ? 'scale-105 text-text-action koda-text-glow' : 'text-text-muted'))}>
+    <span aria-hidden="true" className={cx('inline-flex tracking-wider', variant === 'pulse' && cx('transition-all duration-normal', frame === 0 ? 'scale-105 text-text-action koda-text-glow' : 'text-text-secondary'))}>
       {'KODA'.split('').map((letter, index) => {
         const distance = Math.abs(frame - index * 2)
         const character = variant === 'matrix' && frame < 20 + index * 5 ? matrixChars[(frame * 7 + index * 13) % matrixChars.length] : letter
@@ -59,10 +59,10 @@ export function Spinner({ variant = 'wave', label = 'Loading', showLabel = true,
           variant === 'wave' && (frame === index ? 'text-text-action scale-110 font-bold' : index < frame ? 'text-status-success-foreground' : 'text-text-dim'),
           variant === 'scan' && (distance < 2 ? 'text-text-action koda-text-glow' : 'text-text-dim'),
           variant === 'matrix' && (character === letter ? 'text-status-success-foreground' : 'text-text-action'),
-          variant === 'bounce' && (index === frame ? '-translate-y-1 text-text-action' : 'text-text-muted'))}
+          variant === 'bounce' && (index === frame ? '-translate-y-1 text-text-action' : 'text-text-secondary'))}
           style={variant === 'scan' ? { opacity: distance === 0 ? 1 : distance === 1 ? 0.7 : distance === 2 ? 0.4 : 0.2 } : undefined}>{character}</span>
       })}
-    </span>{showLabel && <span aria-hidden="true" className="text-text-muted text-xs">{label}</span>}
+    </span>{showLabel && <span aria-hidden="true" className="text-text-secondary text-xs">{label}</span>}
   </span>
 }
 
@@ -78,7 +78,7 @@ export interface WorkingIndicatorProps extends HTMLAttributes<HTMLSpanElement> {
 export function WorkingIndicator({ compact = false, elapsedMs = 0, label = 'working', className, ...props }: WorkingIndicatorProps) {
   const seconds = Math.max(0, Math.floor(elapsedMs / 1000))
   const elapsed = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-  return <span className={cx('inline-flex items-center font-code text-text-muted', compact ? 'gap-1 text-xs' : 'gap-2 text-sm', className)} {...props}>
+  return <span className={cx('inline-flex items-center font-code text-text-secondary', compact ? 'gap-1 text-xs' : 'gap-2 text-sm', className)} {...props}>
     <span aria-hidden="true">[</span><Spinner showLabel={false} label={label} className={compact ? 'text-xs' : undefined} /><span aria-hidden="true">]</span><span>{label}</span><span className="tabular-nums">{elapsed}</span>
   </span>
 }
@@ -88,15 +88,15 @@ export interface TerminalSectionProps extends Omit<HTMLAttributes<HTMLElement>, 
 export function TerminalSection({ title, description, action, children, className, ...props }: TerminalSectionProps) {
   const id = useId()
   return <section aria-labelledby={id} className={cx('font-code text-xs', className)} {...props}>
-    <div className="mb-2 flex items-center gap-1 text-text-muted"><span aria-hidden="true">┌─</span><h2 id={id} className="text-xs uppercase text-text-action">{title}</h2><span aria-hidden="true" className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"> {'─'.repeat(60)}</span>{action}<span aria-hidden="true">┐</span></div>
-    <div className="border-x border-dashed border-border-subtle px-4 py-3">{description && <p className="mb-3 text-text-muted">{description}</p>}{children}</div>
-    <div aria-hidden="true" className="flex text-text-muted"><span>└</span><span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">{'─'.repeat(80)}</span><span>┘</span></div>
+    <div className="mb-2 flex items-center gap-1 text-text-secondary"><span aria-hidden="true">┌─</span><h2 id={id} className="text-xs uppercase text-text-action">{title}</h2><span aria-hidden="true" className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"> {'─'.repeat(60)}</span>{action}<span aria-hidden="true">┐</span></div>
+    <div className="border-x border-dashed border-border-subtle px-4 py-3">{description && <p className="mb-3 text-text-secondary">{description}</p>}{children}</div>
+    <div aria-hidden="true" className="flex text-text-secondary"><span>└</span><span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">{'─'.repeat(80)}</span><span>┘</span></div>
   </section>
 }
 
 export interface PanelHeaderProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> { title: string; count?: number; actions?: ReactNode }
 export function PanelHeader({ title, count, actions, className, ...props }: PanelHeaderProps) {
-  return <div className={cx('flex items-center gap-2 border-b border-border-subtle px-3 py-2 font-code text-xs', className)} {...props}><h2 className="flex-1 uppercase text-text-muted">[{title}]{count !== undefined && <span className="ml-2 text-text-primary">{count}</span>}</h2>{actions}</div>
+  return <div className={cx('flex items-center gap-2 border-b border-border-subtle px-3 py-2 font-code text-xs', className)} {...props}><h2 className="flex-1 uppercase text-text-secondary">[{title}]{count !== undefined && <span className="ml-2 text-text-primary">{count}</span>}</h2>{actions}</div>
 }
 export interface PanelProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title: string; count?: number; actions?: ReactNode; variant?: 'sidebar' | 'right' }
 export function Panel({ title, count, actions, variant = 'sidebar', children, className, ...props }: PanelProps) {
@@ -105,14 +105,14 @@ export function Panel({ title, count, actions, variant = 'sidebar', children, cl
 
 export interface EmptyStateProps extends HTMLAttributes<HTMLDivElement> { message: string; description?: string; art?: string; icon?: ReactNode; action?: ReactNode }
 export function EmptyState({ message, description, art, icon, action, className, ...props }: EmptyStateProps) {
-  return <div className={cx('flex flex-col items-center justify-center gap-3 p-8 text-center font-code', className)} {...props}>{art ? <pre aria-hidden="true" className="text-text-muted">{art}</pre> : icon && <span aria-hidden="true" className="text-text-muted">{icon}</span>}<p className="text-sm text-text-primary">{message}</p>{description && <p className="max-w-sm text-xs text-text-muted">{description}</p>}{action}</div>
+  return <div className={cx('flex flex-col items-center justify-center gap-3 p-8 text-center font-code', className)} {...props}>{art ? <pre aria-hidden="true" className="text-text-secondary">{art}</pre> : icon && <span aria-hidden="true" className="text-text-secondary">{icon}</span>}<p className="text-sm text-text-primary">{message}</p>{description && <p className="max-w-sm text-xs text-text-secondary">{description}</p>}{action}</div>
 }
 
 export interface NavItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> { label: string; icon?: ReactNode; meta?: ReactNode; trailing?: ReactNode; actions?: ReactNode; active?: boolean; unread?: boolean; running?: boolean }
 export function NavItem({ label, icon, meta, trailing, actions, active, unread, running, disabled, className, ...props }: NavItemProps) {
   return <div className={cx('group flex items-center font-code text-xs', active ? 'bg-surface-active' : 'hover:bg-surface-hover', disabled && 'opacity-50', className)}>
     <button type="button" disabled={disabled} aria-current={active ? 'page' : undefined} className={cx('flex min-w-0 flex-1 items-center gap-2 rounded-sm px-3 py-2 text-left text-text-primary disabled:cursor-not-allowed', focus)} {...props}>
-      {icon && <span aria-hidden="true" className="shrink-0 text-text-muted">{icon}</span>}<span className="min-w-0 flex-1"><span className={cx('block truncate', unread && 'font-semibold')}>{label}</span>{meta && <span className="block truncate text-text-muted">{meta}</span>}</span>{unread && <span className="size-1.5 rounded-full bg-status-unread"><span className="sr-only">Unread</span></span>}{running && <Spinner showLabel={false} label="Running" />}{trailing}
+      {icon && <span aria-hidden="true" className="shrink-0 text-text-secondary">{icon}</span>}<span className="min-w-0 flex-1"><span className={cx('block truncate', unread && 'font-semibold')}>{label}</span>{meta && <span className="block truncate text-text-secondary">{meta}</span>}</span>{unread && <span className="size-1.5 rounded-full bg-status-unread"><span className="sr-only">Unread</span></span>}{running && <Spinner showLabel={false} label="Running" />}{trailing}
     </button>{actions && <fieldset disabled={disabled} aria-label="Row actions" className="flex items-center pr-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">{actions}</fieldset>}
   </div>
 }
@@ -169,7 +169,7 @@ export interface FileIconProps extends Omit<HTMLAttributes<SVGSVGElement>, 'chil
 export function FileIcon({ filename, type = 'file', isExpanded = false, size = 16, className, ...props }: FileIconProps) {
   const fileType = getFileIconType(filename)
   const Icon = type === 'directory' ? isExpanded ? FolderOpen : Folder : fileType === 'json' ? FileJson : fileType === 'md' ? FileText : fileType === 'default' ? File : FileCode
-  const tone = type === 'directory' || ['js', 'jsx', 'json'].includes(fileType) ? 'text-status-warning' : ['ts', 'tsx', 'css'].includes(fileType) ? 'text-text-action' : ['rust', 'html'].includes(fileType) ? 'text-status-reviewing' : 'text-text-muted'
+  const tone = type === 'directory' || ['js', 'jsx', 'json'].includes(fileType) ? 'text-status-warning' : ['ts', 'tsx', 'css'].includes(fileType) ? 'text-text-action' : ['rust', 'html'].includes(fileType) ? 'text-status-reviewing' : 'text-text-secondary'
   return <Icon aria-hidden="true" data-testid={type === 'directory' ? isExpanded ? 'folder-icon-open' : 'folder-icon' : `file-icon-${fileType}`} className={cx('shrink-0', size === 12 ? 'size-3' : size === 14 ? 'size-3.5' : 'size-4', tone, className)} {...props} />
 }
 
@@ -182,7 +182,7 @@ export function DiffStat({ additions, deletions, showBar = true, className, ...p
 
 export interface CodeBlockProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onCopy'> { code: string; language?: string; wrap?: boolean; copied?: boolean; onCopy?: (code: string) => void }
 export function CodeBlock({ code, language = 'text', wrap = false, copied = false, onCopy, className, ...props }: CodeBlockProps) {
-  return <div className={cx('overflow-hidden rounded-md border border-border-subtle bg-surface-card font-code', className)} {...props}><div className="flex items-center gap-2 border-b border-border-subtle px-3 py-1.5 text-xs text-text-muted"><Terminal aria-hidden="true" className="size-3" /><span className="flex-1">{language}</span><Button variant="ghost" size="sm" aria-label={copied ? 'Code copied' : 'Copy code'} onClick={() => onCopy?.(code)} disabled={!onCopy}><Copy aria-hidden="true" className="size-3" />{copied ? 'Copied' : 'Copy'}</Button></div><pre className={cx('overflow-auto p-3 text-xs text-text-primary', wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre')}><code>{code}</code></pre></div>
+  return <div className={cx('overflow-hidden rounded-md border border-border-subtle bg-surface-card font-code', className)} {...props}><div className="flex items-center gap-2 border-b border-border-subtle px-3 py-1.5 text-xs text-text-secondary"><Terminal aria-hidden="true" className="size-3" /><span className="flex-1">{language}</span><Button variant="ghost" size="sm" aria-label={copied ? 'Code copied' : 'Copy code'} onClick={() => onCopy?.(code)} disabled={!onCopy}><Copy aria-hidden="true" className="size-3" />{copied ? 'Copied' : 'Copy'}</Button></div><pre className={cx('overflow-auto p-3 text-xs text-text-primary', wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre')}><code>{code}</code></pre></div>
 }
 export interface InlineCodeProps extends HTMLAttributes<HTMLElement> { children?: ReactNode }
 export function InlineCode({ children, className, ...props }: InlineCodeProps) { return <code className={cx('rounded-sm border border-border-subtle bg-surface-card px-1 py-0.5 font-code text-xs text-text-primary', className)} {...props}>{children}</code> }
