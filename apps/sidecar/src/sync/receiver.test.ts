@@ -10,6 +10,7 @@ import { router } from '../rpc/router.js'
 import { signRelay, type RelayCommand } from './capabilities.js'
 import { ApprovalBroker } from '../agents/approvalBroker.js'
 import { QuestionBroker } from '../agents/questionBroker.js'
+import { CollaborationService } from './serviceClient.js'
 
 let sync: typeof import('./LiveblocksClient.js')
 let directory: string
@@ -159,6 +160,21 @@ describe('host relay receiver', () => {
 })
 
 describe('invitation replacement and authors', () => {
+  it('replaces grants across mode changes without needing the previous signing key', async () => {
+    const development = await command('control')
+    vi.spyOn(CollaborationService.prototype, 'code').mockResolvedValue({ code: 'unit-test-code' })
+    try {
+      vi.stubEnv('KODA_COLLAB_MODE', 'service')
+      const hosted = await command('control')
+      const manager = new sync.SyncManager(worktreeId)
+      expect((await manager.receive(development)).error).toBe('Unknown or revoked invitation')
+      expect((await manager.receive(hosted)).error).toBeNull()
+      vi.stubEnv('KODA_COLLAB_MODE', 'development')
+      const replacement = await command('control')
+      expect((await manager.receive(hosted)).error).toBe('Unknown or revoked invitation')
+      expect((await manager.receive(replacement)).error).toBeNull()
+    } finally { vi.stubEnv('KODA_COLLAB_MODE', 'development') }
+  })
   it('revokes earlier control grants when an owner issues a view invitation', async () => {
     const oldControl = await command('control')
     await sync.shareWorkspace(worktreeId, 'view')

@@ -166,7 +166,9 @@ export async function shareWorkspace(worktreeId: string, permission: 'view' | 'c
   // Sharing has one current invitation per workspace. Replacing it revokes old
   // control grants at the host, including requests saved before a downgrade.
   for (const [nonce, previous] of Object.entries(getState().grants)) {
-    if (verifyCapability(previous, signingKey()).worktreeId === worktreeId) delete getState().grants[nonce]
+    // These are locally stored grants; old modes may use a different signing key.
+    // Incoming relay requests still require signature verification.
+    if (parseCapability(previous).worktreeId === worktreeId) delete getState().grants[nonce]
   }
   getState().grants[capability.nonce] = invitation
   saveState()
