@@ -154,6 +154,7 @@ export class KodaInstance {
       KODA_HTTP_HOST: 'localhost', KODA_HTTP_PORT: String(this.rpcPort),
       KODA_MODE: 'local', KODA_AUTH_ENABLED: 'false',
       VITE_PORT: String(this.vitePort), VITE_HTTP_RPC_PORT: String(this.rpcPort),
+      KODA_VITE_CACHE_DIR: join(this.root, 'vite-cache'),
       KODA_CORS_ORIGINS: this.url,
       // Git never prompts in a proof, and identities belong only to the fixture.
       GIT_TERMINAL_PROMPT: '0',
@@ -226,18 +227,22 @@ export class KodaInstance {
     } catch (error) { captureError = error }
     finally { await this.stop() }
     if (captureError) throw captureError // Preserve this fixture if ownership is uncertain.
-    if (this.claudeSessions.size) {
+    // Restricted migration runs may retain provider history outside their fixture root.
+    // This does not skip any runtime, approval, persistence, or artifact assertion.
+    const keepNativeSessions = process.env.KODA_PROOF_KEEP_NATIVE_SESSIONS === '1'
+    if (this.claudeSessions.size && !keepNativeSessions) {
       const removed: string[] = []
       for (const session of this.claudeSessions.values()) {
         if (await deleteClaudeProofSession(session)) removed.push(session.threadId!)
       }
       writeFileSync(this.testInfo.outputPath(`${this.label}-claude-cleanup.json`), JSON.stringify({ temporarySdkSessionsRemoved: removed }, null, 2))
     }
-    if (this.codexSessions.size) {
+    if (this.codexSessions.size && !keepNativeSessions) {
       const archived: string[] = []
       for (const session of this.codexSessions.values()) if (await archiveCodexProofSession(session)) archived.push(session.threadId!)
       writeFileSync(this.testInfo.outputPath(`${this.label}-codex-cleanup.json`), JSON.stringify({ temporaryThreadsArchived: archived, providerArchiveVerified: true }, null, 2))
     }
+    if (keepNativeSessions) writeFileSync(this.testInfo.outputPath(`${this.label}-native-history.json`), JSON.stringify({ retained: true, reason: 'Provider history is outside the allowed fixture root' }, null, 2))
     // Only this test's mkdtemp tree; never a shared database or arbitrary port.
     rmSync(this.root, { recursive: true, force: true })
   }
