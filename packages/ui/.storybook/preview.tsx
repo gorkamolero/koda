@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/react-vite'
 import { withThemeByDataAttribute } from '@storybook/addon-themes'
 import '../src/styles.css'
+import { kodaTheme } from './kodaTheme'
 
 const preview: Preview = {
   decorators: [
@@ -19,6 +20,7 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     controls: { expanded: true },
+    docs: { theme: kodaTheme },
     a11y: { test: 'error' },
     options: { storySort: { order: ['Introduction', 'Foundations', 'Brand', 'Primitives', 'Patterns', 'App screens'] } },
   },
