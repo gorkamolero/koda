@@ -253,7 +253,7 @@ function WorktreeRow({
         </span>
 
         {/* Status */}
-        <StatusBadge status={status === 'done' ? 'success' : status === 'blocked' ? 'error' : status === 'needs-review' ? 'warning' : 'processing'} showDot={false} className={cn('w-12 border-0 rounded-none p-0 bg-transparent font-bold', statusColor)}>[{statusLabel}]</StatusBadge>
+        <StatusBadge status={status === 'done' ? 'success' : status === 'blocked' ? 'error' : status === 'needs-review' ? 'warning' : 'processing'} showDot={false} className={cn('w-12 text-xs border-0 rounded-none p-0 bg-transparent font-bold', statusColor)}>[{statusLabel}]</StatusBadge>
 
         {/* Branch name */}
         <span className={cn(

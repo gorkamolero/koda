@@ -57,7 +57,7 @@ function WorktreeRow({ worktree, onClick }: WorktreeRowProps) {
   return (
     <NavItem label={displayName}
       onClick={onClick}
-      buttonClassName={cn('block rounded-none',
+      buttonClassName={cn('block rounded-none text-base leading-6',
         'group w-full text-left font-mono pl-12 pr-4 py-2',
         'hover:bg-surface-hover hover:text-border-accent',
         'transition-colors duration-100'
