@@ -8,6 +8,5 @@ required = ["LIVEBLOCKS_SECRET_KEY"]
 [[d1_databases]]
 binding = "DB"
 database_name = "koda-collaboration"
-# Replace with the ID from `wrangler d1 create koda-collaboration` before deploying.
-database_id = "00000000-0000-4000-8000-000000000000"
+database_id = "8857637a-7a40-443d-8234-9e865fb0932b"
 migrations_dir = "migrations"

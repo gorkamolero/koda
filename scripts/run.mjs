@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -37,6 +38,19 @@ try {
     await run(['--filter', '@koda/sidecar', 'dev', ...process.argv.slice(3)])
   } else if (process.argv[2] === 'verify-clean') {
     await run([path.join(root, 'scripts/verify-clean.mjs')], process.execPath)
+  } else if (process.argv[2] === 'collab-deploy') {
+    // The Worker's Liveblocks secret comes from the env file loaded above and reaches
+    // Cloudflare through a private temporary file, removed as soon as wrangler exits.
+    if (!process.env.LIVEBLOCKS_SECRET_KEY) throw new Error('collab-deploy needs LIVEBLOCKS_SECRET_KEY in the env file')
+    const directory = mkdtempSync(path.join(tmpdir(), 'koda-collab-'))
+    const secrets = path.join(directory, 'secrets.env')
+    writeFileSync(secrets, `LIVEBLOCKS_SECRET_KEY=${process.env.LIVEBLOCKS_SECRET_KEY}\n`, { mode: 0o600 })
+    try {
+      await run(['--filter', '@koda/collab-service', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'DB', '--remote'])
+      await run(['--filter', '@koda/collab-service', 'exec', 'wrangler', 'deploy', '--secrets-file', secrets])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   } else if (process.argv[2] === 'built') {
     const executable = path.join(root, 'apps/desktop/src-tauri/target/debug/bundle/macos/Koda.app/Contents/MacOS/koda-desktop')
     if (!existsSync(executable)) throw new Error('Build the local app first: pnpm --filter desktop tauri build --debug --bundles app')

@@ -9,7 +9,7 @@
     "app:built": "node scripts/run.mjs built",
     "verify:clean": "node scripts/run.mjs verify-clean",
     "dev": "turbo run dev",
-    "collab:deploy": "pnpm --filter @koda/collab-service deploy",
+    "collab:deploy": "node scripts/run.mjs collab-deploy",
     "storybook:deploy": "pnpm --filter @koda/ui deploy-storybook",
     "storybook:pages": "node scripts/publish-storybook-pages.mjs",
     "build": "turbo run build",
