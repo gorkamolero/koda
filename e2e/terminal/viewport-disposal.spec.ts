@@ -17,8 +17,8 @@ for (const lifecycle of ['write', 'reset', 'open'] as const) {
     page.on('pageerror', (error) => pageErrors.push(error.message))
     await page.setContent('<div id="terminal" style="width:800px;height:300px"></div>')
     await page.addStyleTag({ content: uiTokens + uiBaseStyles })
-    await page.addStyleTag({ path: desktopRequire.resolve('xterm/css/xterm.css') })
-    await page.addScriptTag({ path: desktopRequire.resolve('xterm') })
+    await page.addStyleTag({ path: desktopRequire.resolve('@xterm/xterm/css/xterm.css') })
+    await page.addScriptTag({ path: desktopRequire.resolve('@xterm/xterm') })
 
     const result = await page.evaluate(async (lifecycle) => {
       // Hold browser frames so public open/write/dispose deterministically occurs
@@ -91,7 +91,7 @@ for (const lifecycle of ['write', 'reset', 'open'] as const) {
 test('reduced motion keeps terminal font measurement synchronous', async ({ page }) => {
   await page.setContent('<span id="font-measure" style="font-size:16px">WWWW</span>')
   await page.addStyleTag({ content: uiTokens + uiBaseStyles })
-  await page.addStyleTag({ path: desktopRequire.resolve('xterm/css/xterm.css') })
+  await page.addStyleTag({ path: desktopRequire.resolve('@xterm/xterm/css/xterm.css') })
   const metrics = await page.evaluate(async () => {
     // This is xterm's measurement sequence: attach a span, then set its font
     // and synchronously read layout. A global font transition corrupts it.

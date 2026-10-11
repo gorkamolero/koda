@@ -1,12 +1,12 @@
 import { Button, IconButton, TerminalFrame } from '@koda/ui'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
 import { Plus, X, Terminal as TerminalIcon, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { rpcRequest } from '@/lib/tauri'
 import { onPtyData, onPtyExit } from '@/lib/sidecarRpc'
-import 'xterm/css/xterm.css'
+import '@xterm/xterm/css/xterm.css'
 import { TERMINAL_OPTIONS } from './terminalOptions'
 
 interface TerminalTab {

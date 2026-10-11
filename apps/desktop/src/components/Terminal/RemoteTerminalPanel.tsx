@@ -1,14 +1,14 @@
 import { Button, TerminalFrame } from '@koda/ui'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
 import { Lock, Terminal as TerminalIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { rpcRequest } from '@/lib/tauri'
 import { onPtyData, onPtyExit } from '@/lib/sidecarRpc'
 import { TERMINAL_OPTIONS } from './terminalOptions'
-import 'xterm/css/xterm.css'
+import '@xterm/xterm/css/xterm.css'
 
 type HostTerminal = { sessionId: string; pid: number; workingDirectory: string; createdAt: string }
 type Mirror = { terminal: Terminal; fitAddon: FitAddon; dispose: () => void }

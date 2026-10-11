@@ -1,4 +1,4 @@
-import type { Terminal } from 'xterm'
+import type { Terminal } from '@xterm/xterm'
 
 /** Shared by local terminals and the read-only mirror of a host's terminal. */
 export const TERMINAL_OPTIONS: ConstructorParameters<typeof Terminal>[0] = {

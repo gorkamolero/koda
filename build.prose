@@ -174,7 +174,7 @@ parallel:
       2. Install dependencies:
          pnpm add @tanstack/react-router @tanstack/react-query
          pnpm add @tanstack/react-virtual jotai
-         pnpm add @monaco-editor/react xterm xterm-addon-fit
+         pnpm add @monaco-editor/react @xterm/xterm @xterm/addon-fit
          pnpm add -D @playwright/test
 
       3. Create router structure:
