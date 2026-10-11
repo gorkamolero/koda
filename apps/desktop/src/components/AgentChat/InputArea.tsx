@@ -226,7 +226,9 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
       const textarea = textareaRef.current
       if (textarea) {
         textarea.style.height = 'auto'
-        textarea.style.height = `${String(Math.min(textarea.scrollHeight, 200))}px`
+        // Fit measured content within the Composer's token-sized viewport.
+        const limit = Number.parseFloat(getComputedStyle(textarea.parentElement ?? textarea).maxHeight)
+        textarea.style.height = `${Math.min(textarea.scrollHeight, Number.isFinite(limit) ? limit : textarea.scrollHeight)}px`
       }
     },
     [setInputValue]
@@ -389,7 +391,7 @@ export function InputArea({ onSendMessage, onSwitchTab, disabled = false, placeh
                 onClick={handleSend}
                 disabled={!canSend}
                 className={cn(
-                  "h-auto rounded-none border-0 flex items-center gap-1 px-2 py-1 transition-colors",
+                  "h-auto rounded-none border-0 flex items-center gap-1 px-2 py-1 transition-colors disabled:opacity-100",
                   canSend
                     ? "text-text-accent hover:bg-text-accent/10"
                     : "text-text-faint cursor-not-allowed"

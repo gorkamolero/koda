@@ -64,14 +64,14 @@ function FileRow({
   const testId = `diff-file-${filename.replace(/\./g, '-').toLowerCase()}`
 
   return (
-    <NavItem label={file.path} onClick={onClick} data-testid={testId} data-file-status={file.status} className="text-xs" buttonClassName="py-1.5 px-3 gap-2 rounded-none font-mono"
+    <NavItem label={file.path} onClick={onClick} data-testid={testId} data-file-status={file.status} className="text-xs [&>fieldset]:hidden [&:hover>fieldset]:flex [&:focus-within>fieldset]:flex" buttonClassName="py-1.5 px-3 gap-2 rounded-none font-mono"
       actions={<>
         <IconButton variant="unstyled" aria-label="Undo changes" title="Undo changes" className="p-1 text-text-muted hover:text-text-accent" onClick={event => event.stopPropagation()}><Undo2 className="size-3" /></IconButton>
         <IconButton variant="unstyled" aria-label="File actions" className="p-1 text-text-muted hover:text-text-accent" onClick={event => event.stopPropagation()}><ChevronDown className="size-3" /></IconButton>
       </>}>
       <span className={cn('w-4 text-center', statusColor)}>[{statusLabel}]</span>
       <span className="flex min-w-0 flex-1 items-baseline overflow-hidden">{directory && <span className="truncate text-text-faint">{directory}</span>}<span className="truncate text-text-primary">{filename}</span></span>
-      <DiffStat additions={file.additions ?? 0} deletions={file.deletions ?? 0} showBar={false} className="group-hover:hidden" />
+      <DiffStat hideZero variant="git" additions={file.additions ?? 0} deletions={file.deletions ?? 0} showBar={false} className="group-hover:hidden" />
     </NavItem>
   )
 }

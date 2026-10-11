@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +13,7 @@ interface AgentOverviewButtonProps {
  */
 export function AgentOverviewButton({ onClick, isOpen }: AgentOverviewButtonProps) {
   return (
-    <button
+    <Button variant="unstyled"
       data-testid="agent-overview-button"
       onClick={onClick}
       className={cn(
@@ -26,6 +27,6 @@ export function AgentOverviewButton({ onClick, isOpen }: AgentOverviewButtonProp
     >
       <Cpu className="size-3" />
       <span>[AGENTS]</span>
-    </button>
+    </Button>
   )
 }

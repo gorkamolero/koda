@@ -38,8 +38,8 @@ function QuestionFields({ question, answer, disabled, onChange }: { question: Ag
     {question.allowOther && (!hasOptions || answer.other) && <label className="block space-y-1">
       <span>{textLabel}</span>
       {question.isSecret
-        ? <Input type="password" autoComplete="off" value={answer.text} onChange={event => onChange({ ...answer, text: event.target.value })} className="h-auto rounded-none block w-full bg-transparent border border-border-subtle p-2" />
-        : <Textarea autoComplete="off" value={answer.text} rows={2} onChange={event => onChange({ ...answer, text: event.target.value })} className="min-h-0 rounded-none block w-full resize-y bg-transparent border border-border-subtle p-2" />}
+        ? <Input type="password" autoComplete="off" value={answer.text} onChange={event => onChange({ ...answer, text: event.target.value })} className="text-xs h-auto rounded-none block w-full bg-transparent border border-border-subtle p-2" />
+        : <Textarea autoComplete="off" value={answer.text} rows={2} onChange={event => onChange({ ...answer, text: event.target.value })} className="text-xs min-h-0 rounded-none block w-full resize-y bg-transparent border border-border-subtle p-2" />}
     </label>}
   </fieldset>
 }

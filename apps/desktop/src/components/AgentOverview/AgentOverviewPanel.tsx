@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useNavigate } from '@tanstack/react-router'
 import { X, Circle } from 'lucide-react'
 import { useWorkspacesWithStatus } from '@/hooks/useActivity'
@@ -38,21 +39,21 @@ export function AgentOverviewPanel({ onClose }: AgentOverviewPanelProps) {
   return (
     <div
       data-testid="agent-overview-panel"
-      className="absolute top-full left-0 mt-1 z-50 min-w-[280px] max-w-[400px] bg-[#0a0a0a] border border-dashed border-border-subtle font-mono text-xs"
+      className="absolute top-full left-0 mt-1 z-50 min-w-[var(--sidebar-width)] max-w-100 bg-[var(--black-soft)] border border-dashed border-border-subtle font-mono text-xs"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-border-subtle">
         <span className="text-text-accent">┌─ AGENT OVERVIEW ─────┐</span>
-        <button
+        <Button variant="unstyled"
           onClick={onClose}
           className="text-text-faint hover:text-text-primary transition-colors"
         >
           <X className="size-3" />
-        </button>
+        </Button>
       </div>
 
       {/* Content */}
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className="max-h-100 overflow-y-auto">
         {isLoading && (
           <div className="px-3 py-4 text-center text-text-faint">
             Loading...
@@ -68,7 +69,7 @@ export function AgentOverviewPanel({ onClose }: AgentOverviewPanelProps) {
         {workspaces && workspaces.length > 0 && (
           <div className="py-1">
             {workspaces.map((ws) => (
-              <button
+              <Button variant="unstyled"
                 key={ws.id}
                 data-testid={`agent-workspace-${ws.id}`}
                 onClick={() => handleWorkspaceClick(ws.id)}
@@ -80,11 +81,11 @@ export function AgentOverviewPanel({ onClose }: AgentOverviewPanelProps) {
                 </div>
                 <span
                   data-testid="agent-status"
-                  className={cn('text-[10px] uppercase', STATUS_COLORS[ws.status])}
+                  className={cn('text-2xs uppercase', STATUS_COLORS[ws.status])}
                 >
                   {STATUS_LABELS[ws.status]}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         )}

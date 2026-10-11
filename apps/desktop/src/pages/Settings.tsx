@@ -1,3 +1,4 @@
+import { Button, Input, Kbd, Select, TerminalSection } from '@koda/ui'
 import React, { useEffect, useState } from 'react'
 import { useAtom } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -9,49 +10,6 @@ import { isTauriContext, rpcRequest } from '@/lib/tauri'
 import type { CodingAgent, PermissionMode } from '@/lib/rpc'
 
 const guardSetupUrl = 'https://github.com/Dicklesworthstone/destructive_command_guard#quick-install'
-
-/**
- * Terminal-style settings section
- * ┌─ SECTION NAME ───────────────────┐
- * │ description...                   │
- * │                                  │
- * │ content                          │
- * └──────────────────────────────────┘
- */
-function TerminalSection({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="font-mono text-xs">
-      {/* Header */}
-      <div className="flex items-center text-text-faint mb-2">
-        <span>┌─ </span>
-        <span className="text-text-accent">{title}</span>
-        <span> {'─'.repeat(Math.max(0, 30 - title.length))}</span>
-        <span>┐</span>
-      </div>
-      
-      {/* Content */}
-      <div className="px-4 py-3 border-l border-r border-dashed border-border-subtle">
-        {description && (
-          <p className="text-text-muted mb-3">{description}</p>
-        )}
-        {children}
-      </div>
-      
-      {/* Footer */}
-      <div className="text-text-faint">
-        └{'─'.repeat(34)}┘
-      </div>
-    </section>
-  )
-}
 
 /**
  * Terminal-style form field
@@ -72,7 +30,7 @@ function TerminalField({
         <label className="text-text-primary">[{label}]</label>
       </div>
       {description && (
-        <p className="text-text-faint pl-4 text-[10px]">{description}</p>
+        <p className="text-text-faint pl-4 text-2xs">{description}</p>
       )}
       <div className="pl-4">
         {children}
@@ -98,14 +56,14 @@ function TerminalSelect({
   testId?: string
 }) {
   return (
-    <select
+    <Select native
       aria-label={label}
       data-testid={testId}
       value={value}
       onChange={(e) => { onChange(e.target.value) }}
       className={cn(
         'w-full px-3 py-2 text-xs font-mono',
-        'bg-[#0a0a0a] border border-dashed border-border-subtle',
+        'bg-[var(--black-soft)] border border-dashed border-border-subtle',
         'text-text-primary',
         'focus:outline-none focus:border-text-accent',
         'transition-colors cursor-pointer'
@@ -116,7 +74,7 @@ function TerminalSelect({
           {option.label}
         </option>
       ))}
-    </select>
+    </Select>
   )
 }
 
@@ -127,9 +85,9 @@ function ShortcutRow({ action, keys }: { action: string; keys: string }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-dashed border-border-subtle last:border-0">
       <span className="text-text-muted">{action}</span>
-      <kbd className="px-2 py-1 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-accent">
+      <Kbd className="px-2 py-1 bg-[var(--black-soft)] border border-dashed border-border-subtle text-text-accent">
         {keys}
-      </kbd>
+      </Kbd>
     </div>
   )
 }
@@ -152,21 +110,21 @@ function CollaborationSettings() {
     } catch (e) { setSaveError(e instanceof Error ? e.message : String(e)) }
     finally { setSaving(false) }
   }
-  const inputClass = 'w-full px-3 py-2 bg-[#0a0a0a] border border-dashed border-border-subtle text-text-primary focus:outline-none focus:border-text-accent'
-  return <TerminalSection title="COLLABORATION" description="Share workspaces using your install identity. Your first share registers it automatically.">
+  const inputClass = 'rounded-none h-auto text-xs w-full px-3 py-2 bg-[var(--black-soft)] border border-dashed border-border-subtle text-text-primary focus:outline-none focus:border-text-accent'
+  return <TerminalSection compact className="[&_h2]:text-text-accent" title="COLLABORATION" description="Share workspaces using your install identity. Your first share registers it automatically.">
     <div className="space-y-4">
       <TerminalField label="DISPLAY NAME">
-        <input aria-label="Collaboration display name" data-testid="collaboration-display-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={100} className={inputClass} />
+        <Input aria-label="Collaboration display name" data-testid="collaboration-display-name" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={100} className={inputClass} />
       </TerminalField>
       <details>
         <summary className="cursor-pointer text-text-muted">[ADVANCED]</summary>
         <div className="mt-3"><TerminalField label="SERVICE URL" description="Use the service address supplied by your host. Environment configuration takes precedence.">
-          <input aria-label="Collaboration service URL" data-testid="collaboration-service-url" value={serviceUrl} onChange={e => setServiceUrl(e.target.value)} placeholder="https://collaboration.example.com" className={inputClass} />
+          <Input aria-label="Collaboration service URL" data-testid="collaboration-service-url" value={serviceUrl} onChange={e => setServiceUrl(e.target.value)} placeholder="https://collaboration.example.com" className={inputClass} />
         </TerminalField></div>
       </details>
       <p data-testid="collaboration-setup-status" className="text-text-accent">{isPending ? 'Checking...' : data?.mode === 'development-key' ? 'Development key' : data?.reachable ? 'Connected' : data?.enabled ? 'Service unreachable' : 'Not configured'}</p>
       {data?.name && <p className="text-text-muted">Name in shared workspaces: {data.name}</p>}
-      <button data-testid="collaboration-save" disabled={saving || isPending} onClick={() => void save()} className="text-text-accent border border-dashed border-border-subtle px-3 py-2 disabled:opacity-50">{saving ? 'SAVING...' : '[SAVE]'}</button>
+      <Button variant="unstyled" data-testid="collaboration-save" disabled={saving || isPending} onClick={() => void save()} className="text-text-accent border border-dashed border-border-subtle px-3 py-2 disabled:opacity-50">{saving ? 'SAVING...' : '[SAVE]'}</Button>
       {(saveError || error) && <p role="alert" className="text-status-error">{saveError || error?.message}</p>}
     </div>
   </TerminalSection>
@@ -212,12 +170,12 @@ export function Settings() {
 
         <div className="space-y-6">
           {/* Theme Section */}
-          <TerminalSection title="THEME">
+          <TerminalSection compact className="[&_h2]:text-text-accent" title="THEME">
             <ThemeSelector />
           </TerminalSection>
 
           {/* Agent Configuration */}
-          <TerminalSection
+          <TerminalSection compact className="[&_h2]:text-text-accent"
             title="AGENT"
             description="Configure your AI agent preferences"
           >
@@ -257,7 +215,7 @@ export function Settings() {
           <CollaborationSettings />
 
           {/* Git Configuration */}
-          <TerminalSection
+          <TerminalSection compact className="[&_h2]:text-text-accent"
             title="GIT"
             description="Manage your Git identities"
           >
@@ -280,7 +238,7 @@ export function Settings() {
           </TerminalSection>
 
           {/* Keyboard Shortcuts */}
-          <TerminalSection
+          <TerminalSection compact className="[&_h2]:text-text-accent"
             title="KEYBINDS"
             description="Keyboard shortcuts reference"
           >
@@ -294,7 +252,7 @@ export function Settings() {
           </TerminalSection>
 
           {/* About */}
-          <TerminalSection title="ABOUT">
+          <TerminalSection compact className="[&_h2]:text-text-accent" title="ABOUT">
             <div className="space-y-2">
               <div className="flex justify-between py-1">
                 <span className="text-text-muted">VERSION</span>
@@ -312,7 +270,7 @@ export function Settings() {
           </TerminalSection>
 
           {/* Footer */}
-          <div className="text-center text-text-faint text-[10px] pt-4">
+          <div className="text-center text-text-faint text-2xs pt-4">
             <div>{'─'.repeat(40)}</div>
             <div className="py-2">KODA TERMINAL v0.1.0</div>
             <div>{'─'.repeat(40)}</div>

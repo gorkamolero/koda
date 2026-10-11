@@ -86,9 +86,14 @@ export function WorkingIndicator({ compact = false, elapsedMs = 0, label = 'work
 }
 export function CompactWorkingIndicator(props: Omit<WorkingIndicatorProps, 'compact'>) { return <WorkingIndicator compact {...props} /> }
 
-export interface TerminalSectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title: string; description?: string; action?: ReactNode }
-export function TerminalSection({ title, description, action, children, className, ...props }: TerminalSectionProps) {
+export interface TerminalSectionProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title: string; description?: string; action?: ReactNode; compact?: boolean }
+export function TerminalSection({ title, description, action, compact = false, children, className, ...props }: TerminalSectionProps) {
   const id = useId()
+  if (compact) return <section aria-labelledby={id} className={cx('font-code text-xs', className)} {...props}>
+    <div className="flex items-center text-text-faint mb-2"><span aria-hidden="true">┌─ </span><h2 id={id} className="text-xs text-text-action">{title}</h2><span aria-hidden="true"> {'─'.repeat(Math.max(0, 30 - title.length))}</span>{action}<span aria-hidden="true">┐</span></div>
+    <div className="px-4 py-3 border-x border-dashed border-border-subtle">{description && <p className="text-text-muted mb-3">{description}</p>}{children}</div>
+    <div aria-hidden="true" className="text-text-faint">└{'─'.repeat(34)}┘</div>
+  </section>
   return <section aria-labelledby={id} className={cx('font-code text-xs', className)} {...props}>
     <div className="mb-2 flex items-center gap-1 text-text-secondary"><span aria-hidden="true">┌─</span><h2 id={id} className="text-xs uppercase text-text-action">{title}</h2><span aria-hidden="true" className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"> {'─'.repeat(60)}</span>{action}<span aria-hidden="true">┐</span></div>
     <div className="border-x border-dashed border-border-subtle px-4 py-3">{description && <p className="mb-3 text-text-secondary">{description}</p>}{children}</div>
@@ -172,7 +177,7 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
   const enabled = rows.filter(row => !row.item.disabled)
   const focusId = enabled.some(row => row.item.id === focused) ? focused : enabled[0]?.item.id
   useEffect(() => { if (focused) refs.current.get(focused)?.focus({ preventScroll: true }) }, [focused, virtual?.rows])
-  function move(id?: string) { if (id) { setFocused(id); virtual?.scrollToIndex?.(rows.findIndex(row => row.item.id === id)); refs.current.get(id)?.focus() } }
+  function move(id?: string) { if (id) { setFocused(id); const element = refs.current.get(id); if (element) element.focus(); else virtual?.scrollToIndex?.(rows.findIndex(row => row.item.id === id)) } }
   function toggle(item: TreeItem, open: boolean) {
     if (!expandedIds) setExpanded(current => { const next = new Set(current); if (open) next.add(item.id); else next.delete(item.id); return next })
     onExpandedChange?.(item, open)
@@ -180,7 +185,7 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
   function renderRow({ item, level, parent, pos, count }: typeof rows[number]) {
     const custom = rowProps?.(item)
     return <div key={item.id} {...custom} ref={element => { if (element) refs.current.set(item.id, element); else refs.current.delete(item.id) }} role="treeitem" aria-label={item.label} tabIndex={item.id === focusId ? 0 : -1} aria-level={level} aria-posinset={pos} aria-setsize={count} aria-selected={selectedId === item.id} aria-expanded={item.children ? expanded.has(item.id) : undefined} aria-disabled={item.disabled || undefined}
-      className={cx('flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface-hover', focus, selectedId === item.id && 'bg-surface-active', item.disabled && 'opacity-50', rowClassName, custom?.className)}
+      className={cn('flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface-hover', focus, selectedId === item.id && 'bg-surface-active', item.disabled && 'opacity-50', rowClassName, custom?.className)}
       style={{ ...custom?.style, paddingLeft: `calc(var(--space-2) + ${level - 1} * var(--space-${indent}))` }}
       onFocus={() => setFocused(item.id)} onClick={() => { if (!item.disabled) { move(item.id); onSelect?.(item); if (item.children) toggle(item, !expanded.has(item.id)) } }}
       onKeyDown={event => {
@@ -205,7 +210,7 @@ export function Tree({ items, selectedId, onSelect, defaultExpandedIds = [], exp
       {item.icon ?? <FileIcon filename={item.label} type={item.children ? 'directory' : 'file'} isExpanded={expanded.has(item.id)} />}<span className="min-w-0 flex-1 truncate">{item.content ?? item.label}</span>{item.meta}
     </div>
   }
-  return <div ref={containerRef} role="tree" aria-label={label} className={cx('font-code text-xs', className)} {...props}>
+  return <div ref={containerRef} role="tree" aria-label={label} className={cn('font-code text-xs', className)} {...props}>
     {virtual ? <div className="relative w-full" style={{ height: virtual.totalSize }}>{virtual.rows.map(row => rows[row.index] && <div key={String(row.key)} data-index={row.index} ref={virtual.measureElement} className="absolute left-0 top-0 w-full" style={{ transform: `translateY(${row.start}px)` }}>{renderRow(rows[row.index]!)}</div>)}</div> : rows.map(renderRow)}
   </div>
 }
@@ -220,19 +225,25 @@ export function getFileIconType(filename: string): FileIconType {
   if (extension && ['scss', 'sass', 'less'].includes(extension)) return 'css'
   return extension && ['ts', 'tsx', 'js', 'jsx', 'css', 'json', 'md', 'html'].includes(extension) ? extension as FileIconType : 'default'
 }
-export interface FileIconProps extends Omit<HTMLAttributes<SVGSVGElement>, 'children'> { filename: string; type?: 'file' | 'directory'; isExpanded?: boolean; size?: 12 | 14 | 16 }
-export function FileIcon({ filename, type = 'file', isExpanded = false, size = 16, className, ...props }: FileIconProps) {
+export interface FileIconProps extends Omit<HTMLAttributes<SVGSVGElement>, 'children'> { filename: string; type?: 'file' | 'directory'; isExpanded?: boolean; size?: 12 | 14 | 16; appearance?: 'outline' | 'filled' }
+export function FileIcon({ filename, type = 'file', isExpanded = false, size = 16, appearance = 'outline', className, ...props }: FileIconProps) {
   const fileType = getFileIconType(filename)
+  if (appearance === 'filled') {
+    const tone = { folder: 'text-file-icon-folder', ts: 'text-file-icon-ts', tsx: 'text-file-icon-tsx', js: 'text-file-icon-js', jsx: 'text-file-icon-jsx', css: 'text-file-icon-css', json: 'text-file-icon-json', md: 'text-file-icon-md', html: 'text-file-icon-html', rust: 'text-file-icon-rust', default: 'text-file-icon-default' }[type === 'directory' ? 'folder' : fileType]
+    return <svg aria-hidden="true" data-testid={type === 'directory' ? isExpanded ? 'folder-icon-open' : 'folder-icon' : `file-icon-${fileType}`} className={cn('shrink-0', size === 12 ? 'size-3' : size === 14 ? 'size-3.5' : 'size-4', tone, className)} viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d={type === 'directory' ? isExpanded ? 'M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z' : 'M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z' : 'M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z'} />
+    </svg>
+  }
   const Icon = type === 'directory' ? isExpanded ? FolderOpen : Folder : fileType === 'json' ? FileJson : fileType === 'md' ? FileText : fileType === 'default' ? File : FileCode
   const tone = type === 'directory' || ['js', 'jsx', 'json'].includes(fileType) ? 'text-status-warning' : ['ts', 'tsx', 'css'].includes(fileType) ? 'text-text-action' : ['rust', 'html'].includes(fileType) ? 'text-status-reviewing' : 'text-text-secondary'
   return <Icon aria-hidden="true" data-testid={type === 'directory' ? isExpanded ? 'folder-icon-open' : 'folder-icon' : `file-icon-${fileType}`} className={cx('shrink-0', size === 12 ? 'size-3' : size === 14 ? 'size-3.5' : 'size-4', tone, className)} {...props} />
 }
 
-export interface DiffStatProps extends HTMLAttributes<HTMLSpanElement> { additions: number; deletions: number; showBar?: boolean }
-export function DiffStat({ additions, deletions, showBar = true, className, ...props }: DiffStatProps) {
+export interface DiffStatProps extends HTMLAttributes<HTMLSpanElement> { additions: number; deletions: number; showBar?: boolean; hideZero?: boolean; variant?: 'status' | 'git' }
+export function DiffStat({ additions, deletions, showBar = true, hideZero = false, variant = 'status', className, ...props }: DiffStatProps) {
   const added = Math.max(0, additions), removed = Math.max(0, deletions), total = added + removed
   const green = total ? Math.round(added / total * 5) : 0
-  return <span role="img" aria-label={`${added} additions, ${removed} deletions`} className={cx('inline-flex items-center gap-2 font-code text-xs', className)} {...props}><span aria-hidden="true" className="text-status-success-foreground">+{added}</span><span aria-hidden="true" className="text-status-error-foreground">−{removed}</span>{showBar && <span aria-hidden="true" className="inline-flex gap-0.5">{Array.from({ length: 5 }, (_, index) => <span key={index} className={cx('h-2 w-1', !total ? 'bg-border-subtle' : index < green ? 'bg-status-success' : 'bg-status-error')} />)}</span>}</span>
+  return <span role="img" aria-label={`${added} additions, ${removed} deletions`} className={cx('inline-flex items-center gap-2 font-code text-xs', className)} {...props}>{(!hideZero || added > 0) && <span aria-hidden="true" className={variant === 'git' ? 'text-[var(--git-green)]' : 'text-status-success-foreground'}>+{added}</span>}{(!hideZero || removed > 0) && <span aria-hidden="true" className={variant === 'git' ? 'text-[var(--git-red)]' : 'text-status-error-foreground'}>{variant === 'git' ? '-' : '−'}{removed}</span>}{showBar && <span aria-hidden="true" className="inline-flex gap-0.5">{Array.from({ length: 5 }, (_, index) => <span key={index} className={cx('h-2 w-1', !total ? 'bg-border-subtle' : index < green ? 'bg-status-success' : 'bg-status-error')} />)}</span>}</span>
 }
 
 export interface CodeBlockProps extends Omit<HTMLAttributes<HTMLDivElement>, 'onCopy'> { code: string; language?: string; wrap?: boolean; copied?: boolean; onCopy?: (code: string) => void }

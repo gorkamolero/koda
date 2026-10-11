@@ -292,7 +292,7 @@ export function TerminalPanel({ workspaceId, workingDirectory }: TerminalPanelPr
       data-testid="terminal-container"
       tabIndex={-1}
     >
-      <TerminalFrame title="Terminal" status={activeTerminal?.connecting ? 'running' : activeTerminal?.ptySessionId ? 'ready' : 'disconnected'} className="h-full border-0" bodyClassName="flex min-h-0 flex-1 flex-col p-0" header={
+      <TerminalFrame title="Terminal" status={activeTerminal?.connecting ? 'running' : activeTerminal?.ptySessionId ? 'ready' : 'disconnected'} className="h-full border-0 font-ui" bodyClassName="flex min-h-0 flex-1 flex-col p-0" header={
       <div className="flex items-center border-b border-border-subtle bg-surface-card" data-testid="terminal-tab-bar">
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (

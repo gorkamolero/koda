@@ -100,14 +100,15 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
   }, [files, selectedFileId, setSelectedFileId, onNavigateNext, onNavigatePrev])
   useEffect(() => {
     const index = flattenedItems.findIndex(({ node }) => node.id === selectedFileId)
-    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'auto' })
+    const offset = index >= 0 ? virtualizer.getOffsetForIndex(index, 'auto') : undefined
+    if (offset) virtualizer.scrollToOffset(offset[0])
   }, [selectedFileId, flattenedItems, virtualizer])
   const nodes = new Map(flattenedItems.map(({ node }) => [node.id, node]))
   function toItems(nodes: DiffTreeNode[]): TreeItem[] {
     return nodes.map(node => isDiffFolder(node) ? { id: node.id, label: node.name, children: toItems(node.children) } : {
       id: node.id, label: node.path,
       icon: <span className={cn('flex size-4 shrink-0 items-center justify-center rounded text-2xs font-bold', STATUS_COLORS[node.status].bg, STATUS_COLORS[node.status].text)} data-testid="file-status-badge" data-status={node.status}>{STATUS_LABELS[node.status]}</span>,
-      meta: <DiffStat additions={node.additions} deletions={node.deletions} showBar={false} />,
+      meta: <DiffStat hideZero variant="git" additions={node.additions} deletions={node.deletions} showBar={false} />,
     })
   }
 
@@ -170,7 +171,7 @@ export function FileTree({ onNavigateNext, onNavigatePrev }: FileTreeProps) {
       <Tree items={toItems(tree)} label="Changed files" containerRef={parentRef} className="flex-1 overflow-auto fade-mask-y" data-virtualized="true" selectedId={selectedFileId ?? undefined} expandedIds={expandedFolders} indent="3" rowClassName="text-sm"
         onSelect={item => { if (!item.children) setSelectedFileId(item.id) }} onExpandedChange={item => toggleFolder(item.id)} onKeyDown={handleKeyDown}
         rowProps={item => { const node = nodes.get(item.id); return node && !isDiffFolder(node) ? { 'data-testid': `diff-file-${node.path.replace(/[./]/g, '-')}`, 'data-selected': selectedFileId === node.id, 'data-file-status': node.status } : { 'data-testid': 'diff-folder-item', 'data-expanded': expandedFolders.has(item.id) } }}
-        virtual={{ rows: virtualizer.getVirtualItems(), totalSize: virtualizer.getTotalSize(), measureElement: virtualizer.measureElement, scrollToIndex: index => virtualizer.scrollToIndex(index) }} />
+        virtual={{ rows: virtualizer.getVirtualItems(), totalSize: virtualizer.getTotalSize(), measureElement: virtualizer.measureElement, scrollToIndex: index => { const offset = virtualizer.getOffsetForIndex(index, 'auto'); if (offset) virtualizer.scrollToOffset(offset[0]) } }} />
     </div>
   )
 }

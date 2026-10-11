@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useEffect, useCallback } from 'react'
 import { useSetAtom, useAtomValue } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -104,7 +105,7 @@ export function InterviewMode({
         {/* Progress bar */}
         <div className="w-full h-1.5 bg-surface-control rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#62b7ff] to-[#4fe3a3] transition-all duration-300"
+            className="h-full rounded-full bg-gradient-to-r from-[var(--meter-start)] to-[var(--meter-end)] transition-all duration-300"
             style={{ width: `${String(progress.percent)}%` }}
           />
         </div>
@@ -124,24 +125,24 @@ export function InterviewMode({
       {/* Navigation buttons */}
       <div className="border-t border-border-subtle px-6 py-4">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <button
+          <Button variant="unstyled"
             data-testid="interview-back-button"
             onClick={handleBack}
             disabled={isFirstQuestion}
             className={cn(
-              'btn-ghost',
+              'px-4 py-2 rounded-lg font-semibold text-sm bg-transparent text-text-muted border border-border-strong hover:text-text-primary hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-normal',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             data-testid="interview-next-button"
             onClick={handleNext}
             disabled={!hasValidAnswer && currentQuestion?.required}
             className={cn(
-              isLastQuestion ? 'btn-primary' : 'btn-secondary',
+              isLastQuestion ? 'px-4 py-2 rounded-md font-medium text-sm text-inverse bg-[var(--accent-terracotta)] hover:brightness-110 transition-all duration-normal' : 'px-4 py-2 rounded-lg font-semibold text-sm text-text-primary bg-surface-card-strong hover:bg-surface-control-hover transition-colors duration-normal',
               'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none'
             )}
           >
@@ -156,7 +157,7 @@ export function InterviewMode({
                 <ChevronRight className="w-4 h-4 ml-1" />
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

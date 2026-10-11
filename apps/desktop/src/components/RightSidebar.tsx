@@ -129,7 +129,7 @@ export function RightSidebar({
       </div>
 
       {/* Row 2: Tabs bar */}
-      <TabsList aria-label="Workspace panels" className="flex justify-between gap-1 px-3 h-9 min-w-0 overflow-hidden rounded-none bg-transparent p-0 border-b border-dashed border-border-subtle">
+      <TabsList aria-label="Workspace panels" className="flex justify-between gap-1 p-0 px-3 h-9 min-w-0 overflow-hidden rounded-none bg-transparent border-b border-dashed border-border-subtle">
         {/* Left side - main tabs */}
         <div className="flex items-center gap-1 flex-shrink-0 text-xs">
           <span className="text-text-faint mr-1">│</span>

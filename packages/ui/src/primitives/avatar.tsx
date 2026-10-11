@@ -89,7 +89,7 @@ export function AvatarStack({ people, maxVisible = 3, size = 'sm', compact = fal
     {visible.map(person => {
       const tone = person.tone ?? defaultPresenceTone(person.id)
       return <div key={person.id} className="relative" title={person.name}>
-        <Avatar className={cn('border-2 border-surface-card', compact ? size === 'sm' ? 'size-6 text-2xs' : 'size-8 text-xs' : size === 'sm' ? 'size-7' : 'size-9')}>
+        <Avatar className={cn(compact ? 'border-2 border-background' : 'border-2 border-surface-card', compact ? size === 'sm' ? 'size-6 text-2xs' : 'size-8 text-xs' : size === 'sm' ? 'size-7' : 'size-9')}>
           <AvatarImage src={person.src} alt={person.name} />
           {/* koda-token-exception: Remote presence colors are caller-owned identity data; known colors use the token palette. */}
           <AvatarFallback style={person.color ? { backgroundColor: person.color } : undefined} role="img" aria-label={person.name} data-presence-tone={tone} className={presenceClasses[tone]}>

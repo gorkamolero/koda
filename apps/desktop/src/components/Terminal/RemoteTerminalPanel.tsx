@@ -73,7 +73,7 @@ export function RemoteTerminalPanel({ worktreeId, hostName }: { worktreeId: stri
   }, [activeId, terminals])
 
   return (
-    <TerminalFrame title="Terminal" readOnly status={terminals.length ? 'ready' : 'disconnected'} className="h-full border-0" bodyClassName="flex min-h-0 flex-1 flex-col p-0" data-testid="terminal-container" data-remote="true" header={
+    <TerminalFrame title="Terminal" readOnly status={terminals.length ? 'ready' : 'disconnected'} className="h-full border-0 font-ui" bodyClassName="flex min-h-0 flex-1 flex-col p-0" data-testid="terminal-container" data-remote="true" header={
       <div className="flex items-center border-b border-border-subtle bg-surface-card" data-testid="terminal-tab-bar">
         <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
           {terminals.map((item, index) => (

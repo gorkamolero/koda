@@ -24,7 +24,7 @@ export function QuickOpen({ onFileSelect }: QuickOpenProps) {
     <CommandList data-testid="quick-open-results">
       {!results.length && <div className="px-4 py-8 text-center text-sm text-text-faint">{query ? 'No files found' : 'Type to search for files'}</div>}
       {results.map(file => <CommandItem key={file.path} value={file.path} data-testid={`quick-open-result-${file.name.replace(/\./g, '-').toLowerCase()}`} onSelect={() => { onFileSelect(file); handleClose() }} className="gap-3 px-4 py-2.5">
-        <FileIcon filename={file.name} type={file.type} />
+        <FileIcon appearance="filled" filename={file.name} type={file.type} />
         <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-text-primary">{file.name}</div><div className="truncate text-xs text-text-faint">{file.path}</div></div>
       </CommandItem>)}
     </CommandList>

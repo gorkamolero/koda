@@ -22,3 +22,5 @@ export const ResponseError: Story = { args: { error: 'The host disconnected befo
 
 export const ComposedRequest: Story = { args: { appearance: 'terminal', ready: true, submitLabel: 'Submit answers', children: <fieldset><legend>Approach</legend><p>Use the existing reconnect behavior.</p></fieldset> }, play: async ({ canvasElement, args }) => { await userEvent.click(within(canvasElement).getByRole('button', { name: 'Submit answers' })); await expect(args.onSubmit).toHaveBeenCalledOnce() } }
 export const ComposedSecretOnHost: Story = { args: { appearance: 'terminal', requiresHost: true, hostName: 'Gorka', ready: true, children: <p>A private answer is required.</p> }, play: async ({ canvasElement }) => { await expect(within(canvasElement).getByRole('button', { name: 'Submit answer' })).toBeDisabled() } }
+
+export const Interview: Story = { args: { appearance: 'interview', hideActions: true, heading: <h3 className="mb-6 text-xl font-semibold text-text-strong">What should the feature do?</h3>, variant: 'text', question: 'Describe the feature requirements' } }

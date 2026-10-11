@@ -10,7 +10,7 @@ type PopoverSelectProps = React.ComponentProps<typeof SelectPrimitive.Root> & { 
 function Select(props: NativeSelectProps | PopoverSelectProps) {
   if (props.native) {
     const { native: _native, className, ...rest } = props
-    return <select className={cn('bg-surface-card border border-border-subtle p-1 font-code text-xs disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus', className)} {...rest} />
+    return <select className={cn('bg-surface-card border border-border-subtle p-1 font-code text-xs disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus', className)} {...rest} />
   }
   const { native: _native, ...rest } = props
   return <SelectPrimitive.Root {...rest} />

@@ -1,5 +1,5 @@
 import { useId, useState, type HTMLAttributes, type ReactNode, type Ref, type TextareaHTMLAttributes } from 'react'
-import { Check, ChevronDown, ChevronRight, Circle, LockKeyhole, Square, Wifi, WifiOff, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Circle, Loader2, LockKeyhole, Square, Wifi, WifiOff, X } from 'lucide-react'
 import { Button, Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives'
 import { cn } from '../primitives/utils'
 import { Spinner } from '../brand'
@@ -40,8 +40,8 @@ export interface ToolBlockProps extends HTMLAttributes<HTMLDivElement> { tool: s
 /** Running calls open automatically; completed calls collapse until expanded. */
 export function ToolBlock({ tool, status = 'running', summary, duration, defaultOpen, header, bodyClassName, children, className, ...props }: ToolBlockProps) {
   const id = useId()
-  const [expansion, setExpansion] = useState({ status, open: defaultOpen ?? status === 'running', toggled: false })
-  const open = expansion.toggled || expansion.status === status ? expansion.open : status === 'running'
+  const [expansion, setExpansion] = useState({ status, open: defaultOpen ?? status !== 'done', toggled: false })
+  const open = expansion.toggled || expansion.status === status ? expansion.open : status !== 'done'
   return <div data-state={open ? 'open' : 'closed'} className={cn('border border-dashed border-border-subtle bg-surface-card font-code text-text-primary', className)} {...props}><button type="button" className={cx('flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-hover', focus)} aria-expanded={open} aria-controls={id} onClick={() => setExpansion({ status, open: !open, toggled: true })}>{header ?? <>{open ? <ChevronDown aria-hidden="true" className="size-3" /> : <ChevronRight aria-hidden="true" className="size-3" />}<ToolCallSummary tool={tool} status={status} summary={summary} duration={duration} /></>}</button><div id={id} hidden={!open} className={cn("border-t border-dashed border-border-subtle p-3 text-xs", bodyClassName)}>{children}</div></div>
 }
 
@@ -88,7 +88,9 @@ export type QuestionValue = string | string[]
 export interface QuestionCardProps extends Omit<HTMLAttributes<HTMLFormElement>, 'onChange' | 'onSubmit'> {
   title?: string
   question?: string
-  appearance?: 'card' | 'terminal'
+  appearance?: 'card' | 'terminal' | 'interview'
+  heading?: ReactNode
+  hideActions?: boolean
   /** Composed fields allow a request to collect several answers in one form. */
   ready?: boolean
   requiresHost?: boolean
@@ -106,13 +108,13 @@ export interface QuestionCardProps extends Omit<HTMLAttributes<HTMLFormElement>,
   busy?: boolean
   error?: string
 }
-export function QuestionCard({ title = 'Your answer is needed', question, appearance = 'card', children, ready: readyProp, requiresHost = false, submitLabel = 'Submit answer', footerNote, variant = 'single', options = [], value = variant === 'multiple' ? [] : '', onValueChange, onSubmit, onCancel, state = 'actionable', hostName, busy = false, error, className, ...props }: QuestionCardProps) {
+export function QuestionCard({ title = 'Your answer is needed', question, appearance = 'card', heading, hideActions = false, children, ready: readyProp, requiresHost = false, submitLabel = 'Submit answer', footerNote, variant = 'single', options = [], value = variant === 'multiple' ? [] : '', onValueChange, onSubmit, onCancel, state = 'actionable', hostName, busy = false, error, className, ...props }: QuestionCardProps) {
   const id = useId(), secretElsewhere = (variant === 'secret' || requiresHost) && hostName !== undefined
   const disabled = state !== 'actionable' || busy || secretElsewhere
   const ready = readyProp ?? (Array.isArray(value) ? value.length > 0 : value.trim().length > 0)
   const selected = Array.isArray(value) ? value : [value]
-  return <form aria-label="Agent question" autoComplete="off" data-testid="question-card" className={cn('space-y-4 border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'border-text-accent/40 p-3 [&>h3]:text-xs' : 'border-border-accent p-4', className)} onSubmit={event => { event.preventDefault(); if (!disabled && ready) onSubmit?.(value) }} {...props}>
-    <h3 className="text-sm font-medium">{title}</h3>
+  return <form aria-label="Agent question" autoComplete="off" data-testid="question-card" className={cn(appearance === 'interview' ? 'max-w-2xl mx-auto' : 'space-y-4 border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'border-text-accent/40 p-3 [&>h3]:text-xs' : appearance === 'card' ? 'border-border-accent p-4' : undefined, className)} onSubmit={event => { event.preventDefault(); if (!disabled && ready) onSubmit?.(value) }} {...props}>
+    {heading ?? <h3 className="text-sm font-medium">{title}</h3>}
     {hostName && appearance !== 'terminal' && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
     {children ?? <fieldset disabled={disabled} className="min-w-0 space-y-3"><legend className="mb-2 text-sm">{question}</legend>
       {(variant === 'single' || variant === 'multiple') && <><p className="text-text-secondary">{variant === 'multiple' ? 'Choose one or more.' : 'Choose one.'}</p>{options.map((option, index) => <label key={option.value} className="flex cursor-pointer items-start gap-2"><input className={cx('mt-0.5 size-4 shrink-0 accent-text-accent', focus)} type={variant === 'multiple' ? 'checkbox' : 'radio'} name={id} value={option.value} aria-labelledby={`${id}-label-${index}`} checked={selected.includes(option.value)} aria-describedby={option.description ? `${id}-${index}` : undefined} onChange={event => { if (!disabled) onValueChange?.(variant === 'single' ? option.value : event.target.checked ? [...selected, option.value] : selected.filter(item => item !== option.value)) }} /><span><span id={`${id}-label-${index}`}>{option.label}</span>{option.description && <span id={`${id}-${index}`} className="block text-text-secondary">{option.description}</span>}</span></label>)}</>}
@@ -125,14 +127,14 @@ export function QuestionCard({ title = 'Your answer is needed', question, appear
     {state === 'withdrawn' && <p role="status">[WITHDRAWN] This question is no longer available.</p>}
     {error && <p role="alert" className="flex items-start gap-2 text-text-primary"><X aria-hidden="true" className="size-4 shrink-0 text-status-error" />{error}</p>}
     {footerNote}
-    {(state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button type="submit" variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-text-accent' : undefined} data-testid="question-submit" disabled={disabled || !ready} loading={appearance !== 'terminal' && busy}>{busy ? 'Sending…' : submitLabel}</Button><Button variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-status-error' : undefined} data-testid="question-cancel" disabled={disabled} onClick={() => { if (!disabled) onCancel?.() }}>Cancel and stop</Button></div>}
+    {!hideActions && (state === 'actionable' || state === 'read-only') && <div className="flex flex-wrap gap-2"><Button type="submit" variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-text-accent' : undefined} data-testid="question-submit" disabled={disabled || !ready} loading={appearance !== 'terminal' && busy}>{busy ? 'Sending…' : submitLabel}</Button><Button variant={appearance === 'terminal' ? 'unstyled' : 'outline'} size="sm" className={appearance === 'terminal' ? 'border rounded-none border-border-subtle px-3 py-1 disabled:opacity-50 hover:text-status-error' : undefined} data-testid="question-cancel" disabled={disabled} onClick={() => { if (!disabled) onCancel?.() }}>Cancel and stop</Button></div>}
   </form>
 }
 
 export interface ComposerProps extends Omit<HTMLAttributes<HTMLFormElement>, 'onChange' | 'onSubmit'> {
   appearance?: 'card' | 'terminal'
   textareaRef?: Ref<HTMLTextAreaElement>
-  textareaProps?: TextareaHTMLAttributes<HTMLTextAreaElement> & { [attribute: `data-${string}`]: string | undefined }
+  textareaProps?: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'disabled'> & { [attribute: `data-${string}`]: string | undefined }
   footer?: ReactNode
   value: string
   onValueChange?: (value: string) => void
@@ -155,7 +157,7 @@ export function Composer({ appearance = 'card', textareaRef, textareaProps, foot
   const locked = disabled || mode === 'view-only'
   const hint = placeholder ?? (mode === 'view-only' ? `View only · ${ownerName} controls this session` : mode === 'shared' ? `Message ${ownerName}'s shared session…` : 'Ask Koda to build, explain, or fix…')
   if (appearance === 'terminal') return <form aria-label="Message composer" className={cn('group border border-dashed border-border-subtle focus-within:border-text-accent transition-colors font-code', className)} onSubmit={event => { event.preventDefault(); if (!locked && !running && value.trim()) onSend?.() }} {...props}>
-    <div className="flex min-h-20 max-h-50 overflow-y-auto px-3 py-3"><span className="text-text-accent text-sm mr-2 mt-0.5 select-none">&gt;</span><textarea ref={textareaRef} aria-label="Message" value={value} disabled={locked || running} onChange={event => onValueChange?.(event.target.value)} placeholder={hint} {...textareaProps} className={cn('flex-1 min-h-15 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-faint focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed', textareaProps?.className)} /></div>
+    <div className="flex min-h-20 max-h-50 overflow-y-auto px-3 py-3"><span className="text-text-accent text-sm mr-2 mt-0.5 select-none">&gt;</span><textarea ref={textareaRef} aria-label="Message" value={value} onChange={event => onValueChange?.(event.target.value)} placeholder={hint} {...textareaProps} disabled={locked || running} className={cn('flex-1 min-h-15 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-faint focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed', textareaProps?.className)} /></div>
     {children}{attachments}{footer}
   </form>
   return <form aria-label="Message composer" className={cx('space-y-3 rounded-md border border-border-strong bg-surface-card p-3 font-code text-xs text-text-primary', className)} onSubmit={event => { event.preventDefault(); if (!locked && !running && value.trim()) onSend?.() }} {...props}>
@@ -166,10 +168,16 @@ export function Composer({ appearance = 'card', textareaRef, textareaProps, foot
   </form>
 }
 
-export interface SharedBadgeProps extends HTMLAttributes<HTMLSpanElement> { hostName: string; permission: 'control' | 'view'; status?: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'initializing'; showStatus?: boolean }
-export function SharedBadge({ hostName, permission, status = 'connected', showStatus = false, className, ...props }: SharedBadgeProps) {
+export interface SharedBadgeProps extends HTMLAttributes<HTMLSpanElement> { hostName?: string; icon?: ReactNode; connectionOnly?: boolean; showLabel?: boolean; permission?: 'control' | 'view'; status?: 'connected' | 'connecting' | 'reconnecting' | 'disconnected' | 'initializing'; showStatus?: boolean }
+export function SharedBadge({ hostName = '', icon, permission = 'view', connectionOnly = false, showLabel = false, status = 'connected', showStatus = false, className, ...props }: SharedBadgeProps) {
   const Icon = status === 'connected' ? Wifi : status === 'disconnected' ? WifiOff : Circle
-  return <span data-testid="shared-workspace-badge" className={cx('inline-flex flex-wrap items-center gap-2 font-code text-xs text-text-primary', className)} {...props} data-permission={permission}><span>[SHARED BY {hostName.toUpperCase()} · {permission.toUpperCase()}]</span>{showStatus && <span className="inline-flex items-center gap-1 text-text-secondary"><Icon aria-hidden="true" className={cx('size-3', status === 'connected' ? 'text-status-success' : status === 'disconnected' ? 'text-status-error' : 'text-status-warning')} />{status}</span>}</span>
+  if (connectionOnly) {
+    const label = status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : status === 'reconnecting' ? 'Reconnecting...' : status === 'disconnected' ? 'Disconnected' : 'Initializing...'
+    const tone = status === 'connected' ? 'text-status-success-foreground bg-status-success/10' : status === 'connecting' || status === 'reconnecting' ? 'text-status-warning-foreground bg-status-warning/10' : 'text-muted-foreground bg-muted'
+    const ConnectionIcon = status === 'connecting' || status === 'reconnecting' ? Loader2 : status === 'disconnected' ? WifiOff : Wifi
+    return <span title={`Collaboration: ${label}`} className={cn('flex items-center gap-1.5 px-2 py-1 rounded text-xs', tone, className)} {...props}><ConnectionIcon aria-hidden="true" className={cx('size-3', (status === 'connecting' || status === 'reconnecting') && 'animate-spin')} />{showLabel && <span className="font-medium">{label}</span>}</span>
+  }
+  return <span data-testid="shared-workspace-badge" className={cn('inline-flex flex-wrap items-center gap-2 font-code text-xs text-text-primary', className)} {...props} data-permission={permission}>{icon}<span>[SHARED BY {hostName.toUpperCase()} · {permission.toUpperCase()}]</span>{showStatus && <span className="inline-flex items-center gap-1 text-text-secondary"><Icon aria-hidden="true" className={cx('size-3', status === 'connected' ? 'text-status-success' : status === 'disconnected' ? 'text-status-error' : 'text-status-warning')} />{status}</span>}</span>
 }
 
 export interface TerminalFrameProps extends Omit<HTMLAttributes<HTMLElement>, 'title'> { title?: string; status?: 'running' | 'ready' | 'disconnected'; readOnly?: boolean; actions?: ReactNode; header?: ReactNode; bodyClassName?: string }
@@ -186,8 +194,9 @@ export function CommandPalette({ commands, placeholder = 'Search commands and fi
   return open !== undefined ? <CommandDialog open={open} onOpenChange={onOpenChange} commandProps={commandProps}>{content}</CommandDialog> : <Command label="Command palette" {...commandProps}>{content}</Command>
 }
 
-export interface AppShellProps extends HTMLAttributes<HTMLDivElement> { sidebar?: ReactNode; topbar?: ReactNode; main: ReactNode; rightPanel?: ReactNode; bottomPanel?: ReactNode; sidebarLabel?: string; rightPanelLabel?: string }
+export interface AppShellProps extends HTMLAttributes<HTMLDivElement> { sidebar?: ReactNode; topbar?: ReactNode; main: ReactNode; rightPanel?: ReactNode; bottomPanel?: ReactNode; sidebarLabel?: string; rightPanelLabel?: string; variant?: 'workspace' | 'navigation' }
 /** Workspace layout slots; data, navigation and editor instances belong to the app. */
-export function AppShell({ sidebar, topbar, main, rightPanel, bottomPanel, sidebarLabel = 'Workspace navigation', rightPanelLabel = 'Workspace details', className, ...props }: AppShellProps) {
+export function AppShell({ sidebar, topbar, main, rightPanel, bottomPanel, sidebarLabel = 'Workspace navigation', rightPanelLabel = 'Workspace details', variant = 'workspace', children, className, ...props }: AppShellProps) {
+  if (variant === 'navigation') return <div className={cn('h-screen w-screen overflow-hidden bg-surface-messages grid grid-cols-[var(--sidebar-width)_1fr]', className)} {...props}><aside aria-label={sidebarLabel} className="relative glass-sidebar border-r border-border-subtle overflow-hidden">{sidebar}</aside><main className="overflow-hidden bg-surface-messages">{main}</main>{children}</div>
   return <div className={cx('flex min-h-screen overflow-hidden bg-surface-messages font-code text-text-primary', className)} {...props}>{sidebar && <aside aria-label={sidebarLabel} className="hidden w-sidebar shrink-0 border-r border-border-subtle bg-surface-sidebar sm:block">{sidebar}</aside>}<div className="flex min-w-0 flex-1 flex-col">{topbar && <header className="border-b border-border-subtle bg-surface-card px-4 py-3">{topbar}</header>}<div className="flex min-h-0 flex-1"><main className="min-w-0 flex-1 overflow-auto bg-surface-card">{main}</main>{rightPanel && <aside aria-label={rightPanelLabel} className="hidden w-right-panel shrink-0 border-l border-border-subtle bg-surface-card lg:block">{rightPanel}</aside>}</div>{bottomPanel && <div className="border-t border-border-subtle">{bottomPanel}</div>}</div></div>
 }

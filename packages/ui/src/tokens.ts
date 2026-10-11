@@ -186,6 +186,34 @@ export type ThemeTokens = Record<ThemeTokenName, string>
 
 /** Shared spacing, typography, dimensions, effects, motion and layer foundations. */
 export const foundationTokens = {
+  "--file-icon-folder": "#f59e0b",
+  "--file-icon-ts": "#3b82f6",
+  "--file-icon-tsx": "#60a5fa",
+  "--file-icon-js": "#eab308",
+  "--file-icon-jsx": "#facc15",
+  "--file-icon-css": "#a855f7",
+  "--file-icon-json": "#ca8a04",
+  "--file-icon-md": "#6b7280",
+  "--file-icon-html": "#f97316",
+  "--file-icon-rust": "#ea580c",
+  "--file-icon-default": "#9ca3af",
+
+  "--choice-check": "#0b0f1a",
+  "--spec-success-surface": "#f0fdf4",
+  "--spec-success-surface-dark": "#14532d",
+  "--spec-success-border": "#bbf7d0",
+  "--spec-success-border-dark": "#166534",
+  "--spec-success-icon": "#16a34a",
+  "--spec-success-icon-dark": "#4ade80",
+  "--spec-success-heading": "#166534",
+  "--spec-success-heading-dark": "#bbf7d0",
+  "--spec-success-text": "#15803d",
+  "--spec-success-text-dark": "#86efac",
+  "--space-30": "7.5rem",
+  "--space-35": "8.75rem",
+  "--space-75": "18.75rem",
+  "--space-100": "25rem",
+
   "--meter-start": "#62b7ff",
   "--meter-end": "#4fe3a3",
 
@@ -583,6 +611,11 @@ export const typography = {
   }
 } as const
 export const spacing = {
+  "30": "7.5rem",
+  "35": "8.75rem",
+  "75": "18.75rem",
+  "100": "25rem",
+
   "0": "0px",
   "px": "1px",
   "0.5": "0.125rem",

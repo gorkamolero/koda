@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { useState, useMemo } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
 import { useRepo, useWorktrees } from '@/hooks/useRpc'
@@ -124,7 +125,7 @@ export function RepositoryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="unstyled"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
               onClick={() => {
                 // TODO: Open in Finder
@@ -133,8 +134,8 @@ export function RepositoryPage() {
             >
               <FolderOpen className="w-4 h-4" />
               Open
-            </button>
-            <button
+            </Button>
+            <Button variant="unstyled"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
               onClick={() => {
                 // TODO: Open in editor
@@ -143,11 +144,11 @@ export function RepositoryPage() {
             >
               <ExternalLink className="w-4 h-4" />
               Editor
-            </button>
-            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors">
+            </Button>
+            <Button variant="unstyled" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors">
               <Settings className="w-4 h-4" />
               Settings
-            </button>
+            </Button>
             <Link
               to="/"
               search={{ repoId }}
@@ -219,7 +220,7 @@ export function RepositoryPage() {
             {/* Archived Workspaces */}
             {archivedWorkspaces.length > 0 && (
               <div>
-                <button
+                <Button variant="unstyled"
                   onClick={() => { setShowArchived(!showArchived) }}
                   className="flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors mb-3"
                 >
@@ -228,7 +229,7 @@ export function RepositoryPage() {
                   <span className="text-xs text-text-faint">
                     {showArchived ? 'Hide' : 'Show'}
                   </span>
-                </button>
+                </Button>
                 {showArchived && (
                   <div className="space-y-2">
                     {archivedWorkspaces.map((ws) => (

@@ -21,3 +21,7 @@ export const Small: Story = { args: { size: 12 } }
 export const Medium: Story = { args: { size: 14 } }
 export const Large: Story = { args: { size: 16 } }
 
+
+export const Filled: Story = { args: { appearance: 'filled' }, render: args => <div className="flex gap-3">{['index.ts', 'App.tsx', 'index.js', 'App.jsx', 'styles.css', 'package.json', 'README.md', 'index.html', 'main.rs', 'LICENSE'].map(filename => <FileIcon {...args} filename={filename} key={filename} />)}</div> }
+export const FilledFolder: Story = { args: { appearance: 'filled', filename: 'src', type: 'directory' } }
+export const FilledFolderExpanded: Story = { args: { appearance: 'filled', filename: 'src', type: 'directory', isExpanded: true } }

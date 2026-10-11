@@ -33,7 +33,7 @@ export function CreateWorkspaceModal({ isOpen, onClose, onCreated, createLabel =
         {error && <Callout tone="error">ERROR: {error}</Callout>}
         <div>
           <label htmlFor="new-workspace-name" className="block text-2xs text-text-dim mb-1">{nameLabel}</label>
-          <Input id="new-workspace-name" value={name} onChange={event => setName(event.target.value)} placeholder="my-workspace" className="rounded-none bg-transparent border-dashed border-text-dim/30 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent" onKeyDown={event => { if (event.key === 'Enter') void handleCreate() }} autoFocus />
+          <Input id="new-workspace-name" value={name} onChange={event => setName(event.target.value)} placeholder="my-workspace" className="rounded-none bg-transparent placeholder:text-text-dim border-dashed border-text-dim/30 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent" onKeyDown={event => { if (event.key === 'Enter') void handleCreate() }} autoFocus />
         </div>
         <Button variant="ghost" onClick={() => void handleCreate()} disabled={!name.trim() || createWorkspace.isPending} className="w-full h-auto rounded-none p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10">
           {createWorkspace.isPending ? 'CREATING...' : createLabel}

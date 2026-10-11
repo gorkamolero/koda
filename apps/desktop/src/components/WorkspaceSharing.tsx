@@ -1,11 +1,11 @@
-import { useRef, useState } from 'react'
+import { Button, Callout, Dialog, DialogContent, DialogHeader, DialogTitle, NavItem, SegmentedControl, Textarea } from '@koda/ui'
+import { useState } from 'react'
 import { atom, useAtom } from 'jotai'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { Check, Copy, Share2 } from 'lucide-react'
 import { rpcRequest } from '@/lib/tauri'
 import { useCollaborationSetup } from '@/hooks/useCollaborationSetup'
-import { useClickOutside } from '@/hooks/useClickOutside'
 import { useSharedWorkspaces, type Share, type SharePermission } from '@/hooks/useSharedWorkspaces'
 import { cn } from '@/lib/utils'
 
@@ -15,32 +15,21 @@ const PERMISSIONS: { id: SharePermission; label: string; detail: string }[] = [
 ]
 
 function Modal({ title, onClose, children, label }: { title: string; label: string; onClose: () => void; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useClickOutside(ref, { onClickOutside: onClose, onEscape: onClose, enabled: true })
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 animate-in fade-in duration-150" role="dialog" aria-label={label}>
-      <div ref={ref} className="w-full max-w-md mx-4 animate-in zoom-in-95 slide-in-from-bottom-2 duration-200">
-        <div className="bg-surface-card border border-dashed border-text-dim/30 font-mono">
-          <div className="px-4 py-3 border-b border-dashed border-text-dim/20">
-            <div className="text-xs text-border-accent">┌─ {title} {'─'.repeat(Math.max(4, 28 - title.length))}</div>
-          </div>
-          {children}
-          <div className="px-4 py-3 border-t border-dashed border-text-dim/20 flex justify-end">
-            <button onClick={onClose} className="text-xs text-text-dim hover:text-text-primary transition-colors">[ESC] CLOSE</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
+    <DialogContent aria-label={label} aria-labelledby={undefined} aria-describedby={undefined} className="max-w-md bg-surface-card border-text-dim/30 shadow-none" footerClassName="border-text-dim/20 px-4 py-3" closeButtonClassName="h-auto rounded-none border-0 p-0 text-xs text-text-dim hover:bg-transparent hover:text-text-primary">
+      <DialogHeader className="border-text-dim/20"><DialogTitle decorate={false} className="text-xs font-normal tracking-normal text-border-accent"><span aria-hidden="true">┌─ </span>{title}<span aria-hidden="true"> {'─'.repeat(Math.max(4, 28 - title.length))}</span></DialogTitle></DialogHeader>
+      {children}
+    </DialogContent>
+  </Dialog>
 }
 
 function CollaborationSetupState({ onClose }: { onClose: () => void }) {
   const { data, isPending } = useCollaborationSetup()
   if (data?.enabled && data.reachable !== false) return null
-  return <div className="text-xs text-text-muted border border-dashed border-text-dim/30 p-3 space-y-2" data-testid="collaboration-setup">
+  return <Callout className="text-xs text-text-muted border-text-dim/30 bg-transparent p-3 [&>svg]:hidden [&>div]:space-y-2" data-testid="collaboration-setup">
     <p>{isPending ? 'Checking collaboration...' : data?.enabled ? 'The collaboration service is unavailable. Check the service URL and your connection.' : 'Choose your display name and collaboration service in Settings to share or join a workspace.'}</p>
     {!isPending && <Link to="/settings" onClick={onClose} className="text-border-accent">[→] COLLABORATION SETTINGS</Link>}
-  </div>
+  </Callout>
 }
 
 const actionButton = 'w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50'
@@ -74,61 +63,51 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
     setTimeout(() => setCopied(false), 2000)
   }
   return <>
-    <button
+    <Button variant="unstyled"
       data-testid="share-workspace"
       onClick={() => update({ open: true })}
       className="flex items-center gap-1 px-2 py-1 text-xs border border-dashed border-border-subtle hover:border-text-accent hover:text-text-accent transition-colors"
     >
       <Share2 className="size-3" />
       <span>[SHARE]</span>
-    </button>
+    </Button>
     {open && <Modal title="SHARE WORKSPACE" label="Share workspace" onClose={() => update({ open: false })}>
       <div className="p-4 space-y-4">
         <CollaborationSetupState onClose={() => update({ open: false })} />
-        <p className="text-[11px] text-text-muted leading-relaxed">
+        <p className="text-caption text-text-muted leading-relaxed">
           Your collaborator opens this workspace in their own Koda, with the same chat, changes, files and terminal you see. The agent keeps running on this machine. A new invitation replaces the previous one.
         </p>
         <div>
-          <p className="text-[10px] text-text-dim mb-2 uppercase">PERMISSION:</p>
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Permission">
-            {PERMISSIONS.map((option) => (
-              <button
-                key={option.id}
-                role="radio"
-                aria-checked={permission === option.id}
-                data-testid={`share-permission-${option.id}`}
-                onClick={() => update({ permission: option.id, invitation: '' })}
-                className={cn(
-                  'p-2 text-left border border-dashed transition-colors',
-                  permission === option.id ? 'border-border-accent text-border-accent bg-border-accent/10' : 'border-text-dim/30 text-text-muted hover:border-text-dim'
-                )}
-              >
-                <div className="text-xs">[{option.label}]</div>
-                <div className="text-[10px] text-text-dim mt-1 leading-snug">{option.detail}</div>
-              </button>
-            ))}
-          </div>
+          <p className="text-2xs text-text-dim mb-2 uppercase">PERMISSION:</p>
+          <SegmentedControl
+            aria-label="Permission"
+            value={permission}
+            onValueChange={value => update({ permission: value as SharePermission, invitation: '' })}
+            className="grid grid-cols-2 gap-2 rounded-none border-0 bg-transparent p-0"
+            optionClassName="p-2 rounded-none text-left border border-dashed data-[state=checked]:ring-0"
+            options={PERMISSIONS.map(option => ({ value: option.id, 'data-testid': `share-permission-${option.id}`, className: permission === option.id ? 'border-border-accent text-border-accent bg-border-accent/10 data-[state=checked]:bg-border-accent/10' : 'border-text-dim/30 text-text-muted hover:border-text-dim hover:bg-transparent', label: <><div className="text-xs">[{option.label}]</div><div className="text-2xs text-text-dim mt-1 leading-snug">{option.detail}</div></> }))}
+          />
         </div>
-        <button className={actionButton} data-testid="create-invitation" disabled={pending || !setup?.enabled || setup.reachable === false} onClick={() => void create()}>
+        <Button variant="unstyled" className={actionButton} data-testid="create-invitation" disabled={pending || !setup?.enabled || setup.reachable === false} onClick={() => void create()}>
           {pending ? 'CONNECTING...' : '[+] CREATE INVITATION'}
-        </button>
+        </Button>
         {invitation && <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] text-text-dim uppercase">INVITATION · KEEP IT PRIVATE</p>
-            <button onClick={() => void copy()} className="flex items-center gap-1 text-[10px] text-text-dim hover:text-border-accent transition-colors">
+            <p className="text-2xs text-text-dim uppercase">INVITATION · KEEP IT PRIVATE</p>
+            <Button variant="unstyled" onClick={() => void copy()} className="flex items-center gap-1 text-2xs text-text-dim hover:text-border-accent transition-colors">
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}{copied ? '[COPIED]' : '[COPY]'}
-            </button>
+            </Button>
           </div>
-          <textarea
+          <Textarea
             data-testid="share-invitation"
             readOnly
             value={invitation}
             rows={4}
             onFocus={(e) => e.target.select()}
-            className="w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-[10px] text-text-muted break-all resize-none outline-none focus:border-border-accent"
+            className="min-h-0 rounded-none w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-2xs text-text-muted break-all resize-none outline-none focus:border-border-accent"
           />
         </div>}
-        {error && <p role="alert" className={errorBox}>ERROR: {error}</p>}
+        {error && <Callout tone="error" className={`${errorBox} bg-transparent [&>svg]:hidden`}>ERROR: {error}</Callout>}
       </div>
     </Modal>}
   </>
@@ -157,24 +136,24 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
       <div className="p-4 space-y-4">
         <CollaborationSetupState onClose={onClose} />
         <div>
-          <p className="text-[10px] text-text-dim mb-2 uppercase">INVITATION:</p>
+          <p className="text-2xs text-text-dim mb-2 uppercase">INVITATION:</p>
           <div className="flex items-start gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
             <span className="text-text-dim">{'>'}</span>
-            <textarea
+            <Textarea
               data-testid="join-invitation"
               autoFocus
               rows={4}
               value={invitation}
               onChange={(e) => setInvitation(e.target.value)}
               placeholder="paste the invitation you received"
-              className="flex-1 bg-transparent text-[11px] text-text-primary placeholder:text-text-dim/50 outline-none resize-none break-all"
+              className="min-h-0 p-0 border-0 rounded-none flex-1 bg-transparent text-caption text-text-primary placeholder:text-text-dim/50 outline-none resize-none break-all"
             />
           </div>
         </div>
-        <button data-testid="join-confirm" className={actionButton} disabled={!invitation.trim() || pending || !setup?.enabled || setup.reachable === false} onClick={() => void join()}>
+        <Button variant="unstyled" data-testid="join-confirm" className={actionButton} disabled={!invitation.trim() || pending || !setup?.enabled || setup.reachable === false} onClick={() => void join()}>
           {pending ? 'JOINING...' : '[→] JOIN WORKSPACE'}
-        </button>
-        {error && <p role="alert" className={errorBox}>ERROR: {error}</p>}
+        </Button>
+        {error && <Callout tone="error" className={`${errorBox} bg-transparent [&>svg]:hidden`}>ERROR: {error}</Callout>}
       </div>
     </Modal>
   )
@@ -191,12 +170,11 @@ export function SharedWorkspacesSection() {
   const [joining, setJoining] = useState(false)
   return (
     <div className="px-1 mt-2 font-mono" data-testid="shared-workspaces">
-      <div className="px-2 py-1.5 text-[10px] text-text-dim">├─ SHARED WITH YOU ───────────</div>
+      <div className="px-2 py-1.5 text-2xs text-text-dim">├─ SHARED WITH YOU ───────────</div>
       {shares.map((share) => {
         const active = params.worktreeId === share.worktreeId
         return (
-          <Link
-            key={share.roomId}
+          <NavItem key={share.roomId} asChild label={share.workspaceName || 'Shared workspace'} className="hover:bg-transparent" buttonClassName="rounded-none px-0 py-0"><Link
             data-testid="shared-workspace-link"
             to="/workspace/$workspaceId/$worktreeId"
             params={{ workspaceId: 'shared', worktreeId: share.worktreeId }}
@@ -213,19 +191,19 @@ export function SharedWorkspacesSection() {
             <span className={cn('flex-1 truncate text-text-primary group-hover:text-border-accent', active && 'text-border-accent')}>
               {share.workspaceName || 'Shared workspace'}
             </span>
-            <span className="w-6 h-4 flex items-center justify-center text-[9px] text-text-dim border border-dashed border-text-dim/40" title={share.hostName ? `Hosted by ${share.hostName}` : undefined}>
+            <span className="w-6 h-4 flex items-center justify-center text-micro text-text-dim border border-dashed border-text-dim/40" title={share.hostName ? `Hosted by ${share.hostName}` : undefined}>
               {initials(share.hostName)}
             </span>
-          </Link>
+          </Link></NavItem>
         )
       })}
-      <button
+      <Button variant="unstyled"
         data-testid="join-workspace"
         className="flex items-center gap-2 w-full px-2 py-1 text-xs text-text-dim hover:text-border-accent hover:bg-surface-hover transition-colors"
         onClick={() => setJoining(true)}
       >
         [+] JOIN SHARED WORKSPACE
-      </button>
+      </Button>
       {joining && <JoinSharedWorkspaceModal onClose={() => setJoining(false)} />}
     </div>
   )

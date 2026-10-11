@@ -13,3 +13,5 @@ export const Disconnected: Story = { args: { status: 'disconnected' } }
 export const Initializing: Story = { args: { status: 'initializing' } }
 export const BadgeOnly: Story = { args: { showStatus: false } }
 
+
+export const ConnectionStatus: Story = { args: { connectionOnly: true, showLabel: true }, play: async ({ canvasElement }) => { await expect(within(canvasElement).getByTitle('Collaboration: Connected')).toHaveTextContent('Connected') } }

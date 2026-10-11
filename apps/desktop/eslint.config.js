@@ -39,18 +39,18 @@ export default tseslint.config(
       ],
     },
   },
-  // Migration preparation: report existing raw values without blocking desktop.
+  // Enforce shared tokens in all desktop feature components.
   {
     files: ['src/components/**/*.{ts,tsx}', 'src/pages/**/*.{ts,tsx}'],
     plugins: { koda },
-    rules: { 'koda/no-raw-tokens': 'warn' },
+    rules: { 'koda/no-raw-tokens': 'error' },
   },
-  // CSS uses the same token rule and warning severity during migration.
+  // Stylesheets use the same shared token contract.
   {
     files: ['src/**/*.css'],
     plugins: { koda },
     processor: 'koda/css',
-    rules: { 'koda/no-raw-tokens': 'warn' },
+    rules: { 'koda/no-raw-tokens': 'error' },
   },
   // Test files - relax method binding checks for mocks
   {
@@ -61,21 +61,9 @@ export default tseslint.config(
       '@typescript-eslint/require-await': 'off',
     },
   },
-  // Imported AI components - they use @ts-nocheck and export multiple items
+  // Providers export hooks alongside components.
   {
-    files: ['**/ai-elements/**/*.{ts,tsx}'],
-    rules: {
-      '@typescript-eslint/ban-ts-comment': 'off',
-      '@typescript-eslint/no-redundant-type-constituents': 'off',
-      '@typescript-eslint/unbound-method': 'off',
-      'react-refresh/only-export-components': 'off',
-    },
-  },
-  // UI components and providers - export variants/utilities alongside components
-  {
-    files: ['**/components/ui/**/*.{ts,tsx}', '**/*Provider*.tsx'],
-    rules: {
-      'react-refresh/only-export-components': 'off',
-    },
+    files: ['**/*Provider*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 )

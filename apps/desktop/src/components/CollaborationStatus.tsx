@@ -7,8 +7,7 @@
 
 import { useCollaboration } from '@/hooks/useCollaboration'
 import { useIsCollaborationAvailable } from '@/components/CollaborativeWorkspaceProvider'
-import { cn } from '@/lib/utils'
-import { Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { cn, SharedBadge } from '@koda/ui'
 
 interface CollaborationStatusProps {
   /** Show text label */
@@ -36,63 +35,6 @@ function CollaborationStatusInner({
 }) {
   const { status } = useCollaboration()
 
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'connected':
-        return {
-          icon: Wifi,
-          color: 'text-green-500',
-          bgColor: 'bg-green-500/10',
-          label: 'Connected',
-          animate: false,
-        }
-      case 'connecting':
-      case 'reconnecting':
-        return {
-          icon: Loader2,
-          color: 'text-yellow-500',
-          bgColor: 'bg-yellow-500/10',
-          label: status === 'connecting' ? 'Connecting...' : 'Reconnecting...',
-          animate: true,
-        }
-      case 'disconnected':
-        return {
-          icon: WifiOff,
-          color: 'text-muted-foreground',
-          bgColor: 'bg-muted',
-          label: 'Disconnected',
-          animate: false,
-        }
-      default:
-        return {
-          icon: Wifi,
-          color: 'text-muted-foreground',
-          bgColor: 'bg-muted',
-          label: 'Initializing...',
-          animate: false,
-        }
-    }
-  }
-
-  const config = getStatusConfig()
-  const Icon = config.icon
-
-  return (
-    <div
-      data-testid="collaboration-status"
-      className={cn(
-        'flex items-center gap-1.5 px-2 py-1 rounded text-xs',
-        config.bgColor,
-        className
-      )}
-      title={`Collaboration: ${config.label}`}
-    >
-      <Icon
-        className={cn('h-3 w-3', config.color, config.animate && 'animate-spin')}
-      />
-      {showLabel && (
-        <span className={cn('font-medium', config.color)}>{config.label}</span>
-      )}
-    </div>
-  )
+  const legacyTone = status === 'connected' ? 'text-presence-green bg-[color-mix(in_srgb,var(--presence-green)_10%,transparent)]' : status === 'connecting' || status === 'reconnecting' ? 'text-presence-yellow bg-[color-mix(in_srgb,var(--presence-yellow)_10%,transparent)]' : undefined
+  return <SharedBadge connectionOnly status={status === 'initial' ? 'initializing' : status} showLabel={showLabel} data-testid="collaboration-status" className={cn(legacyTone, className)} />
 }
