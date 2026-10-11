@@ -79,7 +79,7 @@ Future public Storybook: [gorkamolero.github.io/koda](https://gorkamolero.github
 
 ![Koda Storybook: host workspace composed from the shared design system](docs/design-system.png)
 
-See [DESIGN.md](./DESIGN.md) for tokens, the component inventory, lint enforcement, and the later desktop migration. Desktop uses the shared foundations now; its component copies remain until that migration.
+Desktop now composes `@koda/ui` across navigation, agent chat, workspace panels, settings and sharing. Feature components retain data and permissions; shared components are presentational. The duplicate primitives and unused AI elements are removed, and token lint is enforced as an error. See [DESIGN.md](./DESIGN.md) and the [migration verification record](docs/desktop-migration-verification.json).
 
 ---
 
