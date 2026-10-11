@@ -9,11 +9,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'src/**/*.css'],
     plugins: { koda },
     rules: {
       'koda/no-raw-tokens': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+  { files: ['src/**/*.css'], processor: 'koda/css' },
 )

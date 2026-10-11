@@ -45,6 +45,13 @@ export default tseslint.config(
     plugins: { koda },
     rules: { 'koda/no-raw-tokens': 'warn' },
   },
+  // CSS uses the same token rule and warning severity during migration.
+  {
+    files: ['src/**/*.css'],
+    plugins: { koda },
+    processor: 'koda/css',
+    rules: { 'koda/no-raw-tokens': 'warn' },
+  },
   // Test files - relax method binding checks for mocks
   {
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
