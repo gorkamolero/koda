@@ -116,7 +116,7 @@ export function RightSidebar({
                 <span>]</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="font-mono bg-[var(--black-soft)] border-dashed">
+            <DropdownMenuContent align="end" className="font-mono border-dashed">
               <DropdownMenuItem onClick={() => handleCreatePr(false)} className="text-xs">
                 Create PR
               </DropdownMenuItem>
@@ -176,7 +176,7 @@ export function RightSidebar({
                 <MoreVertical className="size-3" />
               </IconButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="font-mono bg-[var(--black-soft)] border-dashed">
+            <DropdownMenuContent align="end" className="font-mono border-dashed">
               <DropdownMenuItem className="text-xs">Refresh</DropdownMenuItem>
               <DropdownMenuItem className="text-xs">Settings</DropdownMenuItem>
             </DropdownMenuContent>

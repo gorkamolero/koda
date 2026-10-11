@@ -27,15 +27,15 @@ export function CreateWorkspaceModal({ isOpen, onClose, onCreated, createLabel =
     }
   }
   return <Dialog open={isOpen} onOpenChange={value => { if (!value) onClose() }}>
-    <DialogContent className="max-w-md bg-surface-card border-text-dim/30 shadow-none" closeLabel="[ESC] CANCEL" footerClassName="px-4 py-3 border-text-dim/20" closeButtonClassName="h-auto p-0 border-0 rounded-none text-text-dim hover:text-text-primary" aria-describedby={undefined}>
-      <DialogHeader><DialogTitle decorate={false} className="text-xs text-border-accent font-normal tracking-normal">┌─ NEW WORKSPACE ─────────────</DialogTitle></DialogHeader>
+    <DialogContent className="max-w-md" closeLabel="[ESC] CANCEL" footerClassName="px-4 py-3 border-text-dim/20" closeButtonClassName="h-auto p-0 border-0 rounded-none text-text-secondary hover:text-text-primary" aria-describedby={undefined}>
+      <DialogHeader><DialogTitle decorate={false} className="text-xs text-text-action font-normal tracking-normal">┌─ NEW WORKSPACE ─────────────</DialogTitle></DialogHeader>
       <DialogBody className="space-y-4">
         {error && <Callout tone="error">ERROR: {error}</Callout>}
         <div>
-          <label htmlFor="new-workspace-name" className="block text-2xs text-text-dim mb-1">{nameLabel}</label>
-          <Input id="new-workspace-name" value={name} onChange={event => setName(event.target.value)} placeholder="my-workspace" className="rounded-none bg-transparent placeholder:text-text-dim border-dashed border-text-dim/30 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent" onKeyDown={event => { if (event.key === 'Enter') void handleCreate() }} autoFocus />
+          <label htmlFor="new-workspace-name" className="block text-2xs text-text-secondary mb-1">{nameLabel}</label>
+          <Input id="new-workspace-name" value={name} onChange={event => setName(event.target.value)} placeholder="my-workspace" className="rounded-none bg-transparent placeholder:text-text-secondary border-dashed border-text-dim/30 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent" onKeyDown={event => { if (event.key === 'Enter') void handleCreate() }} autoFocus />
         </div>
-        <Button variant="ghost" onClick={() => void handleCreate()} disabled={!name.trim() || createWorkspace.isPending} className="w-full h-auto rounded-none p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10">
+        <Button variant="ghost" onClick={() => void handleCreate()} disabled={!name.trim() || createWorkspace.isPending} className="w-full h-auto rounded-none p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-text-action hover:bg-border-accent/10">
           {createWorkspace.isPending ? 'CREATING...' : createLabel}
         </Button>
       </DialogBody>
@@ -75,15 +75,15 @@ export function AddRepoModal({ isOpen, onClose, workspaceId }: { isOpen: boolean
   }
   const availableRepos = repos?.filter(repo => repo.id) ?? []
   return <Dialog open={isOpen} onOpenChange={value => { if (!value) onClose() }}>
-    <DialogContent className="max-w-md bg-surface-card border-text-dim/30 shadow-none" closeLabel="[ESC] CANCEL" footerClassName="px-4 py-3 border-text-dim/20" closeButtonClassName="h-auto p-0 border-0 rounded-none text-text-dim hover:text-text-primary" aria-describedby={undefined}>
-      <DialogHeader><DialogTitle decorate={false} className="text-xs text-border-accent font-normal tracking-normal">┌─ ADD REPOSITORY ─────────────</DialogTitle></DialogHeader>
+    <DialogContent className="max-w-md" closeLabel="[ESC] CANCEL" footerClassName="px-4 py-3 border-text-dim/20" closeButtonClassName="h-auto p-0 border-0 rounded-none text-text-secondary hover:text-text-primary" aria-describedby={undefined}>
+      <DialogHeader><DialogTitle decorate={false} className="text-xs text-text-action font-normal tracking-normal">┌─ ADD REPOSITORY ─────────────</DialogTitle></DialogHeader>
       <DialogBody className="space-y-4">
         {error && <Callout tone="error">ERROR: {error}</Callout>}
         {availableRepos.length > 0 && <div>
-          <p className="text-2xs text-text-dim mb-2 uppercase">ATTACH EXISTING REPO:</p>
+          <p className="text-2xs text-text-secondary mb-2 uppercase">ATTACH EXISTING REPO:</p>
           <div className="space-y-1 max-h-32 overflow-y-auto">{availableRepos.map((repo, index) => <NavItem key={repo.id} label={repo.name ?? 'unnamed'} icon={<span>[{index + 1}]</span>} meta={repo.rootPath} onClick={() => void handleAttachExisting(repo.id)} disabled={isAttaching} className="border border-dashed border-text-dim/30" buttonClassName="p-2" />)}</div>
         </div>}
-        <Button variant="ghost" onClick={() => void handleSelectFolder()} disabled={isAttaching} className="w-full h-auto rounded-none p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10">
+        <Button variant="ghost" onClick={() => void handleSelectFolder()} disabled={isAttaching} className="w-full h-auto rounded-none p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-text-action hover:bg-border-accent/10">
           {isAttaching ? 'ADDING...' : '[+] ADD NEW GIT REPOSITORY'}
         </Button>
       </DialogBody>

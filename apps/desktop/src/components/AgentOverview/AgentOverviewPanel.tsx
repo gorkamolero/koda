@@ -39,7 +39,7 @@ export function AgentOverviewPanel({ onClose }: AgentOverviewPanelProps) {
   return (
     <div
       data-testid="agent-overview-panel"
-      className="absolute top-full left-0 mt-1 z-50 min-w-[var(--sidebar-width)] max-w-100 bg-[var(--black-soft)] border border-dashed border-border-subtle font-mono text-xs"
+      className="absolute top-full left-0 mt-1 z-50 min-w-[var(--sidebar-width)] max-w-100 bg-surface-popover border border-dashed border-border-strong shadow-popover font-mono text-xs"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-border-subtle">

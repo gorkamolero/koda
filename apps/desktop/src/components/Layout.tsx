@@ -33,7 +33,7 @@ function SidecarStatus() {
 
   if (!status?.running) {
     return (
-      <div className="fixed bottom-4 right-4 px-4 py-2 rounded-lg bg-surface-card border border-border-subtle animate-in fade-in slide-in-from-bottom-2">
+      <div className="fixed bottom-4 right-4 px-4 py-2 rounded-lg bg-surface-popover border border-border-strong shadow-popover animate-in fade-in slide-in-from-bottom-2">
         <Spinner label="Connecting" speed={120} />
       </div>
     )

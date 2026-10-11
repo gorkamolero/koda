@@ -105,7 +105,7 @@ export function ContextStatsPopover({ className }: ContextStatsPopoverProps) {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-72 p-0 bg-[var(--black-soft)] border border-dashed border-border-strong font-mono"
+        className="w-72 p-0 border border-dashed border-border-strong font-mono"
         align="start"
         sideOffset={8}
       >

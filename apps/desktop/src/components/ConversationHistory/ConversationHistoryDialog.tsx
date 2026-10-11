@@ -139,18 +139,18 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent className="max-w-lg max-h-[80vh] bg-surface-base border-border rounded-xl overflow-hidden" aria-describedby={undefined}>
+      <DialogContent className="max-w-lg max-h-[80vh] rounded-xl overflow-hidden" aria-describedby={undefined}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-text-muted" />
+            <Clock className="w-4 h-4 text-text-secondary" />
             <DialogTitle decorate={false} className="text-sm font-semibold text-text-primary normal-case tracking-normal">
               Conversation History
             </DialogTitle>
           </div>
           <Button variant="unstyled"
             onClick={onClose}
-            className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="p-1 rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -159,13 +159,13 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
         {/* Search */}
         <div className="px-4 py-2 border-b border-border-subtle">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-dim" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
             <Input
               type="text"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value) }}
               placeholder="Search conversations..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-surface-control border border-border-subtle rounded-lg focus:outline-none focus:border-border-accent text-text-primary placeholder:text-text-dim"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-surface-control border border-border-subtle rounded-lg focus:outline-none focus:border-border-accent text-text-primary placeholder:text-text-secondary"
             />
           </div>
         </div>
@@ -174,9 +174,9 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
         <div className="flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <MessageSquare className="w-8 h-8 text-text-dim mb-3" />
-              <p className="text-sm text-text-muted">No conversations found</p>
-              <p className="text-xs text-text-faint mt-1">
+              <MessageSquare className="w-8 h-8 text-text-secondary mb-3" />
+              <p className="text-sm text-text-secondary">No conversations found</p>
+              <p className="text-xs text-text-secondary mt-1">
                 {searchQuery ? 'Try a different search term' : 'Start a conversation to see it here'}
               </p>
             </div>
@@ -184,7 +184,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
             Array.from(groupedConversations.entries()).map(([dateLabel, entries]) => (
               <div key={dateLabel}>
                 {/* Date header */}
-                <div className="px-4 py-2 text-xs font-medium text-text-faint bg-surface-card/50">
+                <div className="px-4 py-2 text-xs font-medium text-text-secondary bg-surface-card/50">
                   {dateLabel}
                 </div>
 
@@ -196,7 +196,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
                     className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-surface-hover transition-colors border-b border-border-subtle/50"
                   >
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-card flex items-center justify-center">
-                      <User className="w-4 h-4 text-text-muted" />
+                      <User className="w-4 h-4 text-text-secondary" />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -204,7 +204,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
                         {entry.preview}
                       </p>
 
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-text-faint">
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-text-secondary">
                         <span className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />
                           {entry.messageCount} messages
@@ -222,7 +222,7 @@ export const ConversationHistoryDialog = memo(function ConversationHistoryDialog
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-3 border-t border-border-subtle bg-surface-card/30">
-          <span className="text-xs text-text-faint">
+          <span className="text-xs text-text-secondary">
             {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
           </span>
 

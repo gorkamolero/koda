@@ -145,7 +145,7 @@ export function InlineComments() {
       {/* New comment input */}
       {activeInput && (
         <div
-          className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
+          className="absolute z-20 bg-surface-popover border border-border-strong rounded-lg shadow-popover p-3 w-80"
           style={{
             top: `${String((activeInput.lineNumber - 1) * 20 + 40)}px`,
             left: activeInput.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
@@ -188,7 +188,7 @@ export function InlineComments() {
       {/* Comment popup */}
       {selectedComment && !isEditing && !showDeleteConfirm && (
         <div
-          className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
+          className="absolute z-20 bg-surface-popover border border-border-strong rounded-lg shadow-popover p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
             left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
@@ -279,7 +279,7 @@ export function InlineComments() {
       {/* Edit comment popup */}
       {isEditing && selectedComment && (
         <div
-          className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
+          className="absolute z-20 bg-surface-popover border border-border-strong rounded-lg shadow-popover p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
             left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',
@@ -321,7 +321,7 @@ export function InlineComments() {
       {/* Delete confirmation popup */}
       {showDeleteConfirm && selectedComment && (
         <div
-          className="absolute z-20 bg-background border border-border rounded-lg shadow-lg p-3 w-80"
+          className="absolute z-20 bg-surface-popover border border-border-strong rounded-lg shadow-popover p-3 w-80"
           style={{
             top: `${String((selectedComment.lineNumber - 1) * 20 + 40)}px`,
             left: selectedComment.side === 'original' ? 'calc(var(--space-12) + var(--space-0_5))' : '50%',

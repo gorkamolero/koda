@@ -137,7 +137,7 @@ export const MentionPopover = memo(function MentionPopover({
       className={cn(
         'absolute bottom-full left-0 mb-2 z-popover',
         'h-auto rounded-none w-96 max-h-64 overflow-y-auto',
-        'bg-[var(--black-soft)] font-mono',
+        'shadow-popover font-mono',
         'border border-dashed border-border-strong'
       )}
     >

@@ -227,7 +227,7 @@ export function TopBar({
           )}
 
           {openDropdownVisible && (
-            <div className="absolute top-full right-0 mt-1 z-50 min-w-48 bg-[var(--black-soft)] border border-dashed border-border-subtle">
+            <div className="absolute top-full right-0 mt-1 z-50 min-w-48 bg-surface-popover border border-dashed border-border-strong shadow-popover">
               <div className="py-1 text-xs">
                 <div className="px-3 py-1 text-text-faint border-b border-dashed border-border-subtle">
                   ┌─ OPEN IN ─────────┐
@@ -379,9 +379,9 @@ export function TopBar({
       {/* Enable collaboration confirmation modal */}
       {collabModalOpen && (
         <Dialog open onOpenChange={open => { if (!open) setCollabModalOpen(false) }}>
-          <DialogContent aria-describedby={undefined} className="bg-[var(--black-soft)] border-dashed border-border-subtle p-4 max-w-md text-xs font-mono">
+          <DialogContent aria-describedby={undefined} className="p-4 max-w-md text-xs font-mono">
             <DialogTitle className="sr-only">Enable Collaboration?</DialogTitle>
-            <div className="text-text-faint mb-3">
+            <div className="text-text-secondary mb-3">
               ┌─ <span className="text-text-accent">Enable Collaboration?</span> {'─'.repeat(8)}┐
             </div>
             
@@ -393,7 +393,7 @@ export function TopBar({
             <div className="flex justify-end gap-2 pt-3 border-t border-dashed border-border-subtle">
               <Button variant="unstyled"
                 onClick={() => { setCollabModalOpen(false) }}
-                className="px-3 py-1.5 text-text-muted hover:text-text-primary transition-colors"
+                className="px-3 py-1.5 text-text-secondary hover:text-text-primary transition-colors"
               >
                 [CANCEL]
               </Button>
@@ -408,7 +408,7 @@ export function TopBar({
               </Button>
             </div>
 
-            <div className="text-text-faint mt-2">
+            <div className="text-text-secondary mt-2">
               └{'─'.repeat(38)}┘
             </div>
           </DialogContent>

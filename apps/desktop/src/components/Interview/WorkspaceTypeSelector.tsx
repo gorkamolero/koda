@@ -56,7 +56,7 @@ export function WorkspaceTypeSelector({
 
   return <Select open={isOpen} onOpenChange={setIsOpen} value={workspaceType} disabled={isUpdating} onValueChange={value => void handleSelect(value as WorkspaceType)}>
     <SelectTrigger data-testid="workspace-type-selector" aria-label="Workspace type" className="h-auto min-w-35 w-auto rounded-md border-border bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"><span>{currentType?.name ?? 'Standard'}</span></SelectTrigger>
-    <SelectContent className="w-64 rounded-md border-border bg-background shadow-lg">
+    <SelectContent className="w-64 rounded-md">
       {WORKSPACE_TYPES.map(type => <SelectItem key={type.id} value={type.id} className="w-full px-3 py-2 text-sm"><span className="block font-medium">{type.name}</span><span className="block text-xs text-muted-foreground mt-0.5">{type.description}</span></SelectItem>)}
     </SelectContent>
   </Select>

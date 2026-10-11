@@ -412,10 +412,10 @@ function SliderComparison({
       </div>
 
       {/* Labels */}
-      <div className="absolute bottom-4 left-4 px-2 py-1 bg-background/80 rounded text-xs font-medium">
+      <div className="absolute bottom-4 left-4 px-2 py-1 bg-surface-popover rounded text-xs font-medium">
         Before
       </div>
-      <div className="absolute bottom-4 right-4 px-2 py-1 bg-background/80 rounded text-xs font-medium">
+      <div className="absolute bottom-4 right-4 px-2 py-1 bg-surface-popover rounded text-xs font-medium">
         After
       </div>
     </>
@@ -431,7 +431,7 @@ function SideBySideComparison({ beforeUrl, afterUrl }: SideBySideComparisonProps
   return (
     <div className="flex h-full gap-2 p-2">
       <div className="flex-1 relative" data-testid="diff-visual-before">
-        <div className="absolute top-2 left-2 px-2 py-1 bg-background/80 rounded text-xs font-medium z-10">
+        <div className="absolute top-2 left-2 px-2 py-1 bg-surface-popover rounded text-xs font-medium z-10">
           Before
         </div>
         <img
@@ -441,7 +441,7 @@ function SideBySideComparison({ beforeUrl, afterUrl }: SideBySideComparisonProps
         />
       </div>
       <div className="flex-1 relative" data-testid="diff-visual-after">
-        <div className="absolute top-2 left-2 px-2 py-1 bg-background/80 rounded text-xs font-medium z-10">
+        <div className="absolute top-2 left-2 px-2 py-1 bg-surface-popover rounded text-xs font-medium z-10">
           After
         </div>
         <img
@@ -511,7 +511,7 @@ function OverlayComparison({
       )}
 
       {/* Opacity slider */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-background/90 rounded-lg shadow-lg">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-surface-popover rounded-lg shadow-lg">
         <span className="text-xs text-muted-foreground">Before</span>
         <Input
           type="range"

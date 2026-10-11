@@ -16,8 +16,8 @@ const PERMISSIONS: { id: SharePermission; label: string; detail: string }[] = [
 
 function Modal({ title, onClose, children, label }: { title: string; label: string; onClose: () => void; children: React.ReactNode }) {
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-    <DialogContent aria-label={label} aria-labelledby={undefined} aria-describedby={undefined} className="max-w-md bg-surface-card border-text-dim/30 shadow-none" footerClassName="border-text-dim/20 px-4 py-3" closeButtonClassName="h-auto rounded-none border-0 p-0 text-xs text-text-dim hover:bg-transparent hover:text-text-primary">
-      <DialogHeader className="border-text-dim/20"><DialogTitle decorate={false} className="text-xs font-normal tracking-normal text-border-accent"><span aria-hidden="true">┌─ </span>{title}<span aria-hidden="true"> {'─'.repeat(Math.max(4, 28 - title.length))}</span></DialogTitle></DialogHeader>
+    <DialogContent aria-label={label} aria-labelledby={undefined} aria-describedby={undefined} className="max-w-md" footerClassName="border-text-dim/20 px-4 py-3" closeButtonClassName="h-auto rounded-none border-0 p-0 text-xs text-text-secondary hover:bg-transparent hover:text-text-primary">
+      <DialogHeader className="border-text-dim/20"><DialogTitle decorate={false} className="text-xs font-normal tracking-normal text-text-action"><span aria-hidden="true">┌─ </span>{title}<span aria-hidden="true"> {'─'.repeat(Math.max(4, 28 - title.length))}</span></DialogTitle></DialogHeader>
       {children}
     </DialogContent>
   </Dialog>
@@ -26,13 +26,13 @@ function Modal({ title, onClose, children, label }: { title: string; label: stri
 function CollaborationSetupState({ onClose }: { onClose: () => void }) {
   const { data, isPending } = useCollaborationSetup()
   if (data?.enabled && data.reachable !== false) return null
-  return <Callout className="text-xs text-text-muted border-text-dim/30 bg-transparent p-3 [&>svg]:hidden [&>div]:space-y-2" data-testid="collaboration-setup">
+  return <Callout className="text-xs text-text-secondary border-text-dim/30 bg-transparent p-3 [&>svg]:hidden [&>div]:space-y-2" data-testid="collaboration-setup">
     <p>{isPending ? 'Checking collaboration...' : data?.enabled ? 'The collaboration service is unavailable. Check the service URL and your connection.' : 'Choose your display name and collaboration service in Settings to share or join a workspace.'}</p>
-    {!isPending && <Link to="/settings" onClick={onClose} className="text-border-accent">[→] COLLABORATION SETTINGS</Link>}
+    {!isPending && <Link to="/settings" onClick={onClose} className="text-text-action">[→] COLLABORATION SETTINGS</Link>}
   </Callout>
 }
 
-const actionButton = 'w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-border-accent hover:bg-border-accent/10 transition-colors disabled:opacity-50'
+const actionButton = 'w-full p-3 text-xs border border-dashed border-border-accent/50 hover:border-border-accent text-text-action hover:bg-border-accent/10 transition-colors disabled:opacity-50'
 const errorBox = 'text-status-error text-xs border border-dashed border-status-error p-2'
 
 type ShareDialogState = { open: boolean; permission: SharePermission; invitation: string; error: string; pending: boolean }
@@ -74,18 +74,18 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
     {open && <Modal title="SHARE WORKSPACE" label="Share workspace" onClose={() => update({ open: false })}>
       <div className="p-4 space-y-4">
         <CollaborationSetupState onClose={() => update({ open: false })} />
-        <p className="text-caption text-text-muted leading-relaxed">
+        <p className="text-caption text-text-secondary leading-relaxed">
           Your collaborator opens this workspace in their own Koda, with the same chat, changes, files and terminal you see. The agent keeps running on this machine. A new invitation replaces the previous one.
         </p>
         <div>
-          <p className="text-2xs text-text-dim mb-2 uppercase">PERMISSION:</p>
+          <p className="text-2xs text-text-secondary mb-2 uppercase">PERMISSION:</p>
           <SegmentedControl
             aria-label="Permission"
             value={permission}
             onValueChange={value => update({ permission: value as SharePermission, invitation: '' })}
             className="grid grid-cols-2 gap-2 rounded-none border-0 bg-transparent p-0"
             optionClassName="p-2 rounded-none text-left border border-dashed data-[state=checked]:ring-0"
-            options={PERMISSIONS.map(option => ({ value: option.id, 'data-testid': `share-permission-${option.id}`, className: permission === option.id ? 'border-border-accent text-border-accent bg-border-accent/10 data-[state=checked]:bg-border-accent/10' : 'border-text-dim/30 text-text-muted hover:border-text-dim hover:bg-transparent', label: <><div className="text-xs">[{option.label}]</div><div className="text-2xs text-text-dim mt-1 leading-snug">{option.detail}</div></> }))}
+            options={PERMISSIONS.map(option => ({ value: option.id, 'data-testid': `share-permission-${option.id}`, className: permission === option.id ? 'border-border-accent text-text-action bg-border-accent/10 data-[state=checked]:bg-border-accent/10' : 'border-text-dim/30 text-text-secondary hover:border-text-dim hover:bg-transparent', label: <><div className="text-xs">[{option.label}]</div><div className="text-2xs text-text-secondary mt-1 leading-snug">{option.detail}</div></> }))}
           />
         </div>
         <Button variant="unstyled" className={actionButton} data-testid="create-invitation" disabled={pending || !setup?.enabled || setup.reachable === false} onClick={() => void create()}>
@@ -93,8 +93,8 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
         </Button>
         {invitation && <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-2xs text-text-dim uppercase">INVITATION · KEEP IT PRIVATE</p>
-            <Button variant="unstyled" onClick={() => void copy()} className="flex items-center gap-1 text-2xs text-text-dim hover:text-border-accent transition-colors">
+            <p className="text-2xs text-text-secondary uppercase">INVITATION · KEEP IT PRIVATE</p>
+            <Button variant="unstyled" onClick={() => void copy()} className="flex items-center gap-1 text-2xs text-text-secondary hover:text-text-action transition-colors">
               {copied ? <Check className="size-3" /> : <Copy className="size-3" />}{copied ? '[COPIED]' : '[COPY]'}
             </Button>
           </div>
@@ -104,7 +104,7 @@ export function ShareWorkspaceButton({ worktreeId }: { worktreeId: string }) {
             value={invitation}
             rows={4}
             onFocus={(e) => e.target.select()}
-            className="min-h-0 rounded-none w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-2xs text-text-muted break-all resize-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent"
+            className="min-h-0 rounded-none w-full p-2 bg-transparent border border-dashed border-text-dim/30 text-2xs text-text-secondary break-all resize-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-border-accent"
           />
         </div>}
         {error && <Callout tone="error" className={`${errorBox} bg-transparent [&>svg]:hidden`}>ERROR: {error}</Callout>}
@@ -136,9 +136,9 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
       <div className="p-4 space-y-4">
         <CollaborationSetupState onClose={onClose} />
         <div>
-          <p className="text-2xs text-text-dim mb-2 uppercase">INVITATION:</p>
+          <p className="text-2xs text-text-secondary mb-2 uppercase">INVITATION:</p>
           <div className="flex items-start gap-2 border border-dashed border-text-dim/30 focus-within:border-border-accent p-2">
-            <span className="text-text-dim">{'>'}</span>
+            <span className="text-text-secondary">{'>'}</span>
             <Textarea
               data-testid="join-invitation"
               autoFocus
@@ -146,7 +146,7 @@ export function JoinSharedWorkspaceModal({ onClose }: { onClose: () => void }) {
               value={invitation}
               onChange={(e) => setInvitation(e.target.value)}
               placeholder="paste the invitation you received"
-              className="min-h-0 p-0 border-0 rounded-none flex-1 bg-transparent text-caption text-text-primary placeholder:text-text-dim/50 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none break-all"
+              className="min-h-0 p-0 border-0 rounded-none flex-1 bg-transparent text-caption text-text-primary placeholder:text-text-secondary outline-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none break-all"
             />
           </div>
         </div>

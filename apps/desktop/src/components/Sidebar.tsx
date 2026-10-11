@@ -73,7 +73,7 @@ function DropdownMenu({ isOpen, onClose, children }: DropdownMenuProps): React.R
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 z-50 mt-1 min-w-45 font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
+      className="absolute right-0 z-50 mt-1 min-w-45 font-mono text-xs bg-surface-popover border border-dashed border-border-strong shadow-popover"
     >
       {children}
     </div>
@@ -168,7 +168,7 @@ function WorkspaceSelector({ onCreateWorkspace }: { onCreateWorkspace: () => voi
       </Button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 z-50 mt-1 bg-surface-card border border-dashed border-text-dim/30 max-h-48 overflow-y-auto">
+        <div className="absolute left-0 right-0 z-50 mt-1 bg-surface-popover border border-dashed border-border-strong shadow-popover max-h-48 overflow-y-auto">
           {workspaces?.map(ws => (
             <Button variant="unstyled"
               key={ws.id}
@@ -315,7 +315,7 @@ function WorktreeContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-45 font-mono text-xs bg-surface-card border border-dashed border-text-dim/30"
+      className="fixed z-50 min-w-45 font-mono text-xs bg-surface-popover border border-dashed border-border-strong shadow-popover"
       style={{ top: position.y, left: position.x }}
     >
       <div className="py-1">

@@ -17,10 +17,10 @@ const ICONS: Record<ToastVariant, React.ReactNode> = {
 }
 
 const STYLES: Record<ToastVariant, string> = {
-  success: 'border-status-success/40 bg-status-success/10',
-  error: 'border-status-error/40 bg-status-error/10',
-  warning: 'border-status-warning/40 bg-status-warning/10',
-  info: 'border-border-accent/40 bg-surface-active',
+  success: 'border-status-success/40',
+  error: 'border-status-error/40',
+  warning: 'border-status-warning/40',
+  info: 'border-border-accent/40',
 }
 
 const ICON_STYLES: Record<ToastVariant, string> = {
@@ -75,14 +75,14 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       onDismiss={handleDismiss}
       dismissProps={{ 'data-testid': 'toast-dismiss', className: 'size-6 p-1 opacity-70 hover:opacity-100' }}
       icon={<div className={cn('flex-shrink-0', ICON_STYLES[toast.type])}>{ICONS[toast.type]}</div>}
-      descriptionClassName="text-sm text-text-muted line-clamp-2"
+      descriptionClassName="text-sm text-text-secondary line-clamp-2"
       data-testid="toast"
       data-type={toast.type}
       role="alert"
       aria-live="assertive"
       className={cn(
         'font-ui pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl',
-        'border p-4 shadow-xl glass',
+        'border p-4 shadow-popover',
         'transition-all duration-200 ease-out',
         STYLES[toast.type],
         isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'

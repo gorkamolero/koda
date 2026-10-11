@@ -82,7 +82,7 @@ export const MessageActionBar = memo(function MessageActionBar({
     <div
       className={cn(
         'flex items-center font-mono',
-        'bg-[var(--black-soft)] border border-dashed border-border-subtle',
+        'bg-surface-popover border border-dashed border-border-strong shadow-popover',
         'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
         className
       )}
