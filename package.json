@@ -14,7 +14,10 @@
     "test": "turbo run test --filter=!e2e",
     "lint": "turbo run lint",
     "desktop": "node scripts/run.mjs app",
-    "sidecar": "node scripts/run.mjs sidecar"
+    "sidecar": "node scripts/run.mjs sidecar",
+    "storybook": "pnpm --filter @koda/ui storybook",
+    "build-storybook": "pnpm --filter @koda/ui build-storybook",
+    "test-storybook": "pnpm --filter @koda/ui test-storybook"
   },
   "devDependencies": {
     "tsx": "^4.7.0",
