@@ -166,6 +166,8 @@ export const baseColorTokens = {
   "--text-on-bubble-user": "var(--text-primary)",
   "--text-on-right-panel": "var(--text-primary)",
   "--text-on-approval": "var(--text-primary)",
+  "--text-on-control-hover": "var(--text-primary)",
+  "--text-on-control-disabled": "var(--text-primary)",
   "--text-action": "var(--accent-terracotta)"
 } as const
 
@@ -332,6 +334,8 @@ export const lightClassTokens = {
   "--text-on-bubble": "var(--warm-700)",
   "--text-on-right-panel": "var(--warm-700)",
   "--text-on-approval": "var(--warm-700)",
+  "--text-on-control-hover": "var(--warm-700)",
+  "--text-on-control-disabled": "var(--warm-700)",
   "--text-action": "#2563a6"
 } as const satisfies Partial<ThemeTokens>
 

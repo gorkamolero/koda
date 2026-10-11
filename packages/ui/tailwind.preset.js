@@ -7,7 +7,7 @@ export default {
   	extend: {
   		colors: {
             'surface-base': 'var(--surface-base)',
-            ...Object.fromEntries(['terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
+            ...Object.fromEntries(['terminal', 'composer', 'bubble', 'bubble-user', 'right-panel', 'approval', 'control-hover', 'control-disabled'].map(surface => [`text-on-${surface}`, `var(--text-on-${surface})`])),
             'text-action': 'var(--text-action)',
 			/* Gray scale for direct access */
 			gray: {
