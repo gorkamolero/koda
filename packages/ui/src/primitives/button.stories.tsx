@@ -19,3 +19,6 @@ export const Hover: Story = { play: async ({ canvasElement }) => { await userEve
 export const Focus: Story = { play: async ({ canvasElement }) => { const button = within(canvasElement).getByRole('button'); button.focus(); await expect(button).toHaveFocus() } }
 export const Active: Story = { play: async ({ canvasElement }) => { await userEvent.pointer({ target: within(canvasElement).getByRole('button'), keys: '[MouseLeft>]' }) } }
 export const KeyboardActivation: Story = { play: async ({ canvasElement, args }) => { const button = within(canvasElement).getByRole('button'); button.focus(); await userEvent.keyboard('{Enter}'); await expect(args.onClick).toHaveBeenCalledOnce() } }
+
+export const DisabledChild: Story = { args: { disabled: true }, render: args => <Button asChild disabled={args.disabled}><a href="#workspace" onClick={args.onClick}>Open workspace</a></Button>, play: async ({ canvasElement, args }) => { const anchor = within(canvasElement).getByRole('link'); anchor.focus(); await userEvent.keyboard('{Enter}'); await expect(args.onClick).not.toHaveBeenCalled(); await expect(anchor).toHaveAttribute('tabindex', '-1') } }
+export const LoadingChild: Story = { ...DisabledChild, args: { loading: true }, render: args => <Button asChild loading={args.loading}><a href="#workspace" onClick={args.onClick}>Opening workspace</a></Button> }

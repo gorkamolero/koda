@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { type DialogProps } from "@radix-ui/react-dialog"
-import { Command as CommandPrimitive } from "cmdk"
+import { Command as CommandPrimitive, useCommandState } from "cmdk"
 import { Search } from "lucide-react"
 
 import { cn } from "./utils"
@@ -11,16 +11,26 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./dialog"
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive
-    ref={ref}
-    className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-md bg-surface-popover text-text-primary",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, children, ...props }, ref) => {
+  const root = React.useRef<HTMLDivElement | null>(null)
+  return <CommandPrimitive ref={node => { root.current = node; if (typeof ref === 'function') ref(node); else if (ref) ref.current = node }}
+    className={cn('flex h-full w-full flex-col overflow-hidden rounded-md bg-surface-popover font-code text-text-primary', className)} {...props}>
+    {children}<CommandSelectionA11y root={root} />
+  </CommandPrimitive>
+})
+/** cmdk can retain a removed option id after filtering. Keep both focus owners
+ * synchronized with the actual selected option after React commits the list. */
+function CommandSelectionA11y({ root }: { root: React.RefObject<HTMLDivElement> }) {
+  const selection = useCommandState(state => `${state.search}\0${state.value}\0${state.selectedItemId}`)
+  React.useLayoutEffect(() => {
+    const selected = root.current?.querySelector('[cmdk-item][aria-selected="true"]')
+    root.current?.querySelectorAll('[cmdk-input], [cmdk-list]').forEach(element => {
+      if (selected?.id) element.setAttribute('aria-activedescendant', selected.id)
+      else element.removeAttribute('aria-activedescendant')
+    })
+  }, [root, selection])
+  return null
+}
 Command.displayName = CommandPrimitive.displayName
 
 const CommandDialog = ({ children, ...props }: DialogProps) => {
@@ -29,7 +39,7 @@ const CommandDialog = ({ children, ...props }: DialogProps) => {
       <DialogContent className="overflow-hidden p-0">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <DialogDescription className="sr-only">Search commands and files</DialogDescription>
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-quiet [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4">
           {children}
         </Command>
       </DialogContent>
@@ -46,7 +56,7 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-10 w-full rounded-md bg-transparent py-3 font-code text-sm outline-none focus-visible:ring-2 focus-visible:ring-border-accent placeholder:text-text-quiet disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full rounded-md bg-transparent py-3 font-code text-sm outline-none focus-visible:ring-2 focus-visible:ring-border-accent placeholder:text-text-muted disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -69,16 +79,12 @@ const CommandList = React.forwardRef<
 
 CommandList.displayName = CommandPrimitive.List.displayName
 
-const CommandEmpty = React.forwardRef<
-  React.ElementRef<typeof CommandPrimitive.Empty>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
->((props, ref) => (
-  <CommandPrimitive.Empty
-    ref={ref}
-    className="py-6 text-center text-sm"
-    {...props}
-  />
-))
+const CommandEmpty = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => {
+    const empty = useCommandState(state => state.filtered.count === 0)
+    return empty ? <div ref={ref} role="option" aria-disabled="true" aria-selected="false" className={cn('py-6 text-center font-code text-sm text-text-muted', className)} {...props} /> : null
+  }
+)
 
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName
 
@@ -89,7 +95,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-text-primary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-quiet",
+      "overflow-hidden p-1 text-text-primary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted",
       className
     )}
     {...props}
@@ -133,7 +139,7 @@ const CommandShortcut = ({
   return (
     <span
       className={cn(
-        "ml-auto text-xs tracking-widest text-text-quiet",
+        "ml-auto text-xs tracking-widest text-text-muted",
         className
       )}
       {...props}
