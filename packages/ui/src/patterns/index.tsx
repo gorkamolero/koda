@@ -67,7 +67,7 @@ export interface ApprovalCardProps extends HTMLAttributes<HTMLElement> {
 }
 export function ApprovalCard({ appearance = 'card', kind = 'command', title, reason, state = 'actionable', command, path, network, files, details, hostName, resolution = 'Approved once', busy = false, error, onApprove, onDeny, className, ...props }: ApprovalCardProps) {
   const id = useId(), disabled = state !== 'actionable' || busy
-  return <section aria-labelledby={props['aria-label'] ? undefined : id} data-testid="approval-card" className={cn('border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'space-y-2 border-text-accent/40 p-3 [&_h3]:text-xs [&_pre]:bg-transparent [&_pre]:p-0 [&_p]:text-text-muted' : 'space-y-3 border-border-accent p-4', className)} {...props}>
+  return <section aria-labelledby={props['aria-label'] ? undefined : id} data-testid="approval-card" className={cn('border bg-surface-card font-code text-xs text-text-primary', appearance === 'terminal' ? 'space-y-2 border-text-accent/40 p-3 [&_h3]:text-xs [&_pre]:bg-transparent [&_pre]:p-0 [&_p]:text-text-secondary' : 'space-y-3 border-border-accent p-4', className)} {...props}>
     <h3 id={id} className="text-sm font-medium">{title ?? `Permission needed · ${kind}`}</h3><p className="text-text-secondary">{reason}</p>
     {hostName && appearance !== 'terminal' && <p className="text-text-secondary">Workspace shared by {hostName}</p>}
     {command && <div><span className="text-text-secondary">Command</span><pre data-testid="approval-command" className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-sm bg-surface-card-muted p-2">{command}</pre></div>}

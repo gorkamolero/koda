@@ -72,6 +72,7 @@ export function ApprovalRequests({ sessionId, readOnly = false, hostName }: { se
       return <ApprovalCard
         key={request.id}
         appearance="terminal"
+        className="[&_p]:text-text-muted"
         data-testid="approval-card"
         data-approval-id={request.id}
         aria-label={`Permission request: ${request.toolName}`}
