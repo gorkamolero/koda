@@ -1,3 +1,4 @@
+import { Button, Input, Textarea, QuestionCard } from '@koda/ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { onNotification, rpcRequest } from '@/lib/tauri'
@@ -37,8 +38,8 @@ function QuestionFields({ question, answer, disabled, onChange }: { question: Ag
     {question.allowOther && (!hasOptions || answer.other) && <label className="block space-y-1">
       <span>{textLabel}</span>
       {question.isSecret
-        ? <input type="password" autoComplete="off" value={answer.text} onChange={event => onChange({ ...answer, text: event.target.value })} className="block w-full bg-transparent border border-border-subtle p-2" />
-        : <textarea autoComplete="off" value={answer.text} rows={2} onChange={event => onChange({ ...answer, text: event.target.value })} className="block w-full resize-y bg-transparent border border-border-subtle p-2" />}
+        ? <Input type="password" autoComplete="off" value={answer.text} onChange={event => onChange({ ...answer, text: event.target.value })} className="h-auto rounded-none block w-full bg-transparent border border-border-subtle p-2" />
+        : <Textarea autoComplete="off" value={answer.text} rows={2} onChange={event => onChange({ ...answer, text: event.target.value })} className="min-h-0 rounded-none block w-full resize-y bg-transparent border border-border-subtle p-2" />}
     </label>}
   </fieldset>
 }
@@ -82,18 +83,25 @@ function QuestionForm({ request, readOnly = false, hostName }: { request: Questi
     }
   }
 
-  return <form data-testid="question-card" data-request-id={request.id} aria-label="Agent question" autoComplete="off" onSubmit={event => { event.preventDefault(); void respond('submit') }} className="border border-text-accent/40 bg-surface-card p-3 space-y-4">
-    <div className="font-medium text-text-primary">{readOnly ? 'The agent is waiting for an answer' : 'Your answer is needed'}</div>
+  return <QuestionCard
+    appearance="terminal"
+    data-testid="question-card"
+    data-request-id={request.id}
+    aria-label="Agent question"
+    title={readOnly ? 'The agent is waiting for an answer' : 'Your answer is needed'}
+    state={readOnly ? 'read-only' : 'actionable'}
+    hostName={hostName === null ? '' : hostName}
+    requiresHost={secretElsewhere}
+    ready={ready}
+    busy={busy}
+    error={error ?? undefined}
+    submitLabel="Submit answers"
+    onSubmit={() => void respond('submit')}
+    onCancel={() => void respond('cancel')}
+    footerNote={!locked && !ready ? <p className="text-text-muted">Answer every question to continue.</p> : undefined}
+  >
     {request.questions.map(question => <QuestionFields key={question.id} question={question} answer={draft.get(question.id) ?? emptyAnswer()} disabled={busy || locked} onChange={answer => setDraft(current => new Map(current).set(question.id, answer))} />)}
-    {readOnly && <p data-testid="question-view-only" className="text-text-muted">View only: {hostName || 'the host'} or a collaborator with control can answer.</p>}
-    {!readOnly && secretElsewhere && <p data-testid="question-secret-on-host" className="text-text-muted">This asks for a secret, so {hostName || 'the host'} answers it on their machine.</p>}
-    {!locked && !ready && <p className="text-text-muted">Answer every question to continue.</p>}
-    {error && <p role="alert" className="text-status-error">{error}</p>}
-    <div className="flex flex-wrap gap-2">
-      <button type="submit" data-testid="question-submit" disabled={busy || locked || !ready} className="border border-border-subtle px-3 py-1 hover:text-text-accent disabled:opacity-50">{busy ? 'Sending…' : 'Submit answers'}</button>
-      <button type="button" data-testid="question-cancel" disabled={busy || locked} onClick={() => void respond('cancel')} className="border border-border-subtle px-3 py-1 hover:text-status-error disabled:opacity-50">Cancel and stop</button>
-    </div>
-  </form>
+  </QuestionCard>
 }
 
 function SessionQuestions({ sessionId, ...shared }: { sessionId: string } & Shared) {
@@ -116,7 +124,7 @@ function SessionQuestions({ sessionId, ...shared }: { sessionId: string } & Shar
   if (!isPending && !error && !pending.length) return null
   return <div data-testid="question-requests" aria-live="polite" className="border-b border-border-subtle px-4 py-2 text-xs space-y-2">
     {isPending && <p className="text-text-muted">Checking for questions…</p>}
-    {error && <div role="alert" className="text-status-error">Unable to load questions: {error.message} <button onClick={() => void refetch()} className="underline">Retry</button></div>}
+    {error && <div role="alert" className="text-status-error">Unable to load questions: {error.message} <Button variant="link" className="h-auto p-0 text-xs" onClick={() => void refetch()}>Retry</Button></div>}
     {pending.map(request => <QuestionForm key={request.id} request={request} {...shared} />)}
   </div>
 }

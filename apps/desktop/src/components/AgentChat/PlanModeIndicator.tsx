@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { cn } from '@/lib/utils'
 
 interface PlanStep {
@@ -37,7 +38,7 @@ export function PlanModeIndicator({
   const progressBar = '█'.repeat(filledChars) + '░'.repeat(barWidth - filledChars)
 
   return (
-    <div className="mx-4 mb-3 font-mono text-xs border border-dashed border-[--plan-border] bg-[#0a0a0a]">
+    <div className="mx-4 mb-3 font-mono text-xs border border-dashed border-[--plan-border] bg-[var(--black-soft)]">
       {/* Header */}
       <div className="px-3 py-1.5 border-b border-dashed border-[--plan-border]/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -45,12 +46,12 @@ export function PlanModeIndicator({
           <span className="text-[--plan-border]">[PLAN MODE]</span>
         </div>
         {onExitPlanMode && (
-          <button
+          <Button variant="unstyled"
             onClick={onExitPlanMode}
-            className="text-text-muted hover:text-text-accent transition-colors"
+            className="h-auto rounded-none border-0 p-0 text-text-muted hover:text-text-accent transition-colors"
           >
             [EXIT]
-          </button>
+          </Button>
         )}
       </div>
 

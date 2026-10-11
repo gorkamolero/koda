@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { memo, useCallback } from 'react'
 import { useSetAtom } from 'jotai'
 import { cn } from '@/lib/utils'
@@ -37,18 +38,18 @@ const ActionButton = memo(function ActionButton({
   variant = 'default',
 }: ActionButtonProps) {
   return (
-    <button
+    <Button variant="unstyled"
       onClick={onClick}
       title={title}
       className={cn(
-        'px-1.5 py-0.5 transition-colors text-xs',
+        'h-auto rounded-none border-0 px-1.5 py-0.5 transition-colors text-xs',
         variant === 'default' && 'text-text-muted hover:text-text-accent',
         variant === 'danger' && 'text-text-muted hover:text-status-error',
         isActive && 'text-[--git-green]'
       )}
     >
       {isActive && activeLabel ? activeLabel : label}
-    </button>
+    </Button>
   )
 })
 
@@ -81,7 +82,7 @@ export const MessageActionBar = memo(function MessageActionBar({
     <div
       className={cn(
         'flex items-center font-mono',
-        'bg-[#0a0a0a] border border-dashed border-border-subtle',
+        'bg-[var(--black-soft)] border border-dashed border-border-subtle',
         'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
         className
       )}

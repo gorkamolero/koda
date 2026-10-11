@@ -1,3 +1,4 @@
+import { Button } from '@koda/ui'
 import { memo, useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { ContentBlock, ToolUseContentBlock, ToolResultContentBlock } from '@/store/chat'
@@ -108,9 +109,9 @@ export const ToolCallSummary = memo(function ToolCallSummary({
   return (
     <div className={cn('font-mono text-xs', className)}>
       {/* Collapsed header */}
-      <button
+      <Button variant="unstyled"
         onClick={() => { setIsExpanded(!isExpanded) }}
-        className="w-full flex items-center gap-2 px-2 py-1 text-left hover:bg-surface-hover transition-colors border border-dashed border-border-subtle"
+        className="h-auto justify-start rounded-none w-full flex items-center gap-2 px-2 py-1 text-left hover:bg-surface-hover transition-colors border border-dashed border-border-subtle"
       >
         {isExpanded ? (
           <ChevronDown className="size-3 text-text-faint" />
@@ -127,7 +128,7 @@ export const ToolCallSummary = memo(function ToolCallSummary({
             ({statusParts.join(' ')})
           </span>
         )}
-      </button>
+      </Button>
 
       {/* Expanded details */}
       {isExpanded && (
