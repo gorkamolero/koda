@@ -171,11 +171,11 @@
   --status-success-foreground: var(--status-success);
   --status-warning-foreground: var(--status-warning);
   --status-error-foreground: var(--status-error);
-  --status-processing-foreground: var(--status-processing);
+  --status-processing-foreground: var(--text-action);
   --status-reviewing-foreground: var(--status-reviewing);
   --status-ready-foreground: var(--status-ready);
   --status-unread-foreground: var(--status-unread);
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
   --sidebar-width: 280px;
   --topbar-height: 44px;
   --right-panel-width: 230px;
@@ -346,7 +346,7 @@
   --status-reviewing-foreground: #0e7490;
   --status-ready-foreground: #166534;
   --status-unread-foreground: #1d4ed8;
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
 }
 
 [data-koda-theme="obsidian"] {
@@ -519,11 +519,11 @@
   --status-success-foreground: var(--status-success);
   --status-warning-foreground: var(--status-warning);
   --status-error-foreground: var(--status-error);
-  --status-processing-foreground: var(--status-processing);
+  --status-processing-foreground: var(--text-action);
   --status-reviewing-foreground: var(--status-reviewing);
   --status-ready-foreground: var(--status-ready);
   --status-unread-foreground: var(--status-unread);
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
 }
 
 [data-koda-theme="light"] {
@@ -700,7 +700,7 @@
   --status-reviewing-foreground: #0e7490;
   --status-ready-foreground: #166534;
   --status-unread-foreground: #1d4ed8;
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
 }
 
 [data-koda-theme="dim"] {
@@ -873,11 +873,11 @@
   --status-success-foreground: var(--status-success);
   --status-warning-foreground: var(--status-warning);
   --status-error-foreground: var(--status-error);
-  --status-processing-foreground: var(--status-processing);
+  --status-processing-foreground: var(--text-action);
   --status-reviewing-foreground: var(--status-reviewing);
   --status-ready-foreground: var(--status-ready);
   --status-unread-foreground: var(--status-unread);
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
 }
 
 [data-koda-theme="graphite"] {
@@ -1045,16 +1045,16 @@
   --text-on-control-hover: var(--text-primary);
   --text-on-control-disabled: var(--text-primary);
   --focus-ring-color: var(--text-action);
-  --text-action: var(--accent-terracotta);
+  --text-action: #f0a18c;
   --text-secondary: var(--warm-600);
   --status-success-foreground: var(--status-success);
   --status-warning-foreground: var(--status-warning);
-  --status-error-foreground: var(--status-error);
-  --status-processing-foreground: var(--status-processing);
+  --status-error-foreground: #fca5a5;
+  --status-processing-foreground: var(--text-action);
   --status-reviewing-foreground: var(--status-reviewing);
   --status-ready-foreground: var(--status-ready);
   --status-unread-foreground: var(--status-unread);
-  --status-unknown-foreground: var(--text-muted);
+  --status-unknown-foreground: var(--text-secondary);
 }
 
 .reduced-transparency {

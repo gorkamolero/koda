@@ -174,11 +174,11 @@ export const baseColorTokens = {
   "--status-success-foreground": "var(--status-success)",
   "--status-warning-foreground": "var(--status-warning)",
   "--status-error-foreground": "var(--status-error)",
-  "--status-processing-foreground": "var(--status-processing)",
+  "--status-processing-foreground": "var(--text-action)",
   "--status-reviewing-foreground": "var(--status-reviewing)",
   "--status-ready-foreground": "var(--status-ready)",
   "--status-unread-foreground": "var(--status-unread)",
-  "--status-unknown-foreground": "var(--text-muted)"
+  "--status-unknown-foreground": "var(--text-secondary)"
 } as const
 
 export type ThemeTokenName = keyof typeof baseColorTokens
@@ -359,7 +359,7 @@ export const lightClassTokens = {
   "--status-reviewing-foreground": "#0e7490",
   "--status-ready-foreground": "#166534",
   "--status-unread-foreground": "#1d4ed8",
-  "--status-unknown-foreground": "var(--text-muted)"
+  "--status-unknown-foreground": "var(--text-secondary)"
 } as const satisfies Partial<ThemeTokens>
 
 export interface ThemeDefinition {
@@ -476,6 +476,8 @@ export const kodaGraphiteTheme: ThemeDefinition = {
   variables: {
     ...baseColorTokens,
     "--text-secondary": "var(--warm-600)",
+    "--text-action": "#f0a18c",
+    "--status-error-foreground": "#fca5a5",
     "--text-primary": "#cdd0d4",
     "--text-strong": "#eceef1",
     "--text-emphasis": "#dde0e4",
