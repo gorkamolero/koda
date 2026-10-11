@@ -1,0 +1,14 @@
+import * as React from 'react'
+import * as CheckboxPrimitive from '@radix-ui/react-checkbox'
+import * as RadioPrimitive from '@radix-ui/react-radio-group'
+import * as SwitchPrimitive from '@radix-ui/react-switch'
+import { Check, Minus } from 'lucide-react'
+import { cn, focusRing } from './utils'
+export const Checkbox = React.forwardRef<React.ElementRef<typeof CheckboxPrimitive.Root>, React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>>(({ className, checked, defaultChecked, ...props }, ref) => <CheckboxPrimitive.Root ref={ref} checked={checked} defaultChecked={defaultChecked} className={cn('inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-border-strong bg-surface-control text-text-primary disabled:opacity-50 data-[state=checked]:border-border-accent data-[state=indeterminate]:border-border-accent', focusRing, className)} {...props}><CheckboxPrimitive.Indicator>{checked === 'indeterminate' || (!checked && defaultChecked === 'indeterminate') ? <Minus className="size-3" /> : <Check className="size-3" />}</CheckboxPrimitive.Indicator></CheckboxPrimitive.Root>)
+Checkbox.displayName = 'Checkbox'
+export const RadioGroup = React.forwardRef<React.ElementRef<typeof RadioPrimitive.Root>, React.ComponentPropsWithoutRef<typeof RadioPrimitive.Root>>(({ className, ...props }, ref) => <RadioPrimitive.Root ref={ref} className={cn('grid gap-3 font-code text-sm text-text-primary', className)} {...props} />)
+RadioGroup.displayName = 'RadioGroup'
+export const RadioGroupItem = React.forwardRef<React.ElementRef<typeof RadioPrimitive.Item>, React.ComponentPropsWithoutRef<typeof RadioPrimitive.Item>>(({ className, ...props }, ref) => <RadioPrimitive.Item ref={ref} className={cn('inline-flex size-4 items-center justify-center rounded-full border border-border-strong bg-surface-control disabled:opacity-50 data-[state=checked]:border-border-accent', focusRing, className)} {...props}><RadioPrimitive.Indicator className="size-2 rounded-full bg-text-primary" /></RadioPrimitive.Item>)
+RadioGroupItem.displayName = 'RadioGroupItem'
+export const Switch = React.forwardRef<React.ElementRef<typeof SwitchPrimitive.Root>, React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>>(({ className, ...props }, ref) => <SwitchPrimitive.Root ref={ref} className={cn('inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border-strong bg-surface-control transition-colors duration-fast data-[state=checked]:bg-surface-active data-[state=checked]:border-border-accent disabled:opacity-50', focusRing, className)} {...props}><SwitchPrimitive.Thumb className="block size-3.5 rounded-full bg-text-primary transition-transform duration-fast data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5" /></SwitchPrimitive.Root>)
+Switch.displayName = 'Switch'
