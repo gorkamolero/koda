@@ -135,7 +135,7 @@ Two developers collaborate on same repo(s). Each has agents on their own machine
 - [x] View/control checks and revoked-control rejection proved at the host's authorization boundary.
 - [ ] Cross-machine test (two Macs), after the same-machine proof
 
-Hosted collaboration uses a Cloudflare Worker with D1, signed Ed25519 install identities, room ownership and revocable join-code grants. Only the Worker holds the Liveblocks secret. Settings supplies the display name and advanced service URL; first share registers automatically. There are no accounts or device recovery in this version. The service has not been deployed, and the release default URL is empty. Development/self-host mode still accepts a local `LIVEBLOCKS_SECRET_KEY`. Playwright proofs run both modes with real Liveblocks; Chromium captures do not claim native WKWebView automation.
+Hosted collaboration uses a Cloudflare Worker with D1, signed Ed25519 install identities, room ownership and revocable join-code grants. Only the Worker holds the Liveblocks secret. Settings supplies the display name and advanced service URL; first share registers automatically. There are no accounts or device recovery in this version. The deployed default is `https://koda-collaboration.gorka-molero.workers.dev`; a local secret does not override service mode. Development-key mode requires both `KODA_COLLAB_MODE=development` and `LIVEBLOCKS_SECRET_KEY`. Owners redeploy with `pnpm collab:deploy`. Playwright proofs run both modes with real Liveblocks; Chromium captures do not claim native WKWebView automation.
 
 ### Sync Technology Options
 1. **Liveblocks** — Managed real-time sync, presence, shared state
