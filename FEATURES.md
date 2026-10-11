@@ -4,6 +4,20 @@ Living document for planned features.
 
 > **Status, 2026-10-08:** Real Codex and Claude flows cover interactive approvals, persisted permissions, restart, and two-instance Liveblocks collaboration. New chats select either agent and its discovered models. Settings controls the default agent and permissions; this setup defaults to bypass for new chats. Host-side checks enforce view/control invitations. See `VERIFY.md` for reproduction commands, native-versus-browser verification scope, and the clean-clone evidence manifest for the commit under review.
 
+## Shared design system and Storybook
+
+**Status:** Package implementation; desktop component migration deferred. See [DESIGN.md](DESIGN.md).
+
+- [x] `@koda/ui` workspace package with shared tokens, typed foundations and a Tailwind preset.
+- [x] Four complete themes: Obsidian, Light, Dim and Graphite; desktop token-only integration preserves existing resolved values.
+- [x] All 40 component groups from the design-system brief, with presentational props and accessible keyboard behavior.
+- [x] Storybook with variant/state stories, generated props docs, theme toolbar, accessibility and browser interaction tests.
+- [x] Introduction, Foundations, Brand, Patterns, and host/collaborator App screens.
+- [x] Token lint errors in `packages/ui`, migration warnings in desktop.
+- [x] Static Storybook and official GitHub Pages workflow prepared for pushes to `main`.
+- [ ] Migrate desktop feature components and remove unused vendored primitives after checking callers.
+- [ ] Enable/publish the public Storybook after owner review; no deployment or repository settings changed in this run.
+
 ## Codex and Claude desktop flow
 
 - [x] Add a local repository and create an isolated git worktree through the UI.

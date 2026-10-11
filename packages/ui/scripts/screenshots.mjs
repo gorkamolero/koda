@@ -39,10 +39,11 @@ try {
       await page.evaluate(() => document.fonts.ready)
       const themeAttribute = await page.locator('html').getAttribute('data-koda-theme')
       if (themeAttribute !== theme.toLowerCase()) throw new Error(`${story}: expected ${theme}, got ${themeAttribute}`)
+      const terminal = await page.locator('section[aria-label^="Terminal"] pre').evaluateAll(nodes => nodes.map(node => ({ color: getComputedStyle(node).color, terminalToken: getComputedStyle(node).getPropertyValue('--text-on-terminal'), textLength: node.textContent.length })))
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
       const screenshot = `${theme.toLowerCase()}-${story}.png`
       await page.screenshot({ path: resolve(output, screenshot), fullPage: true, animations: 'disabled' })
-      results.push({ theme, story, screenshot, themeAttribute, overflow, errors })
+      results.push({ theme, story, screenshot, themeAttribute, overflow, errors, terminal })
       await page.close()
     }
   }

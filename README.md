@@ -57,10 +57,29 @@ See [VERIFY.md](./VERIFY.md) for the real-service proofs, screenshots, separate-
 ### Test
 
 ```bash
-pnpm test      # Run Worker, sidecar and desktop unit tests
+pnpm test      # Run UI, Worker, sidecar and desktop unit tests
 pnpm --filter @koda/sidecar test   # Sidecar unit tests
 pnpm --filter e2e test:proof        # Maintained real-service proofs (Playwright)
 ```
+
+---
+
+## Storybook
+
+The shared `@koda/ui` package documents Koda's four themes and all 40 design-system component groups, with props, variants, keyboard interactions and accessibility tests. Explore the foundations, brand, collaboration patterns, and composed host/collaborator workspace screens.
+
+```bash
+pnpm storybook          # Local explorer at http://localhost:6006
+pnpm build-storybook    # Static build
+pnpm --filter @koda/ui exec playwright install chromium
+pnpm test-storybook     # Browser stories and accessibility checks
+```
+
+Future public Storybook: [gorkamolero.github.io/koda](https://gorkamolero.github.io/koda/). The Pages workflow deploys after changes reach `main`; this implementation branch does not publish it.
+
+![Koda Storybook: host workspace composed from the shared design system](docs/design-system.png)
+
+See [DESIGN.md](./DESIGN.md) for tokens, the component inventory, lint enforcement, and the later desktop migration. Desktop uses the shared foundations now; its component copies remain until that migration.
 
 ---
 
@@ -105,6 +124,7 @@ koda/
 │       │   ├── db/       # SQLite schema + migrations
 │       │   └── rpc/      # JSON-RPC router
 │       └── tests/
+├── packages/ui/          # Shared tokens, components and Storybook
 ├── e2e/                  # Playwright E2E tests
 ├── docs/                 # Extended documentation
 ├── SPEC.md              # Full architecture spec
@@ -140,6 +160,7 @@ Not just code diffs — before/after screenshots of your running app. See what c
 |-----|-------------|
 | [SPEC.md](./SPEC.md) | Full architecture and design spec |
 | [FEATURES.md](./FEATURES.md) | Feature roadmap and status |
+| [DESIGN.md](./DESIGN.md) | Design system, Storybook and token rules |
 | [VERIFY.md](./VERIFY.md) | Reproduce the Codex, Claude, and collaboration proofs |
 | [API.md](./API.md) | JSON-RPC method reference |
 | [docs/koda-collaboration.md](./docs/koda-collaboration.md) | Collaboration architecture |

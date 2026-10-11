@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-11",
+  "branch": "codex/design-system",
+  "scope": "Design system and desktop token-only integration; component migration deferred",
+  "storybook": "10.6.1",
+  "componentGroups": 40,
+  "componentDocs": 61,
+  "stories": 303,
+  "pages": [
+    "Introduction",
+    "Foundations",
+    "Brand",
+    "Patterns",
+    "App screens (host and collaborator)"
+  ],
+  "checks": {
+    "pnpm build": "passed",
+    "pnpm lint": {
+      "result": "passed",
+      "uiWarnings": 0,
+      "desktopMigrationWarnings": 311
+    },
+    "pnpm test": {
+      "result": "passed",
+      "tests": 770,
+      "ui": 42,
+      "desktop": 237,
+      "sidecar": 486,
+      "collabService": 5
+    },
+    "pnpm --filter desktop test": {
+      "result": "passed",
+      "tests": 237
+    },
+    "pnpm build-storybook": "passed",
+    "pnpm --filter @koda/ui test-storybook:themes": {
+      "result": "passed",
+      "storiesPerTheme": 303,
+      "themes": [
+        "Obsidian",
+        "Light",
+        "Dim",
+        "Graphite"
+      ],
+      "totalStoryRuns": 1212,
+      "a11y": "error",
+      "disabledRules": []
+    },
+    "pnpm --filter @koda/ui screenshots": {
+      "result": "passed",
+      "storyCaptures": 16,
+      "managerCaptures": 1,
+      "base": "/koda/",
+      "visualReview": "Inspected all themed captures; no remaining visibly broken content",
+      "overflow": false,
+      "pageErrors": []
+    }
+  },
+  "tokenParity": {
+    "originalTokensPerTheme": 147,
+    "themes": 4,
+    "result": "All original resolved values unchanged"
+  },
+  "publication": {
+    "pushedBranch": "codex/design-system",
+    "deployed": false,
+    "repositorySettingsChanged": false,
+    "workflowTrigger": "push to main only"
+  },
+  "deferred": [
+    "Desktop component migration and unused vendored primitive removal",
+    "Owner-controlled Pages publication",
+    "Real-service e2e proofs (not run per scope)"
+  ]
+}
