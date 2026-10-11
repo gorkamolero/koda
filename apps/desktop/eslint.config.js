@@ -3,6 +3,7 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
+import koda from '@koda/ui/eslint'
 
 export default tseslint.config(
   { ignores: ['dist', 'src-tauri'] },
@@ -37,6 +38,12 @@ export default tseslint.config(
         { checksVoidReturn: { attributes: false } },
       ],
     },
+  },
+  // Migration preparation: report existing raw values without blocking desktop.
+  {
+    files: ['src/components/**/*.{ts,tsx}', 'src/pages/**/*.{ts,tsx}'],
+    plugins: { koda },
+    rules: { 'koda/no-raw-tokens': 'warn' },
   },
   // Test files - relax method binding checks for mocks
   {
