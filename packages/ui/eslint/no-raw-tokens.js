@@ -5,6 +5,7 @@ const pixels = /(?:^|[^\w-])-?(?:\d*\.)?\d+px\b/
 const colorProperty = /^(?:color|background(?:Color|Image)?|border(?:Top|Right|Bottom|Left|Block|Inline)?(?:Start|End)?Color|outlineColor|fill|stroke|boxShadow|textShadow|caretColor|accentColor)$/
 const pixelProperty = /^(?:(?:min|max)?(?:Width|Height)|width|height|(?:padding|margin|inset)(?:Top|Right|Bottom|Left|Block|Inline|Start|End)?|top|right|bottom|left|gap|rowGap|columnGap|border(?:Top|Right|Bottom|Left)?Width|border(?:TopLeft|TopRight|BottomLeft|BottomRight)?Radius|outlineWidth|outlineOffset|fontSize|letterSpacing|wordSpacing|textIndent|verticalAlign|perspective|flexBasis)$/
 const cssColorProperty = /^(?:color|background(?:-color|-image)?|border(?:-[\w-]+)?|outline(?:-color)?|fill|stroke|(?:box|text)-shadow|caret-color|accent-color)$/
+const tokenColorFunction = /\b(?:rgba?|hsla?)\(\s*var\(--[\w-]+\)(?:\s*\/\s*[\d.]+%?)?\s*\)/g
 const rawCssColor = /(?:^|[\s,(])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|(?:^|[\s,(])(?:black|white|red|green|blue|yellow|orange|purple|pink|gray|grey|silver|gold|navy|teal|aqua|lime|maroon|olive|fuchsia|rebeccapurple)(?=$|[\s,)])/i
 
 export default {
@@ -100,7 +101,7 @@ export default {
         if (node.callee.type !== 'Identifier' || node.callee.name !== '__kodaCss') return
         const [property, value] = node.arguments
         if (property?.type !== 'Literal' || value?.type !== 'Literal' || typeof property.value !== 'string' || typeof value.value !== 'string') return
-        if ((cssColorProperty.test(property.value) || property.value.startsWith('--')) && rawCssColor.test(value.value)) report(value, 'a raw CSS color')
+        if ((cssColorProperty.test(property.value) || property.value.startsWith('--')) && rawCssColor.test(value.value.replace(tokenColorFunction, ''))) report(value, 'a raw CSS color')
       },
     }
   },

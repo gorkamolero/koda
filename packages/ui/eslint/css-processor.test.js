@@ -14,6 +14,7 @@ function lint(source, severity = 'error') {
 describe('token CSS enforcement', () => {
   it('accepts token declarations and documented exceptions', () => {
     expect(lint('.label { color: var(--text-primary); padding: var(--space-4); }')).toEqual([])
+    expect(lint('.legacy { color: hsl(var(--primary)); background: rgb(var(--surface-rgb) / 0.5); }')).toEqual([])
     expect(lint('/* koda-token-file: Canonical theme token definitions. */\n:root { --text-primary: #fff; --space-4: 16px; }')).toEqual([])
     expect(lint('.terminal { /* koda-token-exception: External terminal palette is required here. */\ncolor: #fff; }')).toEqual([])
   })
