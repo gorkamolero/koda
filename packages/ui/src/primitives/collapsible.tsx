@@ -6,7 +6,7 @@ import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
 
 const Collapsible = CollapsiblePrimitive.Root
 
-function CollapsibleTrigger(props: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) { return <CollapsiblePrimitive.CollapsibleTrigger {...props} className={cn("font-code focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-accent", props.className)} /> }
+function CollapsibleTrigger(props: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) { return <CollapsiblePrimitive.CollapsibleTrigger {...props} className={cn("font-code focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus", props.className)} /> }
 
 const CollapsibleContent = CollapsiblePrimitive.CollapsibleContent
 

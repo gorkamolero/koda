@@ -33,13 +33,19 @@ function CommandSelectionA11y({ root }: { root: React.RefObject<HTMLDivElement> 
 }
 Command.displayName = CommandPrimitive.displayName
 
-const CommandDialog = ({ children, ...props }: DialogProps) => {
+export interface CommandDialogProps extends DialogProps {
+  /** Props for the command's DOM root, including ARIA, callbacks and test ids. */
+  commandProps?: Omit<React.ComponentPropsWithoutRef<typeof Command>, 'children'> & { [attribute: `data-${string}`]: string | number | boolean | undefined }
+  /** Customize the modal surface without replacing its focus management. */
+  contentProps?: Omit<React.ComponentPropsWithoutRef<typeof DialogContent>, 'children'>
+}
+const CommandDialog = ({ children, commandProps, contentProps, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0">
+      <DialogContent {...contentProps} className={cn("overflow-hidden p-0", contentProps?.className)}>
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <DialogDescription className="sr-only">Search commands and files</DialogDescription>
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4">
+        <Command label="Command palette" {...commandProps} className={cn("[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-secondary [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4", commandProps?.className)}>
           {children}
         </Command>
       </DialogContent>
@@ -56,7 +62,7 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-10 w-full rounded-md bg-transparent py-3 font-code text-sm outline-none focus-visible:ring-2 focus-visible:ring-border-accent placeholder:text-text-muted disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full rounded-md bg-transparent py-3 font-code text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -82,7 +88,7 @@ CommandList.displayName = CommandPrimitive.List.displayName
 const CommandEmpty = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
     const empty = useCommandState(state => state.filtered.count === 0)
-    return empty ? <div ref={ref} role="option" aria-disabled="true" aria-selected="false" className={cn('py-6 text-center font-code text-sm text-text-muted', className)} {...props} /> : null
+    return empty ? <div ref={ref} role="option" aria-disabled="true" aria-selected="false" className={cn('py-6 text-center font-code text-sm text-text-secondary', className)} {...props} /> : null
   }
 )
 
@@ -95,7 +101,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-text-primary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted",
+      "overflow-hidden p-1 text-text-primary [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-secondary",
       className
     )}
     {...props}
@@ -139,7 +145,7 @@ const CommandShortcut = ({
   return (
     <span
       className={cn(
-        "ml-auto text-xs tracking-widest text-text-muted",
+        "ml-auto text-xs tracking-widest text-text-secondary",
         className
       )}
       {...props}
