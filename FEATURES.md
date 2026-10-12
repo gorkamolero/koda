@@ -14,7 +14,7 @@ Living document for planned features.
 - [x] Storybook with variant/state stories, generated props docs, theme toolbar, accessibility and browser interaction tests.
 - [x] Introduction, Foundations, Brand, Patterns, and host/collaborator App screens.
 - [x] Token lint errors in `packages/ui` and desktop components, pages and CSS; documented external renderer adapters only.
-- [x] Public Storybook on GitHub Pages at https://gorkamolero.github.io/koda/ (`pnpm storybook:pages`), mirrored on Cloudflare Pages at https://koda-storybook.pages.dev (`pnpm storybook:deploy`).
+- [x] Public Storybook on GitHub Pages at https://gorkamolero.github.io/koda/ (`pnpm storybook:pages`).
 - [x] Migrate desktop feature components, unify dialogs/file trees/question cards, and remove unused vendored primitives and their dependencies.
 - [x] Preserve proof test IDs, accessible names, native selects and view/control permission behavior.
 - [ ] Enable/publish the public Storybook after owner review; no deployment or repository settings changed in this run.

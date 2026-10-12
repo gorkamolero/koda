@@ -6,7 +6,7 @@ const config: StorybookConfig = {
   framework: '@storybook/react-vite',
   typescript: { reactDocgen: 'react-docgen-typescript' },
   core: { disableTelemetry: true },
-  // The public Storybook is served from a site root (Cloudflare Pages); STORYBOOK_BASE serves it from a subpath.
+  // Builds for a site root by default; STORYBOOK_BASE serves it from a subpath (GitHub Pages uses /koda/).
   async viteFinal(config) {
     return { ...config, base: process.env.STORYBOOK_BASE ?? '/', optimizeDeps: { ...config.optimizeDeps, include: [...(config.optimizeDeps?.include ?? []), 'react/jsx-dev-runtime'] } }
   },
